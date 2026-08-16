@@ -76,5 +76,9 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   the editor, not the shell, so this one is on you. Absence of a permission gate is not permission: under
   `danger-full-access`, `skip-permissions`, or `yolo`, you ask, because the
   environment no longer will.
-- **G5 UI states, G6 commit audit.** Long forms live with their skills
-  (`ui`, `land`).
+- **G6 The change under review.** It is everything since the branch point:
+  `git diff <base>...HEAD` plus staged plus unstaged. `--staged` alone reviews
+  nothing once work has been committed, which G11 requires every few steps.
+  Two passes over it before landing: once for secrets, once for whether the
+  message matches what changed.
+- **G5 UI states.** The long form lives with `ui`.

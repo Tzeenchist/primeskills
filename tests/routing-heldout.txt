@@ -1,0 +1,32 @@
+# Held-out routing queries. Written as a user actually asks, deliberately not
+# from the skill descriptions, and half in Russian. The lexical linter cannot
+# score these -- that is the point; they exist for the model-based check.
+# format: query -> expected skill
+у меня падает тест, разберись -> debug
+почему при делении сумма не сходится -> debug
+надо добавить эндпоинт для отчётов -> build
+допиши функцию и покрой тестами -> build
+я не понимаю, что ты имел в виду -> baby
+объясни попроще, я не программист -> baby
+прежде чем кодить, давай поймём, что вообще нужно -> brief
+у меня есть идея, но она сырая -> brief
+разбей это на задачи по порядку -> plan
+а нам вообще это нужно строить? -> ceo
+посмотри на архитектуру, что сломается -> eng
+проверь состояния экрана и клавиатуру -> beauty
+собери мнения со всех сторон по плану -> teams
+доведи от идеи до готового плана -> autoplan
+пройди по коду перед мержем -> vet
+потыкай приложение руками, найди баги -> probe
+запушь и открой пулреквест -> land
+сделай пустое состояние и ошибку на этом экране -> ui
+я упираюсь в лимит, сохрани контекст -> handoff
+это точно готово? проверь -> verify
+включи защиту от опасных команд -> fence
+крути цикл пока тесты не позеленеют -> cycle
+доведи до пулреквеста -> close
+I think this is done, double check it -> verify
+this keeps failing and I do not know why -> debug
+walk me through what you just said -> baby
+is this even the right thing to build -> ceo
+stop me from wiping anything by accident -> fence

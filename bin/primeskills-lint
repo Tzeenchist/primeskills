@@ -17,6 +17,7 @@ DESC_MAX = 140
 DEFAULT_BUDGET = 800
 REF_BUDGET = 700             # one reference file
 REF_TOTAL_BUDGET = 1200      # all references of one skill
+PARAPHRASE = 0.34            # share of a core rule's words an invariant may echo
 CORE_BUDGET = 1600          # always-loaded files; a ceiling, not a target
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
@@ -63,6 +64,39 @@ def steps_of(procedure):
     return steps
 
 
+def core_rules(core_dir):
+    """Canonical rules with their ids, so a skill can cite instead of restate.
+
+    F8 only catches copied lines. The commoner failure is a paraphrase: the
+    same rule reworded, which drifts from the original and then contradicts it.
+    """
+    rules = {}
+    g = (core_dir / "GUARDRAILS.md")
+    if g.is_file():
+        for m in re.finditer(r"\*\*(G\d+)[^*]*\*\*(.+?)(?=\n- \*\*|\n## |\Z)",
+                             g.read_text(encoding="utf-8"), re.S):
+            rules[m.group(1)] = m.group(2)
+    pr = (core_dir / "PRINCIPLES.md")
+    if pr.is_file():
+        for m in re.finditer(r"^## (\d+)\. (.+?)\n(.*?)(?=\n## |\Z)",
+                             pr.read_text(encoding="utf-8"), re.S | re.M):
+            rules["P" + m.group(1)] = m.group(2) + " " + m.group(3)
+    return {k: significant(v) for k, v in rules.items()}
+
+
+STOPWORDS = {
+    "the", "a", "an", "and", "or", "not", "is", "are", "was", "be", "to", "of",
+    "in", "on", "it", "that", "this", "for", "with", "you", "your", "as", "at",
+    "by", "from", "but", "if", "no", "any", "all", "one", "own", "than", "then",
+    "what", "when", "which", "who", "does", "do", "did", "can", "will", "would",
+}
+
+
+def significant(text):
+    words = re.findall(r"[a-z][a-z0-9-]{2,}", text.lower())
+    return {w for w in words if w not in STOPWORDS}
+
+
 def list_items(section):
     """Whole bullets, continuation lines folded in."""
     items, buf = [], None
@@ -86,7 +120,7 @@ def normalize(line):
     return re.sub(r"\s+", " ", line.lower()).rstrip(".")
 
 
-def check_skill(path, seen_invariants, problems):
+def check_skill(path, seen_invariants, problems, rules=None):
     def bad(rule, msg):
         problems.append((path, rule, msg))
 
@@ -150,6 +184,15 @@ def check_skill(path, seen_invariants, problems):
         else:
             seen_invariants[key] = path.parent.name
 
+        terms = significant(item)
+        for rid, rule_terms in (rules or {}).items():
+            if rid in item or not rule_terms:
+                continue          # already cited: that is the wanted shape
+            shared = terms & rule_terms
+            if len(shared) / len(rule_terms) >= PARAPHRASE:
+                bad("F12", f"invariant restates {rid} without citing it "
+                           f"(shared: {', '.join(sorted(shared)[:6])}): {key[:50]}")
+
     # F11: references are instructions too. Without a cap they become the place
     # excess text goes while F4 stays green.
     total = 0
@@ -188,9 +231,10 @@ def main(argv):
         print(f"nothing to lint under {root}", file=sys.stderr)
         return 1
 
+    rules = core_rules(core) if core.is_dir() else {}
     seen, problems = {}, []
     for path in files:
-        check_skill(path, seen, problems)
+        check_skill(path, seen, problems, rules)
     if core.is_dir():
         check_core(core, problems)
 

@@ -9,8 +9,13 @@ LINT = ROOT / "bin" / "primeskills-lint"
 ROUTE = ROOT / "bin" / "primeskills-route"
 FIXTURES = ROOT / "tests" / "fixtures"
 
+# cases whose skills live in a skills/ subdir because they carry their own core/
+NESTED = {"f12-paraphrase", "f12-cited"}
+
 EXPECT = {
     "ok": None,
+    "f12-paraphrase": "F12",
+    "f12-cited": None,
     "f1-no-frontmatter": "F1",
     "f2-name-mismatch": "F2",
     "f3-long-description": "F3",
@@ -33,7 +38,8 @@ def run(cmd):
 def main():
     failures = []
     for case, rule in sorted(EXPECT.items()):
-        code, out = run([sys.executable, str(LINT), str(FIXTURES / case)])
+        path = FIXTURES / case / "skills" if case in NESTED else FIXTURES / case
+        code, out = run([sys.executable, str(LINT), str(path)])
         if rule is None:
             if code != 0:
                 failures.append(f"{case}: expected clean, got:\n{out}")
