@@ -34,6 +34,14 @@ PREFIX = "prime-"
 # makes core reachable. Markers keep uninstall exact.
 BEGIN, END = "<!-- primeskills:begin -->", "<!-- primeskills:end -->"
 CORE_FILES = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
+# Read-only agent profiles. Paths and frontmatter come from each project's own
+# documentation; four guesses beforehand all failed, and the docs took a minute.
+PROFILES = {
+    "opencode": (HOME / ".config" / "opencode" / "agents" / "prime-analyst.md",
+                 ROOT / "adapters" / "opencode" / "prime-analyst.md"),
+    "kimi": (HOME / ".kimi-code" / "agents" / "prime-analyst.md",
+             ROOT / "adapters" / "kimi" / "prime-analyst.md"),
+}
 ALWAYS_LOADED = {
     "claude": HOME / ".claude" / "CLAUDE.md",
     "codex": HOME / ".codex" / "AGENTS.md",
@@ -60,6 +68,21 @@ def strip_block(text):
     head, rest = text.split(BEGIN, 1)
     tail = rest.split(END, 1)[1] if END in rest else ""
     return (head.rstrip() + "\n" + tail.lstrip()).strip() + "\n", True
+
+
+def profile(agent, apply_it, remove):
+    """Link the read-only profile where the host looks for it."""
+    if agent not in PROFILES:
+        return None
+    dest, src = PROFILES[agent]
+    if apply_it:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.is_symlink() or dest.exists():
+            dest.unlink()
+        if not remove:
+            dest.symlink_to(src)
+    return ("prime-analyst removed" if remove else
+            f"prime-analyst linked into {dest.parent.name}/")
 
 
 def bootstrap(agent, apply_it, remove):
@@ -201,6 +224,7 @@ def main():
             if args.apply:
                 kimi_apply(not args.uninstall)
             print(f"kimi: {bootstrap('kimi', args.apply, args.uninstall)}")
+            print(f"kimi: {profile('kimi', args.apply, args.uninstall)}")
             continue
 
         if agent not in TARGETS:
@@ -225,6 +249,9 @@ def main():
         note = f"  (renamed on collision: {', '.join(renamed)})" if renamed else ""
         print(f"{agent}: {verb} {len(plan_agent(agent))} skills in {root}{note}")
         print(f"{agent}: {bootstrap(agent, args.apply, args.uninstall)}")
+        note = profile(agent, args.apply, args.uninstall)
+        if note:
+            print(f"{agent}: {note}")
 
     if not args.apply:
         print("\nnothing changed. Re-run with --apply.")

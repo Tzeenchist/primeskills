@@ -89,6 +89,16 @@ def check_hooks_declared(r):
                "armed when fence is invoked" if matcher in text else "missing")
 
 
+def check_profile(r, agent, dest):
+    """The read-only profile must be where the host looks, and be ours."""
+    if not dest.exists():
+        r.line(FAIL, agent, "prime-analyst profile", f"missing at {dest}")
+    elif str(ROOT) not in str(dest.resolve()):
+        r.line(WARN, agent, "prime-analyst profile", "present but not ours")
+    else:
+        r.line(OK, agent, "prime-analyst profile", dest.parent.name + "/")
+
+
 def main():
     r = Report()
     print("primeskills doctor\n")
@@ -110,6 +120,8 @@ def main():
     else:
         r.line(WARN, "opencode", "core reachable", "no config")
 
+    check_profile(r, "opencode", HOME / ".config" / "opencode" / "agents" / "prime-analyst.md")
+
     kimi = HOME / ".kimi-code" / "config.toml"
     if kimi.is_file():
         dirs = tomllib.loads(kimi.read_text(encoding="utf-8")).get("extra_skill_dirs", [])
@@ -117,6 +129,7 @@ def main():
         r.line(OK if hit else FAIL, "kimi", "skills linked",
                "extra_skill_dirs" if hit else "path not listed")
         check_core(r, "kimi", HOME / ".kimi-code" / "AGENTS.md", "primeskills:begin")
+        check_profile(r, "kimi", HOME / ".kimi-code" / "agents" / "prime-analyst.md")
     else:
         r.line(WARN, "kimi", "skills linked", "no config")
 

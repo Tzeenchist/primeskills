@@ -18,10 +18,10 @@ SUPPORT = [
      "allowed-tools enforced; the shell is not covered (G7)"),
     ("Codex", "skills + core pointer in ~/.codex/AGENTS.md",
      "profile prime-analyst parses and is accepted; sandbox not exercised"),
-    ("OpenCode", "skills + core in instructions",
-     "read-only agent profile: unresolved"),
-    ("Kimi", "extra_skill_dirs + core pointer in ~/.kimi-code/AGENTS.md",
-     "agent profile: not attempted"),
+    ("OpenCode", "skills + core in instructions + prime-analyst profile",
+     "profile registered; permission edit/write deny"),
+    ("Kimi", "extra_skill_dirs + core pointer + prime-analyst profile",
+     "profile registered; Edit/Write/NotebookEdit denied"),
 ]
 
 
