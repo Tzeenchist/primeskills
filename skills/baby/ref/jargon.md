@@ -1,0 +1,84 @@
+# Terms worth glossing
+
+Gloss one of these the first time it appears in a session, even if the
+user typed it first. One clause, not a lecture. Ported from gstack's
+curated list (77 terms); it is a prompt to explain, not a
+dictionary to paste.
+
+- CAP theorem
+- CORS
+- CSR
+- CSRF
+- DDoS
+- GC pause
+- GIL
+- N+1
+- N+1 query
+- OLAP
+- OLTP
+- SQL injection
+- SSR
+- XSS
+- backpressure
+- bloom filter
+- buffer overflow
+- bundle splitting
+- cache stampede
+- canary deploy
+- cascade delete
+- circuit breaker
+- closure
+- code splitting
+- cold start
+- composite index
+- consistent hashing
+- covering index
+- cyclomatic complexity
+- dangling pointer
+- dead letter queue
+- deadlock
+- debounce
+- eventual consistency
+- fan-in
+- fan-out
+- feature flag
+- foreign key
+- green-blue deploy
+- heap fragmentation
+- hoisting
+- hot reload
+- hydration
+- hydration mismatch
+- idempotency
+- idempotent
+- inbox pattern
+- kill switch
+- load balancer
+- memoization
+- memory leak
+- mmap
+- null pointer
+- optimistic locking
+- outbox pattern
+- pessimistic locking
+- prompt injection
+- quorum
+- race condition
+- rate limit
+- reconciliation
+- replication lag
+- reverse proxy
+- saga
+- sharding
+- soft delete
+- stack overflow
+- tail call
+- throttle
+- throttle (UI)
+- thundering herd
+- tombstone
+- tree-shaking
+- two-phase commit
+- virtual DOM
+- warm start
+- zero-copy

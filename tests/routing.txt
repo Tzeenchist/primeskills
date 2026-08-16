@@ -14,3 +14,9 @@ check the interface states and accessibility -> beauty
 what do I actually want here -> brief
 run the whole review panel -> teams
 idea to approved plan in one pass -> autoplan
+review my diff before the PR -> vet
+click through the app and find bugs -> probe
+open a pull request for this -> land
+build the empty and error states -> ui
+what does that term mean -> baby
+get this reviewed and into a pull request -> close

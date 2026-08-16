@@ -17,6 +17,9 @@ MARGIN = 0.15  # top score must beat the runner-up by this much
 STOP = {
     "the", "a", "an", "to", "of", "for", "in", "on", "is", "it", "this", "that",
     "use", "when", "before", "after", "and", "or", "any", "my", "me", "i",
+    # question and filler words: they say a question is being asked, never which
+    "what", "does", "did", "how", "why", "who", "can", "should", "will",
+    "would", "there", "here", "then", "than", "with", "over", "once", "some",
 }
 
 
@@ -37,6 +40,7 @@ def terms(text):
 
 
 def load(skills_dir):
+    """name -> (tier, terms). Tier defaults to "skill"; flows declare tier: flow."""
     out = {}
     for path in sorted(Path(skills_dir).glob("*/SKILL.md")):
         text = path.read_text(encoding="utf-8")
@@ -44,7 +48,10 @@ def load(skills_dir):
             continue
         end = text.find("\n---\n", 4)
         meta = yaml.safe_load(text[4:end]) or {}
-        out[meta.get("name", path.parent.name)] = terms(str(meta.get("description", "")))
+        out[meta.get("name", path.parent.name)] = (
+            meta.get("tier", "skill"),
+            terms(str(meta.get("description", ""))),
+        )
     return out
 
 
@@ -78,7 +85,17 @@ def main(argv):
         checked += 1
         query, expected = (part.strip() for part in line.split("->", 1))
         q = terms(query)
-        ranked = sorted(((score(q, d), n) for n, d in skills.items()), reverse=True)
+        if expected not in skills:
+            print(f"R3: {query!r} names unknown skill {expected}")
+            problems += 1
+            continue
+        # Compare only within the tier of the expected answer. "Run the step" and
+        # "run the chain that contains it" is a choice of intent, not of wording;
+        # no term-overlap metric can separate them, and pretending otherwise just
+        # bends descriptions out of shape.
+        tier = skills[expected][0]
+        pool = {n: d for n, (t, d) in skills.items() if t == tier}
+        ranked = sorted(((score(q, d), n) for n, d in pool.items()), reverse=True)
         top_score, top_name = ranked[0]
         runner = ranked[1][0] if len(ranked) > 1 else 0.0
         if top_name != expected:

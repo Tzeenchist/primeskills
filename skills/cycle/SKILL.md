@@ -1,7 +1,8 @@
 ---
 name: cycle
-description: Use to run implementation to a verified finish, looping build and debug until green
+description: Use to run the implementation loop, building and debugging until the tests are green
 budget: 250
+tier: flow
 role: write
 ---
 

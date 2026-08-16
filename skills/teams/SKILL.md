@@ -2,6 +2,7 @@
 name: teams
 description: Use to run the full review panel over an existing plan and consolidate what it finds
 budget: 250
+tier: flow
 role: read-only
 ---
 
