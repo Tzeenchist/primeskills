@@ -11,8 +11,8 @@ refs:
 # Verify
 
 ## Trigger
-Before any claim of done, fixed, working, or passing — and before committing,
-pushing, or opening a PR. Also before handing work to another agent.
+Before any claim of done, fixed, working or passing, before committing or
+pushing, and before handing work to another agent.
 
 ## Invariants
 - Evidence before claims. If you have not run the command in this message, you
@@ -29,13 +29,13 @@ pushing, or opening a PR. Also before handing work to another agent.
 2. Name the command that would prove the claim → **verify:** it tests the claim,
    not a neighbour of it
 3. Run it whole and fresh → **verify:** exit code is 0
-4. Read the tool's own success signal → **verify:** for a test runner, 0 failed
-   and the count you expected; for other tools, whatever they report instead —
-   an exit code alone is half the proof (G4)
+4. Read the tool's own success signal → **verify:** 0 failed and the count you
+   expected from a test runner, whatever other tools report instead — an exit
+   code alone is half the proof (G4)
 5. For a bug fix, pair the run with the red evidence `build` recorded
    → **verify:** the recorded failure and this pass describe the same test.
-   Only when no record exists, prove it in a throwaway worktree — never by
-   reverting the live tree, which can eat work that is not yours
+   With no record, prove it in a throwaway worktree — never by reverting the
+   live tree, which can eat work that is not yours
 6. Run the full suite, not only the touched file, unless a flow already ran it
    for this state → **verify:** exit code is 0, and you say which run you used
 7. Kill spawned processes, remove temp artifacts → **verify:** none left behind
@@ -43,9 +43,11 @@ pushing, or opening a PR. Also before handing work to another agent.
 ## Stop conditions
 - Tempted to adjust the test instead of the code: stop. That impulse is the
   finding.
+- No recorded red run and no worktree to prove one: the regression is unproven.
+  Say that rather than calling the fix verified.
 - Three runs, three failures, same error: roll back and report (G9).
-- Reaching for "should", "probably", "looks right": you are about to claim
-  without evidence. See RATIONALIZATIONS.
+- Reaching for "should" or "probably": you are about to claim without evidence.
+  See RATIONALIZATIONS.
 
 ## Output
 `PASS` or `FAIL`, the command, its exit code, the pass/fail counts, and the

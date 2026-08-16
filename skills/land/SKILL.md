@@ -33,8 +33,10 @@ ran — did not return BLOCK. Not before all three.
    branch, or you create one before committing
 5. Commit in conventional form: type, scope, one-line summary, then why
    → **verify:** the summary reads as what changed, not as what you did today
-6. Push and open the PR with the plan's acceptance criteria as the description
-   → **verify:** the PR shows each criterion and how it was met
+6. Push. Open a PR if the remote is hosted; if it is a bare or local remote,
+   there is nothing to open — say so and put the acceptance criteria in the
+   report instead → **verify:** the branch is on the remote, and the criteria
+   are visible either in the PR or in what you hand back
 7. If memory is enabled, record what the code and history do not: a decision and
    its reason, a rare bug with its root, an option rejected and why
    → **verify:** nothing recorded is already derivable from `git log`
@@ -46,6 +48,8 @@ ran — did not return BLOCK. Not before all three.
 - The diff contains a change nobody asked for: remove it or say why it stays.
 - The push is rejected: read why. A rejected push is information about the
   remote, and force is not the answer to it.
+- No hosting for a pull request: that is not a failure, it is a different
+  handover. Never report a PR you did not create.
 - You are on the default branch with uncommitted work: branch first, ask second.
 
 ## Output
