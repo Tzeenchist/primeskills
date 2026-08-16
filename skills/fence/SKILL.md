@@ -3,25 +3,37 @@ name: fence
 description: Use to arm destructive-command warnings and restrict edits to a directory
 budget: 200
 role: write
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "python3 /srv/project/primeskills/skills/fence/bin/check-commands.py"
+          statusMessage: "fence: checking the command"
+    - matcher: "Edit|Write|NotebookEdit"
+      hooks:
+        - type: command
+          command: "python3 /srv/project/primeskills/skills/fence/bin/check-boundary.py"
+          statusMessage: "fence: checking the boundary"
 ---
 
 # Fence
 
 ## Trigger
-Arm before touching production, shared systems, or an unfamiliar repo, and
-before any unattended session. Also on request: "be careful", "lock edits here".
+Arm before touching production, shared systems, an unfamiliar repo, or any
+unattended session. Also on request: "be careful", "lock edits here".
 
 ## Invariants
 - The command guard warns; it never silently allows what it could not parse.
 - A boundary applies to every write, including ones you consider trivial.
-- Pattern matching is necessary and never sufficient. Destruction usually
-  arrives through a harmless command with a misconfigured target (GUARDRAILS G17).
+- Pattern matching is necessary and never sufficient: destruction usually
+  arrives through a harmless command with a misconfigured target (G17).
 
 ## Procedure
-1. Register the hooks with the host agent: `bin/check-commands.py` on `Bash`,
-   `bin/check-boundary.py` on `Edit` and `Write` → **verify:** a known-bad
-   command returns `permissionDecision: ask`
-2. To scope edits, write one absolute path per line into `.primeskills/boundary`
+1. On Claude Code the hooks are declared in this skill's frontmatter and arm
+   themselves on invocation → **verify:** `primeskills-doctor` reports the
+   guards live, and a known-bad command returns `ask`
+2. To scope edits, put one absolute path per line in `.primeskills/boundary`
    → **verify:** a path outside it returns `deny`
 3. Report which guards are live → **verify:** the user sees the boundary paths
 

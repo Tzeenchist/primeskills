@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Is the set actually wired up, in each agent, right now?
+
+Written after two of the same failure in two days: core/ was written, budgeted
+and reported as the shared base while no host ever loaded it; fence's hooks were
+written and covered by 22 tests while nothing invoked them. Both were built,
+verified in isolation, and never connected. The linter checks form, the tests
+check logic, the status tool counts words -- none of them asks whether the thing
+is switched on.
+
+Exit 0 when every check passes.
+"""
+import json
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+HOME = Path.home()
+SKILLS = ROOT / "skills"
+FENCE = SKILLS / "fence" / "bin"
+
+OK, FAIL, WARN = "ok  ", "FAIL", "warn"
+
+
+class Report:
+    def __init__(self):
+        self.failed = 0
+
+    def line(self, status, agent, what, detail=""):
+        if status == FAIL:
+            self.failed += 1
+        print(f"  [{status}] {agent:<10} {what}" + (f" — {detail}" if detail else ""))
+
+
+def installed_skills(root):
+    """Entries under `root` that resolve back into this repository."""
+    if not root.is_dir():
+        return []
+    found = []
+    for entry in sorted(root.iterdir()):
+        skill = entry / "SKILL.md"
+        if not skill.exists():
+            continue
+        if str(ROOT) in str(Path(skill).resolve()):
+            found.append(entry.name)
+    return found
+
+
+def check_skills(r, agent, root):
+    have, want = installed_skills(root), len(list(SKILLS.glob("*/SKILL.md")))
+    if not have:
+        r.line(FAIL, agent, "skills linked", f"none found in {root}")
+    elif len(have) < want:
+        r.line(FAIL, agent, "skills linked", f"{len(have)} of {want}")
+    else:
+        r.line(OK, agent, "skills linked", f"{len(have)}")
+
+
+def check_core(r, agent, path, needle):
+    if path is None or not path.is_file():
+        r.line(FAIL, agent, "core reachable", f"{path} missing")
+    elif needle in path.read_text(encoding="utf-8"):
+        r.line(OK, agent, "core reachable", path.name)
+    else:
+        r.line(FAIL, agent, "core reachable", f"no pointer in {path.name}")
+
+
+def check_guards(r):
+    """The guards must refuse, not merely exist."""
+    cases = [
+        (FENCE / "check-commands.py", '{"tool_input":{"command":"rm -rf /var/data"}}', "ask",
+         "destructive command"),
+        (FENCE / "check-commands.py", "not json", "ask", "unreadable payload fails closed"),
+    ]
+    for script, payload, expect, what in cases:
+        out = subprocess.run([sys.executable, str(script)], input=payload,
+                             capture_output=True, text=True)
+        got = (json.loads(out.stdout or "{}").get("hookSpecificOutput") or {}).get("permissionDecision")
+        r.line(OK if got == expect else FAIL, "guards", what, f"decision={got}")
+
+
+def check_hooks_declared(r):
+    text = (SKILLS / "fence" / "SKILL.md").read_text(encoding="utf-8")
+    for matcher in ("Bash", "Edit|Write|NotebookEdit"):
+        r.line(OK if matcher in text else FAIL, "claude",
+               f"hook declared for {matcher}",
+               "armed when fence is invoked" if matcher in text else "missing")
+
+
+def main():
+    r = Report()
+    print("primeskills doctor\n")
+
+    check_skills(r, "claude", HOME / ".claude" / "skills")
+    check_core(r, "claude", HOME / ".claude" / "CLAUDE.md", "primeskills:begin")
+    check_hooks_declared(r)
+
+    check_skills(r, "codex", HOME / ".codex" / "skills")
+    check_core(r, "codex", HOME / ".codex" / "AGENTS.md", "primeskills:begin")
+
+    check_skills(r, "opencode", HOME / ".config" / "opencode" / "skills")
+    cfg = HOME / ".config" / "opencode" / "opencode.json"
+    if cfg.is_file():
+        instructions = json.loads(cfg.read_text(encoding="utf-8")).get("instructions", [])
+        hit = any("primeskills" in i for i in instructions)
+        r.line(OK if hit else FAIL, "opencode", "core reachable",
+               "in instructions" if hit else "not in instructions")
+    else:
+        r.line(WARN, "opencode", "core reachable", "no config")
+
+    kimi = HOME / ".kimi-code" / "config.toml"
+    if kimi.is_file():
+        dirs = tomllib.loads(kimi.read_text(encoding="utf-8")).get("extra_skill_dirs", [])
+        hit = str(SKILLS) in dirs
+        r.line(OK if hit else FAIL, "kimi", "skills linked",
+               "extra_skill_dirs" if hit else "path not listed")
+        check_core(r, "kimi", HOME / ".kimi-code" / "AGENTS.md", "primeskills:begin")
+    else:
+        r.line(WARN, "kimi", "skills linked", "no config")
+
+    check_guards(r)
+
+    print(f"\n{r.failed} failed")
+    return 1 if r.failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

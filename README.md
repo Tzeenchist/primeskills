@@ -34,6 +34,7 @@ agent-skills, prompt-eng-interactive-tutorial, loopx. Там же
 ## Инструменты
 
 ```
+python3 bin/primeskills-doctor            # подключено ли всё у каждого агента
 python3 bin/primeskills-status            # состав и статус, из репозитория
 python3 bin/primeskills-lint              # формат: F1-F11, C1-C2
 python3 bin/primeskills-route skills tests/routing.txt
@@ -45,5 +46,5 @@ python3 tests/run.py                      # весь прогон
 
 Набор написан и установлен. Ревью Codex разобрано (`review/codex-2026-08-16.md`):
 пять P1 и все P2, кроме сознательно отклонённого переименования `land`.
-Открыто: профиль read-only в OpenCode и Kimi, честная проверка маршрутизации
-на незнакомых формулировках, канонические идентификаторы инвариантов для F8.
+Открыто: профиль read-only в OpenCode и Kimi; скиллы `merge` и `deploy`
+и объединяющая их команда; обкатка на живой задаче.
