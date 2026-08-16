@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Format linter for primeskills SKILL.md files.
+
+Checks the contract from docs/SKILL-FORMAT.md. Exit 0 = clean, 1 = violations.
+Rule IDs (F1..F9) are stable so tests can assert on them.
+"""
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+SECTIONS = ["Trigger", "Invariants", "Procedure", "Stop conditions", "Output", "References"]
+ROLES = {"read-only", "write"}
+DESC_MAX = 140
+DEFAULT_BUDGET = 800
+
+
+def split_frontmatter(text):
+    if not text.startswith("---\n"):
+        return None, text
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None, text
+    try:
+        return yaml.safe_load(text[4:end]), text[end + 5:]
+    except yaml.YAMLError:
+        return None, text[end + 5:]
+
+
+def sections_of(body):
+    """Return [(heading, content)] for level-2 headings, in file order."""
+    out, name, buf = [], None, []
+    for line in body.splitlines():
+        if line.startswith("## "):
+            if name is not None:
+                out.append((name, "\n".join(buf)))
+            name, buf = line[3:].strip(), []
+        elif name is not None:
+            buf.append(line)
+    if name is not None:
+        out.append((name, "\n".join(buf)))
+    return out
+
+
+def steps_of(procedure):
+    """Split a procedure body into numbered steps (a step may span lines)."""
+    steps, buf = [], None
+    for line in procedure.splitlines():
+        if re.match(r"^\s*\d+\.\s", line):
+            if buf is not None:
+                steps.append("\n".join(buf))
+            buf = [line]
+        elif buf is not None:
+            buf.append(line)
+    if buf is not None:
+        steps.append("\n".join(buf))
+    return steps
+
+
+def normalize(line):
+    line = re.sub(r"[`*_]", "", line.strip().lstrip("-").strip())
+    return re.sub(r"\s+", " ", line.lower()).rstrip(".")
+
+
+def check_skill(path, seen_invariants, problems):
+    def bad(rule, msg):
+        problems.append((path, rule, msg))
+
+    text = path.read_text(encoding="utf-8")
+    meta, body = split_frontmatter(text)
+
+    if not isinstance(meta, dict):
+        bad("F1", "no valid YAML frontmatter")
+        return
+    for key in ("name", "description", "role"):
+        if not meta.get(key):
+            bad("F1", f"frontmatter missing '{key}'")
+    if meta.get("name") and meta["name"] != path.parent.name:
+        bad("F2", f"name '{meta['name']}' != directory '{path.parent.name}'")
+    if meta.get("role") and meta["role"] not in ROLES:
+        bad("F9", f"role '{meta['role']}' not in {sorted(ROLES)}")
+
+    desc = str(meta.get("description", ""))
+    if len(desc) > DESC_MAX:
+        bad("F3", f"description {len(desc)} chars > {DESC_MAX}")
+
+    budget = meta.get("budget", DEFAULT_BUDGET)
+    words = len(body.split())
+    if words > budget:
+        bad("F4", f"body {words} words > budget {budget}")
+
+    found = [name for name, _ in sections_of(body)]
+    if found != SECTIONS:
+        bad("F5", f"sections {found} != {SECTIONS}")
+
+    content = dict(sections_of(body))
+    procedure = content.get("Procedure", "")
+    steps = steps_of(procedure)
+    if not steps:
+        bad("F6", "Procedure has no numbered steps")
+    for step in steps:
+        if "verify:" not in step:
+            bad("F6", f"step without 'verify:': {step.splitlines()[0].strip()[:60]}")
+
+    for ref in meta.get("refs") or []:
+        if not isinstance(ref, dict) or not ref.get("when"):
+            bad("F7", f"ref without 'when': {ref}")
+
+    for line in content.get("Invariants", "").splitlines():
+        if not line.strip().startswith("-"):
+            continue
+        key = normalize(line)
+        if not key:
+            continue
+        if key in seen_invariants:
+            bad("F8", f"invariant duplicated in '{seen_invariants[key]}': {key[:60]}")
+        else:
+            seen_invariants[key] = path.parent.name
+
+
+def main(argv):
+    root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parent.parent / "skills"
+    files = sorted(root.glob("*/SKILL.md"))
+    if not files:
+        print(f"no SKILL.md under {root}", file=sys.stderr)
+        return 1
+
+    seen, problems = {}, []
+    for path in files:
+        check_skill(path, seen, problems)
+
+    for path, rule, msg in problems:
+        print(f"{path}: {rule}: {msg}")
+    print(f"{len(files)} skills, {len(problems)} problems")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

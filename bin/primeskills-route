@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Routing linter: does a query reach the skill it should?
+
+Offline and deterministic: ranks skills by term overlap between the query and
+the skill's `description`. It does not simulate a model. What it does catch is
+the failure that actually bites -- two descriptions perched on the same words,
+so neither wins clearly. Rules: R1 wrong skill on top, R2 margin too thin.
+"""
+import re
+import sys
+from pathlib import Path
+
+import yaml
+
+MARGIN = 0.15  # top score must beat the runner-up by this much
+
+STOP = {
+    "the", "a", "an", "to", "of", "for", "in", "on", "is", "it", "this", "that",
+    "use", "when", "before", "after", "and", "or", "any", "my", "me", "i",
+}
+
+
+def stem(word):
+    """Crude suffix stripping. Enough to make "passing"/"passed"/"pass" match."""
+    for suffix in ("ing", "ed", "es", "s"):
+        if len(word) > len(suffix) + 2 and word.endswith(suffix):
+            return word[: -len(suffix)]
+    return word
+
+
+def terms(text):
+    words = re.findall(r"[a-z0-9_-]+", text.lower())
+    return {stem(w) for w in words if w not in STOP and len(w) > 2}
+
+
+def load(skills_dir):
+    out = {}
+    for path in sorted(Path(skills_dir).glob("*/SKILL.md")):
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            continue
+        end = text.find("\n---\n", 4)
+        meta = yaml.safe_load(text[4:end]) or {}
+        out[meta.get("name", path.parent.name)] = terms(str(meta.get("description", "")))
+    return out
+
+
+def score(query, desc):
+    """Share of the query the description claims.
+
+    Jaccard was the obvious choice and the wrong one: it punishes a description
+    for every word the user did not happen to type, so a long accurate
+    description scores worse than a short vague one. What matters here is
+    coverage -- how much of what the user said this skill speaks to.
+    """
+    if not desc or not query:
+        return 0.0
+    return len(query & desc) / len(query)
+
+
+def main(argv):
+    skills_dir = argv[1]
+    table = Path(argv[2])
+    skills = load(skills_dir)
+    if not skills:
+        print(f"no skills under {skills_dir}", file=sys.stderr)
+        return 1
+
+    problems = 0
+    checked = 0
+    for line in table.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "->" not in line:
+            continue
+        checked += 1
+        query, expected = (part.strip() for part in line.split("->", 1))
+        q = terms(query)
+        ranked = sorted(((score(q, d), n) for n, d in skills.items()), reverse=True)
+        top_score, top_name = ranked[0]
+        runner = ranked[1][0] if len(ranked) > 1 else 0.0
+        if top_name != expected:
+            print(f"R1: {query!r} -> {top_name} (expected {expected}); ranking {ranked}")
+            problems += 1
+        elif top_score - runner < MARGIN:
+            print(f"R2: {query!r} -> {expected} wins by {top_score - runner:.2f} < {MARGIN}")
+            problems += 1
+
+    print(f"{checked} queries, {problems} problems")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

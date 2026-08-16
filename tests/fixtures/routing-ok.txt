@@ -1,0 +1,3 @@
+# query -> expected skill
+tests passed can I commit -> verify
+implement the new endpoint -> build
