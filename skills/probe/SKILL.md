@@ -18,14 +18,19 @@ runs; the properties of the diff are `vet`.
 ## Invariants
 - You report. You do not fix. A found bug that you also fixed cannot be
   reproduced by the person reading your report.
+- Read-only means the codebase, not the application. Producing an empty list or
+  a failed payment means writing application data, so you need a disposable
+  environment with a stated way to reset it. Without one, say which states you
+  could not produce.
 - Test against development or a staging copy. Production is touched only with
   explicit confirmation, and never with writes (G17).
 - A defect report that cannot be reproduced from its own text is not a report.
 - What you did not test is part of the result. Say it.
 
 ## Procedure
-1. Confirm what you are pointed at: URL, branch, commit, database
-   → **verify:** it is not a working store and not production
+1. Confirm what you are pointed at: URL, branch, commit, database, and how it
+   gets reset → **verify:** it is disposable — not a working store, not
+   production (G17)
 2. Walk the main path a real user takes, end to end → **verify:** you performed
    each step, not read the code that implements it
 3. At each screen or endpoint, exercise the states: nothing yet, one item,

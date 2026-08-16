@@ -32,8 +32,10 @@ the task to another agent. Also on request: "save state", "checkpoint".
    1–3 sentences of summary, decisions and why, remaining work in priority
    order, and notes — gotchas, blockers, open questions, approaches tried that
    did not work → **verify:** a reader who was not here could act on it
-5. Commit it → **verify:** the file is in the diff and the tests were green
-   before the commit
+5. Commit it, and push it if the branch has a remote — a checkpoint that never
+   leaves this machine cannot reach the next agent → **verify:** the file is in
+   the diff, tests were green before the commit, and you state whether it was
+   pushed
 
 ## Stop conditions
 - Tests are red: say so in the notes and do not imply the work is resumable

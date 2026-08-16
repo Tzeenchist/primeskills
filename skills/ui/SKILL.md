@@ -15,7 +15,9 @@ Work that produces markup, styles, or interaction. Reads `plan` output like
 `build` does; this is the interface half of the same job.
 
 ## Invariants
-- Ship the five states or do not ship the component. Success alone is a demo.
+- Anything that waits or carries data ships all five states, or does not ship.
+  Success alone is a demo. A static or synchronous control may mark a state
+  not applicable — with the reason, not by omission.
 - Hierarchy is the design decision. If everything has equal weight, nothing has
   been decided.
 - Keyboard and pointer are the same feature, not two.
@@ -24,7 +26,7 @@ Work that produces markup, styles, or interaction. Reads `plan` output like
 
 ## Procedure
 1. Read `ref/ui-states.md` and name the five states for this component
-   → **verify:** each has intended content, including what the empty one teaches
+   → **verify:** each has intended content or a stated reason it cannot occur
 2. Build the states in order: empty, loading, error, partial, success
    → **verify:** each is reachable in the running build, not only in the code
 3. Set hierarchy before decoration: what should the eye reach first, second,

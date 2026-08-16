@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Print the one authoritative status block, generated from the repository.
+
+Written because the documents drifted: three files claimed three different
+skill counts, and support was described as four agents while two profiles were
+unverified. Numbers that are typed by hand go stale; these are read.
+"""
+import re
+import subprocess
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
+
+# Role isolation, stated at the level it was actually verified.
+SUPPORT = [
+    ("Claude Code", "skills + core pointer in CLAUDE.md",
+     "allowed-tools enforced; the shell is not covered (G7)"),
+    ("Codex", "skills + core pointer in ~/.codex/AGENTS.md",
+     "profile prime-analyst parses and is accepted; sandbox not exercised"),
+    ("OpenCode", "skills + core in instructions",
+     "read-only agent profile: unresolved"),
+    ("Kimi", "extra_skill_dirs + core pointer in ~/.kimi-code/AGENTS.md",
+     "agent profile: not attempted"),
+]
+
+
+def words(p):
+    return len(p.read_text(encoding="utf-8").split())
+
+
+def body_words(p):
+    text = p.read_text(encoding="utf-8")
+    return len(re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.S).split())
+
+
+def main():
+    skills = sorted(ROOT.glob("skills/*/SKILL.md"))
+    flows = [p for p in skills if "\ntier: flow" in p.read_text(encoding="utf-8")]
+    core = sum(words(ROOT / "core" / f) for f in ALWAYS)
+    on_demand = words(ROOT / "core" / "RATIONALIZATIONS.md") + \
+        sum(words(p) for p in ROOT.glob("skills/*/ref/*.md"))
+    total = sum(body_words(p) for p in skills)
+    head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+
+    print(f"primeskills @ {head}")
+    print(f"  skills            {len(skills)} (of which flows: {len(flows)})")
+    print(f"  skill bodies      {total} words")
+    print(f"  core, always      {core} words")
+    print(f"  loaded on demand  {on_demand} words")
+    print(f"  always-on total   {total + core} words")
+    print("\n  agent        install                                        role isolation")
+    for name, install, isolation in SUPPORT:
+        print(f"  {name:<12} {install:<45} {isolation}")
+
+
+if __name__ == "__main__":
+    main()

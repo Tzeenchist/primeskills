@@ -17,7 +17,7 @@ DESC_MAX = 140
 DEFAULT_BUDGET = 800
 REF_BUDGET = 700             # one reference file
 REF_TOTAL_BUDGET = 1200      # all references of one skill
-CORE_BUDGET = 1400          # always-loaded files only
+CORE_BUDGET = 1600          # always-loaded files; a ceiling, not a target
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 

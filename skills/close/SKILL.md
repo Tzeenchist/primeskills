@@ -25,8 +25,10 @@ works" and "it is someone else's turn".
    finding is struck once fixed, not carried (G16)
 4. Call `probe` if the change touches a running interface → **verify:** it
    returned PASS, BLOCK or NOT RUN; on BLOCK return to step 3
-5. Call `land` → **verify:** PR exists, criteria marked, secrets pass done
-6. Call `handoff` if work remains → **verify:** the checkpoint names what is left
+5. Call `handoff` if work remains, before landing → **verify:** the checkpoint
+   names what is left and is part of the change `land` will push
+6. Call `land` → **verify:** PR exists, criteria marked, secrets pass done, and
+   the checkpoint went up with it
 
 ## Stop conditions
 - Three trips back to `build` on the same finding: stop and ask (G9).

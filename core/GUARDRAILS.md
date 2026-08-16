@@ -14,7 +14,10 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 
 ## Evidence
 - **G4 Exit-code proof.** Nothing passes until a command says so: exit code 0
-  and a runner line reporting `0 failed`. Absence of a crash is not a pass.
+  **and** the tool's own success signal read from its output — `0 failed` for a
+  test runner, an empty report for a linter, a produced artifact for a build.
+  Where a tool has no signal beyond its exit code, say so and rely on the code.
+  Absence of a crash is never a pass.
 - **G15 Claimed limits need evidence.** "The API can't", "that needs a
   credential", "impossible here" are material claims. State one only with a
   verbatim error, a documented line, or a live probe. Recognising a familiar
@@ -41,15 +44,19 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   are not asked to memorise it. Necessary, never sufficient: see G17.
 - **Git authority.** Create branches, commit, read `diff` and `log`. Rewriting
   history, force-pushing, and resetting are outside your authority.
-- **G14 Snapshot before risk.** Before a migration, a bulk edit, or a
-  refactor: `git stash create` or a `checkpoint/...` branch for code, a dump
-  for data. Backup first, not after.
+- **G14 Snapshot before risk.** Before a migration, a bulk edit, or a refactor,
+  take a snapshot you have proved you can restore, covering tracked, staged
+  **and untracked** files you own. `git stash create` silently skips untracked
+  work and a branch records nothing uncommitted, so neither is a snapshot on its
+  own. Data gets a dump. Never sweep in changes that are not yours.
 
 ## Loops
-- **G9 Circuit breaker.** Three failed attempts on the same test or bug: roll
-  back, report what was tried, ask. Every retry tests a fundamentally new
-  hypothesis, not cosmetics. A cycle closes only when the new test passes *and*
-  the full suite passes.
+- **G9 Circuit breaker.** One counter per problem, owned by whoever runs the
+  loop — `cycle` when it runs, otherwise the skill in hand. It increments on
+  every failed attempt at the same failure, wherever the attempt happened.
+  At three: restore the G14 snapshot, report what each attempt ruled out, ask.
+  Every retry tests a fundamentally new hypothesis, not cosmetics. A cycle closes
+  only when the new test passes *and* the full suite passes.
 - **G13 Hypothesis ledger.** Before each new attempt, write one line:
   "hypothesis N failed because X; hypothesis N+1 does Y differently."
 - **G11 Checkpoints.** Every 2–3 completed steps, record status and commit
