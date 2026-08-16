@@ -14,6 +14,8 @@ SECTIONS = ["Trigger", "Invariants", "Procedure", "Stop conditions", "Output", "
 ROLES = {"read-only", "write"}
 DESC_MAX = 140
 DEFAULT_BUDGET = 800
+CORE_BUDGET = 1400          # always-loaded files only
+CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 
 def split_frontmatter(text):
@@ -119,16 +121,31 @@ def check_skill(path, seen_invariants, problems):
             seen_invariants[key] = path.parent.name
 
 
+def check_core(core_dir, problems):
+    """C1: the always-loaded part of core/ pays on every session. Cap it."""
+    files = [core_dir / n for n in CORE_ALWAYS]
+    missing = [f.name for f in files if not f.exists()]
+    if missing:
+        problems.append((core_dir, "C2", f"missing always-loaded files: {missing}"))
+        return
+    words = sum(len(f.read_text(encoding="utf-8").split()) for f in files)
+    if words > CORE_BUDGET:
+        problems.append((core_dir, "C1", f"core {words} words > budget {CORE_BUDGET}"))
+
+
 def main(argv):
     root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parent.parent / "skills"
     files = sorted(root.glob("*/SKILL.md"))
-    if not files:
-        print(f"no SKILL.md under {root}", file=sys.stderr)
+    core = root.parent / "core"
+    if not files and not core.is_dir():
+        print(f"nothing to lint under {root}", file=sys.stderr)
         return 1
 
     seen, problems = {}, []
     for path in files:
         check_skill(path, seen, problems)
+    if core.is_dir():
+        check_core(core, problems)
 
     for path, rule, msg in problems:
         print(f"{path}: {rule}: {msg}")
