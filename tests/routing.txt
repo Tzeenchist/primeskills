@@ -1,0 +1,5 @@
+# query -> expected skill
+tests passed can I commit -> verify
+is this done -> verify
+be careful with destructive commands -> fence
+lock edits to this folder -> fence

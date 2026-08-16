@@ -29,7 +29,10 @@ def stem(word):
 
 
 def terms(text):
-    words = re.findall(r"[a-z0-9_-]+", text.lower())
+    # Split on hyphens too: "destructive-command" has to match a user who
+    # types "destructive commands", or the linter reports a description defect
+    # that is really a tokenizer defect.
+    words = re.findall(r"[a-z0-9_]+", text.lower())
     return {stem(w) for w in words if w not in STOP and len(w) > 2}
 
 
