@@ -32,9 +32,38 @@ python3 bin/primeskills-install claude --apply   # только один аге�
 | агент | механизм | статус |
 |---|---|---|
 | **Claude Code** | `allowed-tools` во frontmatter | **работает.** Поле стоит в самих скиллах, поэтому переживает симлинк и не требует генерации. Линтер сверяет его с `role` (правило F10) |
-| **Codex** | профиль `[profiles.prime-analyst]` с `sandbox_mode = "read-only"`, вызов `codex -p prime-analyst` | **проверено частично:** `codex doctor` разбирает конфиг без ошибок, флаг `-p prime-analyst` принимается. Что песочница действительно режет запись, живьём не проверялось |
+| **Codex** | профиль `[profiles.prime-analyst]`, вызов `codex -p prime-analyst` | **синтаксис верный, песочница в этой среде не работает** — см. ниже |
 | **Kimi** | профиль `~/.kimi-code/agents/prime-analyst.md` | **работает.** Запуск с несуществующим профилем печатает список доступных, и `prime-analyst` в нём есть. `tools` разрешает Read/Grep/Glob, `disallowedTools` запрещает Edit/Write/NotebookEdit |
 | **OpenCode** | профиль `~/.config/opencode/agents/prime-analyst.md` | **работает.** `opencode agent list` показывает `prime-analyst (primary)`. `permission: edit: deny, write: deny` |
+
+### Codex: песочница здесь не работает вовсе
+
+Синтаксис профиля подтверждён документацией и совпадает с тем, что у нас
+записано: `[profiles.NAME]` с ключами `sandbox_mode`
+(`read-only` / `workspace-write` / `danger-full-access`) и `approval_policy`
+(`untrusted` / `on-request` / `never`).
+
+Но проверка живьём дала другое. `codex sandbox` с записью файла:
+
+| режим | результат |
+|---|---|
+| `read-only` | `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`, файл не создан |
+| `workspace-write` | **та же ошибка**, файл не создан |
+| `danger-full-access` | отработало, файл создан |
+
+То есть `bubblewrap` в этой среде сломан, и падают **оба** ограничивающих
+режима, а не только read-only. Файл не появился не потому, что песочница
+удержала запись, а потому, что команда вообще не запустилась.
+
+Практический вывод: профиль `prime-analyst` с `sandbox_mode = "read-only"`
+здесь «защищает» тем, что не даёт выполнить ничего, включая `git diff`, который
+нужен `vet`. Это не изоляция, а неработоспособность. Там, где `bwrap` исправен,
+профиль сработает как задумано; здесь для Codex остаётся `approval_policy`
+и текстовый запрет.
+
+Раньше в этой таблице стояло «проверено частично: конфиг разбирается, флаг
+принимается». Разбор конфига и приём флага не говорят ничего о том, режет ли
+песочница запись, — и это ровно та подмена, против которой написан G4.
 
 ### Как это нашлось
 

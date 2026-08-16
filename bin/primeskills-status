@@ -17,7 +17,7 @@ SUPPORT = [
     ("Claude Code", "skills + core pointer in CLAUDE.md",
      "allowed-tools enforced; the shell is not covered (G7)"),
     ("Codex", "skills + core pointer in ~/.codex/AGENTS.md",
-     "profile prime-analyst parses and is accepted; sandbox not exercised"),
+     "profile syntax correct; sandbox unusable here (bwrap fails in every mode)"),
     ("OpenCode", "skills + core in instructions + prime-analyst profile",
      "profile registered; permission edit/write deny"),
     ("Kimi", "extra_skill_dirs + core pointer + prime-analyst profile",

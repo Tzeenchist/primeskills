@@ -20,6 +20,9 @@ attempt, not after the third.
   describe a system that never existed.
 - The bug is in the code until proven otherwise. Blaming the framework,
   the compiler, or the machine needs the same evidence as any other claim (G15).
+- When the unknown is someone else's tool — its format, flags, or where it looks
+  for files — read its documentation before probing it. Guessing costs more
+  attempts than reading, and reverse-engineering costs more than both.
 
 ## Procedure
 1. Preflight: read the repository's agent instructions, note what is already
@@ -50,6 +53,8 @@ attempt, not after the third.
   `build` — restore the snapshot and report what each attempt ruled out.
 - You cannot reproduce it: say so. An unreproducible bug is not fixed by a
   plausible patch.
+- Two guesses at a third-party format have failed: stop guessing and go read.
+  A third guess is rarely the one that works.
 - The fix would add a null guard or an empty catch over a bad value: that is
   the symptom talking. Go back to step 4.
 

@@ -34,10 +34,12 @@ a bad value hide the bug that produced it. Repair at the lowest durable layer:
 agent behaviour, data and state, harness mismatch, or process gap — name which
 one before fixing.
 
-## 6. Search before building
-Ask "has someone solved this?" before "how would I design this?". Checking is
-near-free; not checking reinvents something worse. Knowing what exists earns the
-right to write your own 30 lines (§2).
+## 6. Read before building, and before guessing
+Two questions, one habit. Before writing: "has someone solved this?" — checking
+is near-free, not checking reinvents something worse. Before working out how an
+existing tool behaves: read its documentation first. Probing, decompiling and
+trial-and-error are what you do *after* the docs fall short, never instead.
+Knowing what exists earns the right to write your own 30 lines (§2).
 
 ## 7. Turn tasks into verifiable goals
 "Add validation" → "write tests for invalid input, then make them pass".
