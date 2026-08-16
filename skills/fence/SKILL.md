@@ -1,0 +1,37 @@
+---
+name: fence
+description: Use to arm destructive-command warnings and restrict edits to a directory
+budget: 200
+role: write
+---
+
+# Fence
+
+## Trigger
+Arm before touching production, shared systems, or an unfamiliar repo, and
+before any unattended session. Also on request: "be careful", "lock edits here".
+
+## Invariants
+- The command guard warns; it never silently allows what it could not parse.
+- A boundary applies to every write, including ones you consider trivial.
+- Pattern matching is necessary and never sufficient. Destruction usually
+  arrives through a harmless command with a misconfigured target (GUARDRAILS G17).
+
+## Procedure
+1. Register the hooks with the host agent: `bin/check-commands.py` on `Bash`,
+   `bin/check-boundary.py` on `Edit` and `Write` → **verify:** a known-bad
+   command returns `permissionDecision: ask`
+2. To scope edits, write one absolute path per line into `.primeskills/boundary`
+   → **verify:** a path outside it returns `deny`
+3. Report which guards are live → **verify:** the user sees the boundary paths
+
+## Stop conditions
+- Hooks unsupported by the host: say so plainly. The rules still stand, but
+  nothing enforces them. Do not imply otherwise.
+- Asked to widen the boundary mid-task: that is the user's call, not yours.
+
+## Output
+One line: guards armed, boundary paths, host support.
+
+## References
+`GUARDRAILS.md` G7, G10, G14, G17 hold the rules these hooks enforce.

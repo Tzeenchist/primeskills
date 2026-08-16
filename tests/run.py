@@ -54,7 +54,9 @@ def main():
     for f in failures:
         print(f)
     print(f"{len(EXPECT) + 2} checks, {len(failures)} failed")
-    return 1 if failures else 0
+
+    fence = subprocess.run([sys.executable, str(Path(__file__).parent / "test_fence.py")])
+    return 1 if (failures or fence.returncode) else 0
 
 
 if __name__ == "__main__":
