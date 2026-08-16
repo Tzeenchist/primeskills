@@ -3,3 +3,7 @@ tests passed can I commit -> verify
 is this done -> verify
 be careful with destructive commands -> fence
 lock edits to this folder -> fence
+implement the new endpoint -> build
+why is this test failing -> debug
+save state before I run out of limit -> handoff
+run the implementation loop until green -> cycle

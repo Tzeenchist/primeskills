@@ -378,7 +378,7 @@ adapters/kimi/
 | B | `core/` — PRINCIPLES, GUARDRAILS, OUTPUT + RATIONALIZATIONS по требованию | ✅ 1 367 слов всегда, 304 по требованию |
 | C | `fence` — хуки безопасности и границы правок | ✅ 22 проверки |
 | D | `verify` — листовой узел графа | ✅ 398 слов + `ref/harness.md` |
-| E | `build`, `debug`, `handoff` + поток `cycle` | |
+| E | `build`, `debug`, `handoff` + поток `cycle` | ✅ 6 скиллов, 8 запросов маршрутизации |
 | **F** | **Замер против gstack на одном таске** | **точка разворота** |
 | G | `plan`, `ceo`, `eng`, `beauty`, `brief` + потоки `teams`, `autoplan` | |
 | H | `vet`, `probe`, `land`, `ui`, `baby` + поток `close` | |
