@@ -15,6 +15,8 @@ ROLES = {"read-only", "write"}
 WRITING_TOOLS = {"Edit", "Write", "NotebookEdit"}
 DESC_MAX = 140
 DEFAULT_BUDGET = 800
+REF_BUDGET = 700             # one reference file
+REF_TOTAL_BUDGET = 1200      # all references of one skill
 CORE_BUDGET = 1400          # always-loaded files only
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
@@ -59,6 +61,24 @@ def steps_of(procedure):
     if buf is not None:
         steps.append("\n".join(buf))
     return steps
+
+
+def list_items(section):
+    """Whole bullets, continuation lines folded in."""
+    items, buf = [], None
+    for line in section.splitlines():
+        if line.strip().startswith("- "):
+            if buf:
+                items.append(" ".join(buf))
+            buf = [line.strip()[2:]]
+        elif buf is not None and line.startswith(("  ", "\t")) and line.strip():
+            buf.append(line.strip())
+        elif buf:
+            items.append(" ".join(buf))
+            buf = None
+    if buf:
+        items.append(" ".join(buf))
+    return items
 
 
 def normalize(line):
@@ -121,16 +141,31 @@ def check_skill(path, seen_invariants, problems):
         if not isinstance(ref, dict) or not ref.get("when"):
             bad("F7", f"ref without 'when': {ref}")
 
-    for line in content.get("Invariants", "").splitlines():
-        if not line.strip().startswith("-"):
-            continue
-        key = normalize(line)
+    for item in list_items(content.get("Invariants", "")):
+        key = normalize(item)
         if not key:
             continue
         if key in seen_invariants:
-            bad("F8", f"invariant duplicated in '{seen_invariants[key]}': {key[:60]}")
+            bad("F8", f"invariant copied verbatim from '{seen_invariants[key]}': {key[:60]}")
         else:
             seen_invariants[key] = path.parent.name
+
+    # F11: references are instructions too. Without a cap they become the place
+    # excess text goes while F4 stays green.
+    total = 0
+    for ref in meta.get("refs") or []:
+        if not isinstance(ref, dict) or not ref.get("path"):
+            continue
+        target = (path.parent / ref["path"]).resolve()
+        if not target.is_file():
+            bad("F11", f"ref path does not exist: {ref['path']}")
+            continue
+        n = len(target.read_text(encoding="utf-8").split())
+        total += n
+        if n > REF_BUDGET:
+            bad("F11", f"{ref['path']} is {n} words > {REF_BUDGET}")
+    if total > REF_TOTAL_BUDGET:
+        bad("F11", f"references total {total} words > {REF_TOTAL_BUDGET}")
 
 
 def check_core(core_dir, problems):

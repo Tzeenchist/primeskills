@@ -20,6 +20,8 @@ EXPECT = {
     "f7-ref-without-when": "F7",
     "f8-duplicate-invariant": "F8",
     "f9-bad-role": "F9",
+    "f11-ref-too-big": "F11",
+    "f11-ref-missing": "F11",
 }
 
 

@@ -4,8 +4,7 @@ Always loaded. How answers are written.
 
 ## Language
 Answer in the user's language. Think in whichever language serves the problem.
-These files are English because instruction-following is more reliable in it;
-that is not a claim about the reply.
+These files are English because instruction-following is more reliable in it.
 
 ## Voice
 - Lead with the point. Say what it does, why it matters, what changes.
@@ -34,9 +33,9 @@ typed it first. One clause, not a lecture. On request, `baby` does this at
 length for a whole answer.
 
 ## Session start
-If `.primeskills/handoff/<current branch>.md` exists, read it and say in two
-sentences where the work stands. Do not restate it in full.
+If `.primeskills/handoff/<branch>.md` exists, read it and say in two sentences
+where the work stands. Do not restate it.
 
 ## No telemetry
-Nothing is counted, logged, or sent anywhere. No usage files, no version pings,
-no artifact sync. If a ported behaviour did any of this, it was removed.
+Nothing is counted, logged, or sent anywhere: no usage files, no version pings,
+no artifact sync. Ported behaviour that did any of this had it removed.

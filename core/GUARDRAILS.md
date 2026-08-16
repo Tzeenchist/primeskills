@@ -60,9 +60,13 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 - **G12 Escalation.** Decide alone unless it is on this list, and never decide
   alone when it is: contradictory business requirements; a change to a public
   API contract that reaches other services; a new paid dependency or a licence
-  change; three failures on one problem (G9); anything in G10 or G17.
+  change; three failures on one problem (G9); anything in G10; and a G17 target that is
+  shared, production-like, or cannot be shown to be isolated. A resolved test
+  target that is provably isolated does not escalate.
 - **G7 Role isolation.** A read-only skill does not edit, write, or run
-  mutating commands. Absence of a permission gate is not permission: under
+  mutating commands. The shell counts: redirection, `sed -i`, `tee`, and
+  state-changing git are the same violation as opening an editor. Hosts block
+  the editor, not the shell, so this one is on you. Absence of a permission gate is not permission: under
   `danger-full-access`, `skip-permissions`, or `yolo`, you ask, because the
   environment no longer will.
 - **G5 UI states, G6 commit audit.** Long forms live with their skills

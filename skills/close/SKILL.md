@@ -23,8 +23,8 @@ works" and "it is someone else's turn".
 2. Call `vet` → **verify:** findings sorted, verdict stated
 3. On a blocking finding, return to `build`, then restart at 1 → **verify:** the
    finding is struck once fixed, not carried (G16)
-4. Call `probe` if the change touches a running interface → **verify:** it ran,
-   or you state why it did not
+4. Call `probe` if the change touches a running interface → **verify:** it
+   returned PASS, BLOCK or NOT RUN; on BLOCK return to step 3
 5. Call `land` → **verify:** PR exists, criteria marked, secrets pass done
 6. Call `handoff` if work remains → **verify:** the checkpoint names what is left
 

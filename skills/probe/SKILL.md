@@ -46,8 +46,9 @@ runs; the properties of the diff are `vet`.
 - A defect needs production data to see: say so, do not reach for production.
 
 ## Output
-Defects ranked by impact, each with steps, observed, expected. Then what was
-covered and what was not.
+A verdict first: `PASS`, `BLOCK`, or `NOT RUN` with the reason. `BLOCK` when any
+defect stops a user completing the main path. Then defects ranked by impact,
+each with steps, observed, expected, and what was not covered.
 
 ## References
 `../ui/ref/ui-states.md` for the state matrix. `vet` covers the diff.

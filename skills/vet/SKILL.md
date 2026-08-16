@@ -24,7 +24,8 @@ not the running system — that is `probe`.
 - You read and report. Fixing is `build`.
 
 ## Procedure
-1. Read `git diff --staged` and state what the change is meant to do
+1. Read the whole change — `git diff <base>...HEAD` plus staged and unstaged
+   (G6) — and state what it is meant to do
    → **verify:** your statement matches the plan or the commit message, and you
    say so when it does not
 2. Scan for secrets first: keys, tokens, passwords, `.env` files, real

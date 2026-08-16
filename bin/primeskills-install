@@ -25,7 +25,74 @@ TARGETS = {
     "opencode": HOME / ".config" / "opencode" / "skills",
 }
 KIMI_CONFIG = HOME / ".kimi-code" / "config.toml"
+OPENCODE_CONFIG = HOME / ".config" / "opencode" / "opencode.json"
 PREFIX = "prime-"
+
+# Skills reference core by number (PRINCIPLES §3, GUARDRAILS G17). Linking
+# skills/ alone leaves every one of those references pointing at a file no host
+# ever loads. Each host has one file it always reads; a managed block there
+# makes core reachable. Markers keep uninstall exact.
+BEGIN, END = "<!-- primeskills:begin -->", "<!-- primeskills:end -->"
+CORE_FILES = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
+ALWAYS_LOADED = {
+    "claude": HOME / ".claude" / "CLAUDE.md",
+    "codex": HOME / ".codex" / "AGENTS.md",
+    "kimi": HOME / ".kimi-code" / "AGENTS.md",
+}
+
+
+def bootstrap_text():
+    paths = "\n".join(f"- {ROOT / 'core' / f}" for f in CORE_FILES)
+    return f"""{BEGIN}
+## primeskills
+
+Before the first primeskills skill runs in a session, read these three files
+once. The skills reference them by number (PRINCIPLES §1-§8, GUARDRAILS G1-G17)
+and are incomplete without them.
+
+{paths}
+{END}"""
+
+
+def strip_block(text):
+    if BEGIN not in text:
+        return text, False
+    head, rest = text.split(BEGIN, 1)
+    tail = rest.split(END, 1)[1] if END in rest else ""
+    return (head.rstrip() + "\n" + tail.lstrip()).strip() + "\n", True
+
+
+def bootstrap(agent, apply_it, remove):
+    """Returns a one-line status."""
+    if agent == "opencode":
+        if not OPENCODE_CONFIG.is_file():
+            return "no config, skipped"
+        import json
+        data = json.loads(OPENCODE_CONFIG.read_text(encoding="utf-8"))
+        instructions = data.get("instructions", [])
+        want = [str(ROOT / "core" / f) for f in CORE_FILES]
+        present = all(w in instructions for w in want)
+        if apply_it:
+            instructions = [i for i in instructions if i not in want]
+            if not remove:
+                instructions += want
+            data["instructions"] = instructions
+            OPENCODE_CONFIG.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return ("core already in instructions" if present and not remove
+                else "core removed from instructions" if remove
+                else "core added to instructions")
+
+    target = ALWAYS_LOADED.get(agent)
+    if target is None:
+        return "no always-loaded file known"
+    text = target.read_text(encoding="utf-8") if target.is_file() else ""
+    cleaned, had = strip_block(text)
+    if apply_it:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(cleaned if remove else (cleaned.rstrip() + "\n\n" + bootstrap_text() + "\n"),
+                          encoding="utf-8")
+    return (f"core pointer removed from {target.name}" if remove
+            else f"core pointer {'refreshed in' if had else 'added to'} {target.name}")
 
 
 def ours():
@@ -133,6 +200,7 @@ def main():
             print(f"kimi: {action}")
             if args.apply:
                 kimi_apply(not args.uninstall)
+            print(f"kimi: {bootstrap('kimi', args.apply, args.uninstall)}")
             continue
 
         if agent not in TARGETS:
@@ -156,6 +224,7 @@ def main():
             (apply_claude if kind == "dir" else apply_link)(dest, src)
         note = f"  (renamed on collision: {', '.join(renamed)})" if renamed else ""
         print(f"{agent}: {verb} {len(plan_agent(agent))} skills in {root}{note}")
+        print(f"{agent}: {bootstrap(agent, args.apply, args.uninstall)}")
 
     if not args.apply:
         print("\nnothing changed. Re-run with --apply.")

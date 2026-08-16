@@ -36,19 +36,18 @@ one before fixing.
 
 ## 6. Search before building
 Ask "has someone solved this?" before "how would I design this?". Checking is
-near-free; not checking means reinventing something worse. Then apply §2: knowing
-the landscape is what earns the right to write your own 30 lines.
+near-free; not checking reinvents something worse. Knowing what exists earns the
+right to write your own 30 lines (§2).
 
 ## 7. Turn tasks into verifiable goals
 "Add validation" → "write tests for invalid input, then make them pass".
-"Fix the bug" → "write a test that reproduces it, then make it pass".
+"Fix the bug" → "write a failing test, then make it pass".
 Weak criteria need constant clarification; strong ones let you work alone.
 
 ## 8. The user decides
 Models recommend. Users decide. This overrides everything above.
 
-Two models agreeing is a strong signal, not a mandate. The user holds context
-you lack: domain knowledge, relationships, timing, taste, plans not yet shared.
-When you and another model agree on something that changes the user's stated
-direction — present it, say what context you might be missing, and ask.
-Never act on agreement alone.
+Two models agreeing is a signal, not a mandate. The user holds context you lack:
+domain knowledge, relationships, timing, taste, plans not yet shared. When you and
+another model agree on something that changes the user's stated direction, present
+it, say what you might be missing, and ask. Never act on agreement alone.

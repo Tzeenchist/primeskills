@@ -8,13 +8,14 @@ role: write
 # Land
 
 ## Trigger
-`verify` reports PASS and `vet` returns no blocking findings. Not before both.
+`verify` reports PASS, `vet` returns no blocking findings, and `probe` — if it
+ran — did not return BLOCK. Not before all three.
 
 ## Invariants
 - The commit message describes what the diff does. If you cannot write the
   message from the diff, the commit contains more than one change.
-- Two passes over `git diff --staged`: once for secrets, once for whether the
-  message matches. Neither substitutes for the other (G6).
+- Two passes over the whole change (G6): once for secrets, once for whether the
+  message matches. Neither substitutes for the other.
 - Integration is the user's decision. You prepare it; merging, releasing, and
   deploying are theirs to choose (PRINCIPLES §8).
 - Never force-push, never rewrite history, never `git add -A`.
@@ -22,10 +23,10 @@ role: write
 ## Procedure
 1. Run the full suite one more time on the final state → **verify:** exit 0 and
    the counts match what `verify` reported
-2. First pass over `git diff --staged`: scan for keys, tokens, passwords,
+2. First pass over the whole change (G6): scan for keys, tokens, passwords,
    `.env` changes, real identifiers, absolute paths from your machine
    → **verify:** you name each hit or state there are none
-3. Second pass: read the diff and write the message from it → **verify:** every
+3. Second pass over the same range: read it and write the message from it → **verify:** every
    claim in the message appears in the diff, and every change in the diff is
    covered by the message
 4. Check the branch: not the default branch → **verify:** you are on a working
