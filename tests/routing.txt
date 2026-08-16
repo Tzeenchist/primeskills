@@ -20,3 +20,6 @@ open a pull request for this -> land
 build the empty and error states -> ui
 what does that term mean -> baby
 get this reviewed and into a pull request -> close
+merge the approved branch into main -> merge
+put this on the staging server -> deploy
+take it all the way out to production -> release

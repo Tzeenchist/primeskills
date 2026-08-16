@@ -30,3 +30,6 @@ this keeps failing and I do not know why -> debug
 walk me through what you just said -> baby
 is this even the right thing to build -> ceo
 stop me from wiping anything by accident -> fence
+влей ветку в main, ревью прошло -> merge
+выкати на стенд -> deploy
+раскатай в прод и проверь, что живо -> release

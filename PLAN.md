@@ -118,7 +118,8 @@ baby    — в любой момент: объяснить предыдущий 
 | `teams` | `ceo` → `eng` → `beauty` → свод | 120 |
 | `autoplan` | `brief` → `plan` → `teams` → правка плана | 150 |
 | `cycle` | `build` → `verify` → при FAIL `debug`, максимум 3 круга | 150 |
-| `close` | `verify` → `vet` → `probe` → `land` | 150 |
+| `close` | `verify` → `vet` → `probe` → `land` | 250 |
+| `release` | `land` → `merge` → `deploy`, три решения пользователя | 250 |
 
 ### Арифметика бюджета
 
