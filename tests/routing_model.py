@@ -14,7 +14,8 @@ it is not run inside the test suite. Usage:
     codex exec "$(cat /tmp/prompt.txt)" > /tmp/answer.txt
     python3 tests/routing_model.py --check /tmp/answer.txt
 
-Result on 2026-08-16 (codex, gpt-5.6-sol): 28 of 28 correct, 0 unanswered.
+Results (codex, gpt-5.6-sol): 28 of 28 on 2026-08-16 with 19 skills;
+31 of 31 after merge, deploy and release were added.
 """
 import re
 import sys
