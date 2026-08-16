@@ -381,7 +381,7 @@ adapters/kimi/
 | E | `build`, `debug`, `handoff` + поток `cycle` | ✅ 6 скиллов, 8 запросов маршрутизации |
 | **F** | **Замер против gstack на одном таске** | ✅ 9,3–14,8× (`bench/RESULT.md`) |
 | G | `plan`, `ceo`, `eng`, `beauty`, `brief` + потоки `teams`, `autoplan` | ✅ 13 скиллов, 15 запросов маршрутизации |
-| H | `vet`, `probe`, `land`, `ui`, `baby` + поток `close` | |
+| H | `vet`, `probe`, `land`, `ui`, `baby` + поток `close` | ✅ набор полный: 19 скиллов, 5896 слов |
 | I | Адаптеры под 4 агента, профиль `prime-analyst`, опциональный mem0 | |
 | J | Удаление gstack | |
 
