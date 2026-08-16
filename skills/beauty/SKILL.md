@@ -3,6 +3,7 @@ name: beauty
 description: Use to review a plan for interface states, hierarchy and accessibility before building UI
 budget: 300
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---
 
 # Beauty

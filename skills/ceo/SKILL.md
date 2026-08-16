@@ -3,6 +3,7 @@ name: ceo
 description: Use to review a plan for whether it is the right work at all, before committing to it
 budget: 300
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---
 
 # Ceo

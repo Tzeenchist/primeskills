@@ -3,6 +3,7 @@ name: baby
 description: Use to explain a term or the previous answer in plain language, without assumed expertise
 budget: 400
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:
   - path: ref/jargon.md
     when: the passage being explained contains a term of art

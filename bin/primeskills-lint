@@ -12,6 +12,7 @@ import yaml
 
 SECTIONS = ["Trigger", "Invariants", "Procedure", "Stop conditions", "Output", "References"]
 ROLES = {"read-only", "write"}
+WRITING_TOOLS = {"Edit", "Write", "NotebookEdit"}
 DESC_MAX = 140
 DEFAULT_BUDGET = 800
 CORE_BUDGET = 1400          # always-loaded files only
@@ -82,6 +83,17 @@ def check_skill(path, seen_invariants, problems):
         bad("F2", f"name '{meta['name']}' != directory '{path.parent.name}'")
     if meta.get("role") and meta["role"] not in ROLES:
         bad("F9", f"role '{meta['role']}' not in {sorted(ROLES)}")
+
+    # F10: role and allowed-tools must agree. Claude Code enforces the latter;
+    # everywhere else the role is the only statement, so they cannot drift.
+    tools = meta.get("allowed-tools")
+    if meta.get("role") == "read-only":
+        if not tools:
+            bad("F10", "read-only skill without allowed-tools")
+        elif WRITING_TOOLS & set(tools):
+            bad("F10", f"read-only skill allows {sorted(WRITING_TOOLS & set(tools))}")
+    elif tools and not (WRITING_TOOLS & set(tools)):
+        bad("F10", "write skill whose allowed-tools cannot write")
 
     desc = str(meta.get("description", ""))
     if len(desc) > DESC_MAX:

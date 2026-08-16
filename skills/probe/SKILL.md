@@ -3,6 +3,7 @@ name: probe
 description: Use to click through a running app and report the bugs it actually has, without fixing them
 budget: 800
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:
   - path: ../ui/ref/ui-states.md
     when: the system under test has a user interface

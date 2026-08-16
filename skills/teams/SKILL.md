@@ -4,6 +4,7 @@ description: Use to run the full review panel over an existing plan and consolid
 budget: 250
 tier: flow
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---
 
 # Teams

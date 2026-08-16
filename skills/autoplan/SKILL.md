@@ -4,6 +4,7 @@ description: Use to go from a raw idea to an approved plan without stopping betw
 budget: 250
 tier: flow
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---
 
 # Autoplan

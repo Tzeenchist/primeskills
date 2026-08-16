@@ -3,6 +3,7 @@ name: vet
 description: Use to review a diff before it merges, for correctness, security and scope
 budget: 800
 role: read-only
+allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:
   - path: ref/security.md
     when: the diff touches input handling, authentication, storage, or an external integration

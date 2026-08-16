@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Link the skills into each agent, from one source of truth.
+
+Nothing is copied: every agent points at skills/ in this repository, so an edit
+here takes effect everywhere at once. Prints a plan by default; --apply does it.
+
+Claude Code wants a real directory with the files linked inside it (that is how
+gstack installs, and it keeps ref/ reachable). Codex and OpenCode take a symlink
+to the directory. Kimi needs no links at all -- just the path in its config.
+"""
+import argparse
+import os
+import shutil
+import sys
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SKILLS = ROOT / "skills"
+HOME = Path.home()
+
+TARGETS = {
+    "claude": HOME / ".claude" / "skills",
+    "codex": HOME / ".codex" / "skills",
+    "opencode": HOME / ".config" / "opencode" / "skills",
+}
+KIMI_CONFIG = HOME / ".kimi-code" / "config.toml"
+PREFIX = "prime-"
+
+
+def ours():
+    return sorted(p.parent for p in SKILLS.glob("*/SKILL.md"))
+
+
+def is_ours(path):
+    """A link we created, so uninstall never removes someone else's skill."""
+    if path.is_symlink():
+        return str(ROOT) in os.path.realpath(path)
+    inner = path / "SKILL.md"
+    return inner.is_symlink() and str(ROOT) in os.path.realpath(inner)
+
+
+def target_name(agent, skill_dir):
+    """Prefix only on a real collision, so names stay plain where they can."""
+    dest = TARGETS[agent] / skill_dir.name
+    if dest.exists() and not is_ours(dest):
+        return PREFIX + skill_dir.name
+    return skill_dir.name
+
+
+def plan_agent(agent):
+    root = TARGETS[agent]
+    steps = []
+    for skill in ours():
+        name = target_name(agent, skill)
+        dest = root / name
+        if agent == "claude":
+            steps.append(("dir", dest, skill))
+        else:
+            steps.append(("link", dest, skill))
+    return steps
+
+
+def apply_claude(dest, src):
+    if dest.is_symlink() or dest.is_file():
+        dest.unlink()
+    dest.mkdir(parents=True, exist_ok=True)
+    for item in src.rglob("*"):
+        if item.is_dir():
+            continue
+        rel = item.relative_to(src)
+        out = dest / rel
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.is_symlink() or out.exists():
+            out.unlink()
+        out.symlink_to(item)
+
+
+def apply_link(dest, src):
+    if dest.is_symlink() or dest.is_file():
+        dest.unlink()
+    elif dest.is_dir():
+        shutil.rmtree(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.symlink_to(src, target_is_directory=True)
+
+
+def kimi_state():
+    if not KIMI_CONFIG.is_file():
+        return None
+    data = tomllib.loads(KIMI_CONFIG.read_text(encoding="utf-8"))
+    return data.get("extra_skill_dirs", [])
+
+
+def kimi_apply(add):
+    text = KIMI_CONFIG.read_text(encoding="utf-8")
+    dirs = kimi_state() or []
+    want = str(SKILLS)
+    if add and want not in dirs:
+        dirs.append(want)
+    if not add and want in dirs:
+        dirs.remove(want)
+    rendered = "extra_skill_dirs = [" + ", ".join(f'"{d}"' for d in dirs) + "]"
+    if "extra_skill_dirs" in text:
+        out = []
+        for line in text.splitlines():
+            out.append(rendered if line.strip().startswith("extra_skill_dirs") else line)
+        text = "\n".join(out) + "\n"
+    else:
+        text += "\n" + rendered + "\n"
+    KIMI_CONFIG.write_text(text, encoding="utf-8")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("agents", nargs="*", default=[], help="claude codex opencode kimi; empty = all")
+    ap.add_argument("--apply", action="store_true", help="do it (default: print the plan)")
+    ap.add_argument("--uninstall", action="store_true")
+    args = ap.parse_args()
+
+    agents = args.agents or list(TARGETS) + ["kimi"]
+    verb = "remove" if args.uninstall else ("link" if args.apply else "would link")
+
+    for agent in agents:
+        if agent == "kimi":
+            dirs = kimi_state()
+            if dirs is None:
+                print("kimi: no config.toml, skipped")
+                continue
+            present = str(SKILLS) in dirs
+            action = "already listed" if present and not args.uninstall else \
+                     ("not listed" if not present and args.uninstall else f"{verb} extra_skill_dirs entry")
+            print(f"kimi: {action}")
+            if args.apply:
+                kimi_apply(not args.uninstall)
+            continue
+
+        if agent not in TARGETS:
+            print(f"unknown agent {agent}", file=sys.stderr)
+            return 2
+        root = TARGETS[agent]
+        if not root.parent.exists():
+            print(f"{agent}: not installed here, skipped")
+            continue
+        renamed = []
+        for kind, dest, src in plan_agent(agent):
+            if dest.name != src.name:
+                renamed.append(f"{src.name} -> {dest.name}")
+            if not args.apply:
+                continue
+            if args.uninstall:
+                if dest.exists() and is_ours(dest):
+                    shutil.rmtree(dest) if dest.is_dir() and not dest.is_symlink() else dest.unlink()
+                continue
+            root.mkdir(parents=True, exist_ok=True)
+            (apply_claude if kind == "dir" else apply_link)(dest, src)
+        note = f"  (renamed on collision: {', '.join(renamed)})" if renamed else ""
+        print(f"{agent}: {verb} {len(plan_agent(agent))} skills in {root}{note}")
+
+    if not args.apply:
+        print("\nnothing changed. Re-run with --apply.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
