@@ -379,8 +379,8 @@ adapters/kimi/
 | C | `fence` — хуки безопасности и границы правок | ✅ 22 проверки |
 | D | `verify` — листовой узел графа | ✅ 398 слов + `ref/harness.md` |
 | E | `build`, `debug`, `handoff` + поток `cycle` | ✅ 6 скиллов, 8 запросов маршрутизации |
-| **F** | **Замер против gstack на одном таске** | **точка разворота** |
-| G | `plan`, `ceo`, `eng`, `beauty`, `brief` + потоки `teams`, `autoplan` | |
+| **F** | **Замер против gstack на одном таске** | ✅ 9,3–14,8× (`bench/RESULT.md`) |
+| G | `plan`, `ceo`, `eng`, `beauty`, `brief` + потоки `teams`, `autoplan` | ✅ 13 скиллов, 15 запросов маршрутизации |
 | H | `vet`, `probe`, `land`, `ui`, `baby` + поток `close` | |
 | I | Адаптеры под 4 агента, профиль `prime-analyst`, опциональный mem0 | |
 | J | Удаление gstack | |

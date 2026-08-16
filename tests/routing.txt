@@ -7,3 +7,10 @@ implement the new endpoint -> build
 why is this test failing -> debug
 save state before I run out of limit -> handoff
 run the implementation loop until green -> cycle
+break this into ordered tasks -> plan
+is this the right work at all -> ceo
+review the architecture and edge cases -> eng
+check the interface states and accessibility -> beauty
+what do I actually want here -> brief
+run the whole review panel -> teams
+idea to approved plan in one pass -> autoplan
