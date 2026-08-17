@@ -1,7 +1,7 @@
 ---
 name: primeskills
 description: Use to print the guide to this set of skills
-budget: 300
+budget: 350
 role: write
 ---
 
@@ -16,8 +16,8 @@ with the set installed. Also on request: `/primeskills`.
   question *about* the set; it does not do work *in* it.
 - The guide is generated from the set, never retyped. A guide written by hand
   describes the set as it was on the day it was written.
-- Hand the guide over whole. Summarising it replaces the reader's reading with
-  yours, and the guide is what they asked for.
+- Hand the guide over whole: summarising replaces the reader's reading with
+  yours. Translating does not — every line survives, in their language.
 - The language is the reader's, asked once and remembered.
 
 ## Procedure
@@ -30,8 +30,12 @@ with the set installed. Also on request: `/primeskills`.
    `--which-lang` now returns that language
 4. Print it: `primeskills-help` → **verify:** the output ends with the line
    counting skills and sequences
-5. Give the output unchanged → **verify:** you added no summary, no ranking
-   and no advice on top
+5. The one-line descriptions print in English — that is the text you match on.
+   If the reader's language is not English, translate them as you hand the guide
+   over → **verify:** every one is translated, still says when to reach for that
+   skill, and none was improved on the way
+6. Give the rest unchanged → **verify:** you added no summary, no ranking and
+   no advice on top
 
 ## Stop conditions
 - `primeskills-help` is not on PATH: say so and point at `primeskills-doctor`.
