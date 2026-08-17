@@ -96,10 +96,24 @@ python3 bin/primeskills-install claude --apply   # только один аге�
   `browse` и `review`, плюс каталог `gstack/` с симлинками на `bin` и `ETHOS.md`.
   Осталось ровно 27 наших.
 
-Источник gstack не тронут: `~/.claude/skills/gstack` на месте, и для Claude Code
-набор продолжает работать. Снято только подключение к Codex. Список удалённого —
-`~/.mcp-disabled-backup-2026-08-17/codex-gstack-manifest.txt`; восстанавливается
-установщиком самого gstack, а не из манифеста.
+**Второй источник, найденный не сразу.** После чистки `~/.codex/skills` Codex
+по-прежнему показывал gstack: он читает ещё и `~/.agents/skills` — каталог по
+межагентному соглашению `.agents`, на который не ссылается ни один конфиг. Там
+лежала **отдельная полная установка gstack на 617 МБ** (не ссылки на копию для
+Claude Code) и ни одного нашего навыка.
+
+111 записей перенесены в `~/.agents/skills_archive`, остались только
+`find-skills` и `modern-web-guidance` — они не из gstack. Перенос, а не
+удаление: откат — `mv ~/.agents/skills_archive/* ~/.agents/skills/`.
+
+Источник для Claude Code не тронут: `~/.claude/skills/gstack` на месте, 90
+записей, набор продолжает работать. Список снятого с Codex —
+`~/.mcp-disabled-backup-2026-08-17/codex-gstack-manifest.txt`.
+
+**Открытым остаётся вопрос охвата:** `~/.agents/skills` — путь общий, и какие
+ещё агенты его читают, конфигами не установить. У OpenCode свой каталог с
+собственной копией gstack (35 записей), у Kimi в `extra_skill_dirs` только наш
+путь. Если у кого-то gstack пропадёт — вернуть одной командой выше.
 
 ## Mem0 — по флагу
 
