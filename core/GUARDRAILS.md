@@ -43,8 +43,12 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   truncated tables, mass process and container kills: stop and ask. `fence`
   holds the pattern list and the safe exceptions and blocks at call time — you
   are not asked to memorise it. Necessary, never sufficient: see G17.
-- **Git authority.** Create branches, commit, read `diff` and `log`. Rewriting
-  history, force-pushing, and resetting are outside your authority.
+- **Authority is a ladder, not a switch.** Reading and editing files in the
+  work you were asked to do needs no permission. Each rung below is a separate
+  yes, and one does not imply the next: commit, push, open a pull request,
+  merge, deploy, roll back, delete anything. Rewriting history, force-pushing
+  and resetting are outside the ladder entirely. A permission gate the host
+  never showed you is not permission granted.
 - **G14 Snapshot before risk.** Before a migration, a bulk edit, or a refactor,
   take a snapshot you have proved you can restore, covering tracked, staged
   **and untracked** files you own. `git stash create` silently skips untracked
@@ -60,9 +64,10 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   only when the new test passes *and* the full suite passes.
 - **G13 Hypothesis ledger.** Before each new attempt, write one line:
   "hypothesis N failed because X; hypothesis N+1 does Y differently."
-- **G11 Checkpoints.** Every 2–3 completed steps, record status and commit
-  atomically. Stage intentional files only — never `git add -A`. Never commit
-  broken tests or mid-edit state.
+- **G11 Checkpoints.** Every 2–3 completed steps, leave a point you can come
+  back to. A commit is the good one where committing is allowed; where it is
+  not, a snapshot covering untracked work is. Stage intentional files only —
+  never `git add -A`. Never commit broken tests or mid-edit state.
 
 ## People
 - **G12 Escalation.** Decide alone unless it is on this list, and never decide

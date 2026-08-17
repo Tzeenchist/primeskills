@@ -24,7 +24,9 @@ Arm before touching production, shared systems, an unfamiliar repo, or any
 unattended session. Also on request: "be careful", "lock edits here".
 
 ## Invariants
-- The command guard warns; it never silently allows what it could not parse.
+- This is a warning layer, not a boundary. The command list is a list; a shell
+  cannot be closed with a denylist. It never silently allows what it could not
+  parse, and that is the only guarantee it makes.
 - The boundary hook sees `Edit`, `Write`, `NotebookEdit` — not the shell:
   `sed -i`, `tee`, `cp` and redirection walk past it. It is a reminder you
   cannot forget, not a wall.

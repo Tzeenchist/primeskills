@@ -21,15 +21,17 @@ ROOT = Path(__file__).resolve().parent.parent
 ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 # Role isolation, stated at the level it was actually verified.
+# "Enforced" here means the host declares the restriction, not that anyone has
+# proved it cannot be walked around. No adversarial test backs these rows.
 SUPPORT = [
     ("Claude Code", "skills + core pointer in CLAUDE.md",
-     "allowed-tools enforced; the shell is not covered (G7)"),
+     "editing tools held; shell writes anywhere — advisory, not a boundary"),
     ("Codex", "skills + core pointer in ~/.codex/AGENTS.md",
-     "profile syntax correct; sandbox unusable here (bwrap fails in every mode)"),
+     "profile syntax correct; sandbox unusable here — advisory only"),
     ("OpenCode", "skills + core in instructions + prime-analyst profile",
-     "profile registered; permission edit/write deny"),
+     "edit/write denied; shell is a separate channel — advisory"),
     ("Kimi", "extra_skill_dirs + core pointer + prime-analyst profile",
-     "profile registered; Edit/Write/NotebookEdit denied"),
+     "Edit/Write/NotebookEdit denied; shell not covered — advisory"),
 ]
 
 

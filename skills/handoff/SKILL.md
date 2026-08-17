@@ -32,9 +32,9 @@ the task to another agent. Also on request: "save state", "checkpoint".
    1–3 sentences of summary, decisions and why, remaining work in priority
    order, and notes — gotchas, blockers, open questions, approaches tried that
    did not work → **verify:** a reader who was not here could act on it
-5. Commit it. A checkpoint that never leaves this machine cannot reach the next
-   agent, so say the branch has a remote and ask before pushing — changing a
-   remote is not a side effect of a session ending → **verify:** the file is in
+5. The file is written; committing and pushing are separate permissions and
+   neither follows from a session ending. Say the file exists, say whether the
+   branch has a remote, and ask for each → **verify:** the file is in
    the diff, tests were green before the commit, and you say pushed, declined,
    or not asked for
 

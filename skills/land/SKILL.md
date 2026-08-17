@@ -52,7 +52,8 @@ ran — did not return BLOCK. Not before all three.
   remote, and force is not the answer to it.
 - No hosting for a pull request: that is not a failure, it is a different
   handover. Never report a PR you did not create.
-- You are on the default branch with uncommitted work: branch first, ask second.
+- You are on the default branch with uncommitted work: say so and ask. Creating
+  a branch is cheap, but choosing where the user's work lives is theirs.
 
 ## Output
 Branch, commit, PR URL, the acceptance criteria with each marked, and one line

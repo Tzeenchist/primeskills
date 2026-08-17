@@ -25,8 +25,10 @@ Never on your own initiative, and never as the tail end of merging.
 1. Resolve the target: which environment, which host, which database, which
    branch or tag → **verify:** print it and have the user confirm it is what
    they meant, when it is production
-2. State the rollback and its cost in minutes → **verify:** it is a concrete
-   command or procedure, and you have checked its prerequisites exist
+2. State the rollback, its cost in minutes, and whether it is possible at all
+   after the migrations in this release → **verify:** it is a concrete command
+   or procedure with its prerequisites checked, or an explicit "forward only"
+   the user has heard before you start
 3. Back up what the deploy can destroy — data, uploaded files, configuration
    → **verify:** the backup exists and you can name how to restore from it (G14)
 4. Check what ships: the commit going out and how it differs from what runs now
@@ -43,8 +45,11 @@ Never on your own initiative, and never as the tail end of merging.
 ## Stop conditions
 - No rollback: stop. A deploy you cannot undo is a decision, not a task.
 - The target cannot be proved to be the intended one: stop (G17, G12).
-- Health check fails: roll back first, diagnose after. Debugging a live
-  environment while users sit on the broken version is the wrong order.
+- Health check fails: carry out the rollback decided in step 2, and if that
+  decision was "forward only" — because a migration made the old version
+  incompatible — say so and ask. Debugging a live environment while users sit
+  on the broken version is the wrong order; rolling into a schema the old code
+  cannot read is the wrong direction.
 - Migrations are irreversible and the backup is missing or untested: stop.
 
 ## Output
