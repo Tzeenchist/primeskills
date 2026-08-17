@@ -1,7 +1,7 @@
 ---
 name: fence
 description: Use to arm destructive-command warnings and restrict edits to a directory
-budget: 240
+budget: 350
 role: write
 hooks:
   PreToolUse:

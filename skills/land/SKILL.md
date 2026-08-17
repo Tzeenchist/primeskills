@@ -1,7 +1,7 @@
 ---
 name: land
 description: Use to commit, push and open a pull request once work is verified and reviewed
-budget: 800
+budget: 600
 role: write
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: deploy
 description: Use to put merged work into an environment, with a rollback ready before it starts
-budget: 500
+budget: 550
 role: write
 ---
 

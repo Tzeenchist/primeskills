@@ -1,7 +1,7 @@
 ---
 name: vet
 description: Use to review a diff before it merges, for correctness, security and scope
-budget: 800
+budget: 550
 role: reports
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:

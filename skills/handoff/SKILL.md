@@ -1,7 +1,7 @@
 ---
 name: handoff
 description: Use to save working state so another session or agent can resume without losing the thread
-budget: 400
+budget: 500
 role: write
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: eng
 description: Use to review a plan for architecture, data flow, edge cases and test coverage
-budget: 300
+budget: 400
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---

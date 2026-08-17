@@ -1,7 +1,7 @@
 ---
 name: verify
 description: Use before claiming tests pass or work is done, and before any commit or PR
-budget: 430
+budget: 550
 role: write
 refs:
   - path: ref/harness.md

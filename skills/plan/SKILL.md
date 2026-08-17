@@ -1,7 +1,7 @@
 ---
 name: plan
 description: Use when requirements are clear and work needs breaking into ordered tasks, before touching code
-budget: 600
+budget: 500
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---

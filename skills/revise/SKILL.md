@@ -1,7 +1,7 @@
 ---
 name: revise
 description: Use when a reviewer requested changes, to answer every comment and rework the branch
-budget: 500
+budget: 550
 role: write
 ---
 

@@ -72,8 +72,9 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   shared, production-like, or cannot be shown to be isolated. A resolved test
   target that is provably isolated does not escalate.
 - **G7 Role isolation.** A read-only skill does not edit, write, or run
-  mutating commands. A `reports` skill leaves the work alone
-  but writes its verdict under `.primeskills/`.
+  mutating commands. A `reports` skill leaves the work
+  untouched and writes only under `.primeskills/`: a verdict nobody can read is
+  not a verdict.
   The shell counts: redirection, `sed -i`, `tee`, and
   state-changing git are the same violation as opening an editor. Hosts block
   the editor, not the shell, so this one is on you. Absence of a permission gate is not permission: under

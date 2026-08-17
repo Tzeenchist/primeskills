@@ -1,7 +1,7 @@
 ---
 name: measure
 description: Use when something got slower, to set a baseline and find where the time actually goes
-budget: 500
+budget: 550
 role: reports
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---

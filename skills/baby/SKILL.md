@@ -1,7 +1,7 @@
 ---
 name: baby
 description: Use to explain a term or the previous answer in plain language, without assumed expertise
-budget: 400
+budget: 450
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:

@@ -1,7 +1,7 @@
 ---
 name: ui
 description: Use when building an interface with empty, loading, error and success states and keyboard access
-budget: 600
+budget: 450
 role: write
 refs:
   - path: ref/ui-states.md

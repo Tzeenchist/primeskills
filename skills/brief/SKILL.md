@@ -1,7 +1,7 @@
 ---
 name: brief
 description: Use before creating anything, to find out what is actually wanted and what to cut
-budget: 800
+budget: 550
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---

@@ -1,7 +1,7 @@
 ---
 name: autoplan
 description: Use to go from a raw idea to an approved plan without stopping between steps
-budget: 250
+budget: 300
 tier: flow
 calls: [brief, plan, teams]
 role: read-only

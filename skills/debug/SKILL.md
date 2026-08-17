@@ -1,7 +1,7 @@
 ---
 name: debug
 description: Use when a test fails, a build breaks, or behaviour surprises you, before proposing a fix
-budget: 620
+budget: 700
 role: write
 ---
 

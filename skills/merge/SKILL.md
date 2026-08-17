@@ -1,7 +1,7 @@
 ---
 name: merge
 description: Use to merge an approved change into the base branch once CI is green
-budget: 430
+budget: 500
 role: write
 ---
 

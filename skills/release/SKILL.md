@@ -1,7 +1,7 @@
 ---
 name: release
 description: Use to take merged work all the way to a running environment, merging then deploying
-budget: 250
+budget: 350
 tier: flow
 calls: [land, merge, deploy]
 role: write

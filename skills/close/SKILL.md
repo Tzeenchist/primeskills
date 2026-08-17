@@ -1,7 +1,7 @@
 ---
 name: close
 description: Use to take verified work through review and testing to a pull request
-budget: 250
+budget: 350
 tier: flow
 calls: [verify, vet, probe, handoff, land]
 calls_optional: [probe, handoff]

@@ -1,7 +1,7 @@
 ---
 name: primeskills
 description: Use to print the guide to this set of skills
-budget: 350
+budget: 450
 role: write
 ---
 

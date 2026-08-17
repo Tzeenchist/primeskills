@@ -1,7 +1,7 @@
 ---
 name: teams
 description: Use to run the full review panel over an existing plan and consolidate what it finds
-budget: 250
+budget: 350
 tier: flow
 calls: [ceo, eng, beauty]
 calls_optional: [beauty]
