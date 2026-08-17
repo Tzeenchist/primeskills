@@ -122,27 +122,35 @@ def bootstrap(agent, apply_it, remove):
 # cannot resolve is an instruction that fails silently, so the command gets a
 # place on PATH here rather than an absolute path baked into every SKILL.md.
 LOCAL_BIN = HOME / ".local" / "bin"
-RUN_TOOL = ROOT / "bin" / "primeskills-run"
+SHARED_TOOLS = ("primeskills-run", "primeskills-help")
 
 
 def command(apply_it, remove):
-    dest = LOCAL_BIN / RUN_TOOL.name
-    ours_link = dest.is_symlink() and os.path.realpath(dest) == str(RUN_TOOL)
-    if remove:
-        if apply_it and ours_link:
-            dest.unlink()
-        return "primeskills-run unlinked" if ours_link else "primeskills-run not ours, left alone"
-    if dest.exists() and not ours_link:
-        return f"{dest} exists and is not ours, left alone"
-    if apply_it:
-        LOCAL_BIN.mkdir(parents=True, exist_ok=True)
-        if dest.is_symlink():
-            dest.unlink()
-        dest.symlink_to(RUN_TOOL)
+    done, skipped = [], []
+    for name in SHARED_TOOLS:
+        src = ROOT / "bin" / name
+        dest = LOCAL_BIN / name
+        ours_link = dest.is_symlink() and os.path.realpath(dest) == str(src)
+        if remove:
+            if apply_it and ours_link:
+                dest.unlink()
+            (done if ours_link else skipped).append(name)
+            continue
+        if dest.exists() and not ours_link:
+            skipped.append(name)
+            continue
+        if apply_it:
+            LOCAL_BIN.mkdir(parents=True, exist_ok=True)
+            if dest.is_symlink():
+                dest.unlink()
+            dest.symlink_to(src)
+        done.append(name)
     on_path = str(LOCAL_BIN) in os.environ.get("PATH", "").split(os.pathsep)
     tail = "" if on_path else f" (warning: {LOCAL_BIN} is not on PATH)"
-    verb = "linked" if apply_it else "would link"
-    return f"primeskills-run {verb} into {LOCAL_BIN}{tail}"
+    verb = ("unlinked" if apply_it else "would unlink") if remove else \
+           ("linked" if apply_it else "would link")
+    note = f"; left alone: {', '.join(skipped)}" if skipped else ""
+    return f"{', '.join(done) or 'nothing'} {verb} into {LOCAL_BIN}{tail}{note}"
 
 
 def ours():

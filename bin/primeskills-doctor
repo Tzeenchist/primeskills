@@ -101,19 +101,21 @@ def check_profile(r, agent, dest):
 
 
 def check_command(r):
-    """Six skills name `primeskills-run`. If the shell cannot find it, those
-    instructions fail silently -- the exact failure this tool exists to catch."""
-    found = shutil.which("primeskills-run")
-    if not found:
-        r.line(FAIL, "shared", "primeskills-run on PATH", "not found")
-        return
-    target = ROOT / "bin" / "primeskills-run"
-    if Path(found).resolve() != target.resolve():
-        r.line(WARN, "shared", "primeskills-run on PATH", f"{found} is not ours")
-        return
-    p = subprocess.run([sys.executable, str(target), "--help"],
-                       capture_output=True, text=True)
-    r.line(OK if p.returncode == 0 else FAIL, "shared", "primeskills-run on PATH", found)
+    """Skills name these tools by bare name. If the shell cannot find one, the
+    instruction fails silently -- the exact failure this tool exists to catch."""
+    for name, probe in (("primeskills-run", "--help"),
+                        ("primeskills-help", "--which-lang")):
+        found = shutil.which(name)
+        if not found:
+            r.line(FAIL, "shared", f"{name} on PATH", "not found")
+            continue
+        target = ROOT / "bin" / name
+        if Path(found).resolve() != target.resolve():
+            r.line(WARN, "shared", f"{name} on PATH", f"{found} is not ours")
+            continue
+        p = subprocess.run([sys.executable, str(target), probe],
+                           capture_output=True, text=True)
+        r.line(OK if p.returncode == 0 else FAIL, "shared", f"{name} on PATH", found)
 
 
 def main():

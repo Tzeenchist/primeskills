@@ -43,6 +43,7 @@ python3 bin/primeskills-status            # состав и статус, из �
 python3 bin/primeskills-lint              # формат: F1-F11, C1-C2
 python3 bin/primeskills-run show          # запись прогона текущей ветки
 python3 bin/primeskills-adherence --all   # соблюдались ли инварианты вызванных скиллов
+python3 bin/primeskills-help             # справка по набору, EN или RU
 python3 bin/primeskills-route skills tests/routing.txt
 python3 bin/primeskills-install --apply   # разложить по агентам
 python3 tests/run.py                      # весь прогон

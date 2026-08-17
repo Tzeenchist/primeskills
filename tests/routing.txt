@@ -31,3 +31,5 @@ how is this unfamiliar code structured -> study
 understand a module I did not write and report back -> study
 strip machine tells before this text is published -> prose
 clean up the draft so it does not read as machine written -> prose
+print the guide to this set of skills -> primeskills
+which skill do I use for that -> primeskills

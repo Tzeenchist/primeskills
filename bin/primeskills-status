@@ -59,6 +59,11 @@ def expand(name, call_map, seen=None):
     return seen
 
 
+def budget_of(path):
+    m = re.search(r"^budget:\s*(\d+)", path.read_text(encoding="utf-8"), re.M)
+    return int(m.group(1)) if m else 800
+
+
 def calls_of(path, key="calls"):
     m = re.search(rf"^{key}:\s*\[(.*?)\]", path.read_text(encoding="utf-8"), re.M)
     return [n.strip() for n in m.group(1).split(",") if n.strip()] if m else []
@@ -100,8 +105,14 @@ def main():
     print(f"  one skill          {base + min(singles.values())}"
           f" … {base + max(singles.values())} words "
           f"(base {base} + one body {min(singles.values())}–{max(singles.values())})")
-    print(f"  headroom           {3000 - base - max(singles.values())} words "
-          f"before a call hits the 3000 ceiling (C3)")
+    # C3 is enforced against the declared budget, not today's body: a skill may
+    # grow into its budget without warning. Reporting the roomier number would
+    # promise headroom the linter will refuse.
+    budgets = {p.parent.name: budget_of(p) for p in skills
+               if p.parent.name in singles}
+    worst_name = max(budgets, key=budgets.get)
+    print(f"  headroom           {3000 - base - budgets[worst_name]} words before "
+          f"C3 refuses (budget of '{worst_name}' is {budgets[worst_name]})")
     print("  a flow             base + every body it can call:")
     certain = {p.parent.name: calls_of(p) for p in skills}
     everything = {p.parent.name: calls_of(p) + calls_of(p, "calls_optional")
