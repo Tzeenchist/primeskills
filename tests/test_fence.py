@@ -15,7 +15,7 @@ COMMANDS = [
     ('{"tool_input":{"command":"rm -rf /var/data"}}', "ask"),
     ('{"tool_input":{"command":"git commit -m \\"wip\\" && rm -rf /"}}', "ask"),
     ('{"tool_input":{"command":"psql -c \'DROP DATABASE prod\'"}}', "ask"),
-    ('{"tool_input":{"command":"dropdb snirrex_wagtail"}}', "ask"),
+    ('{"tool_input":{"command":"dropdb ledger_staging"}}', "ask"),
     ('{"tool_input":{"command":"python manage.py flush"}}', "ask"),
     ('{"tool_input":{"command":"git push --force origin main"}}', "ask"),
     ('{"tool_input":{"command":"git clean -fd"}}', "ask"),

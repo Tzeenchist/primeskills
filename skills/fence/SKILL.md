@@ -8,12 +8,12 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "python3 /srv/project/primeskills/skills/fence/bin/check-commands.py"
+          command: "python3 $HOME/.claude/skills/fence/bin/check-commands.py"
           statusMessage: "fence: checking the command"
     - matcher: "Edit|Write|NotebookEdit"
       hooks:
         - type: command
-          command: "python3 /srv/project/primeskills/skills/fence/bin/check-boundary.py"
+          command: "python3 $HOME/.claude/skills/fence/bin/check-boundary.py"
           statusMessage: "fence: checking the boundary"
 ---
 

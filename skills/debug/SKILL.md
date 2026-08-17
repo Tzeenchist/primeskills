@@ -30,22 +30,26 @@ attempt, not after the third.
    reproduce from a state you can describe
 2. Reproduce it once, cleanly → **verify:** the failure appears, and you can
    state the exact command and starting condition
-3. Shrink to a minimal failing example: strip inputs, mocks, and steps until
+3. Ask whether it ever worked: `git log --oneline -20 -- <files in the
+   failure>` and, if a good commit is known, check out and run there
+   → **verify:** you can say "regression, and the cause is inside this diff" or
+   "never worked", and you say which
+4. Shrink to a minimal failing example: strip inputs, mocks, and steps until
    removing anything more makes it pass → **verify:** the MRE still fails and
    fits in a screen
-4. Read the actual values at the boundary — types, nulls, empties, encodings.
+5. Read the actual values at the boundary — types, nulls, empties, encodings.
    Print them, do not infer them → **verify:** you can name what the data is,
    not what it should be
-5. Name the layer the fault lives in: agent behaviour, data and state, harness
+6. Name the layer the fault lives in: agent behaviour, data and state, harness
    mismatch, or process gap → **verify:** the layer explains every symptom you
    observed, not just the loudest one
-6. State one hypothesis and the experiment that would falsify it → **verify:**
+7. State one hypothesis and the experiment that would falsify it → **verify:**
    the experiment can come out either way
-7. Run the experiment → **verify:** the result is read, not assumed
-8. If it failed, write the ledger line before touching anything: "hypothesis N
+8. Run the experiment → **verify:** the result is read, not assumed
+9. If it failed, write the ledger line before touching anything: "hypothesis N
    failed because X; hypothesis N+1 does Y differently" → **verify:** N+1 is
    different in kind, not in cosmetics (G13)
-9. Fix at the lowest durable layer, then hand to `verify` → **verify:** the MRE
+10. Fix at the lowest durable layer, then hand to `verify` → **verify:** the MRE
    passes and the full suite passes
 
 ## Stop conditions
@@ -56,7 +60,7 @@ attempt, not after the third.
 - Two guesses at a third-party format have failed: stop guessing and go read.
   A third guess is rarely the one that works.
 - The fix would add a null guard or an empty catch over a bad value: that is
-  the symptom talking. Go back to step 4.
+  the symptom talking. Go back to step 5.
 
 ## Output
 The MRE, the root cause and its layer, the fix, the ruled-out hypotheses, and
