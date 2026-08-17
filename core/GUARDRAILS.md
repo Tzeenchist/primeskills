@@ -26,7 +26,8 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   open question, remaining work, finding, status — is re-checked against the
   record or dropped. An open item names its anchor: file and line, commit,
   issue, or the message that raised it. No anchor, no item. The record beats
-  memory. Resolved items are marked resolved, not deleted.
+  memory. Resolved items are marked resolved, not deleted. Check a new item
+  against the open ones: duplicates report progress twice.
 
 ## Harness and data
 - **G8 Harness immutability and hygiene.** Never edit tests, fixtures, or

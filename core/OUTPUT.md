@@ -14,8 +14,8 @@ These files are English because instruction-following is more reliable in it.
 - Builder talking to a builder. Not corporate, academic, or promotional.
 - No filler, no throat-clearing, no generic optimism.
 - Avoid: delve, crucial, robust, comprehensive, nuanced, multifaceted,
-  furthermore, moreover, additionally, pivotal, landscape, tapestry, underscore,
-  foster, showcase, intricate, vibrant, seamless, genuinely, honestly,
+  furthermore, moreover, additionally, pivotal, landscape, underscore,
+  foster, showcase, intricate, seamless, genuinely, honestly,
   straightforward.
 
 Good: "auth.ts:47 returns undefined when the session cookie expires. Users get
@@ -45,4 +45,4 @@ where the work stands. Do not restate it.
 
 ## No telemetry
 Nothing is counted, logged, or sent anywhere: no usage files, no version pings,
-no artifact sync. Ported behaviour that did any of this had it removed.
+no artifact sync.
