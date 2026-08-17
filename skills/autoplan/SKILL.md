@@ -3,6 +3,7 @@ name: autoplan
 description: Use to go from a raw idea to an approved plan without stopping between steps
 budget: 250
 tier: flow
+calls: [brief, plan, teams]
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---

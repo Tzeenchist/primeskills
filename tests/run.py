@@ -16,6 +16,7 @@ EXPECT = {
     "ok": None,
     "f12-paraphrase": "F12",
     "f12-cited": None,
+    "f13-unknown-call": "F13",
     "f1-no-frontmatter": "F1",
     "f2-name-mismatch": "F2",
     "f3-long-description": "F3",

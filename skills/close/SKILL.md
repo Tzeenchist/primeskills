@@ -3,6 +3,7 @@ name: close
 description: Use to take verified work through review and testing to a pull request
 budget: 250
 tier: flow
+calls: [verify, vet, probe, handoff, land]
 role: write
 ---
 

@@ -120,7 +120,7 @@ def normalize(line):
     return re.sub(r"\s+", " ", line.lower()).rstrip(".")
 
 
-def check_skill(path, seen_invariants, problems, rules=None):
+def check_skill(path, seen_invariants, problems, rules=None, known=()):
     def bad(rule, msg):
         problems.append((path, rule, msg))
 
@@ -137,6 +137,17 @@ def check_skill(path, seen_invariants, problems, rules=None):
         bad("F2", f"name '{meta['name']}' != directory '{path.parent.name}'")
     if meta.get("role") and meta["role"] not in ROLES:
         bad("F9", f"role '{meta['role']}' not in {sorted(ROLES)}")
+
+    # F13: a flow's cost is the sum of what it calls, so the list has to resolve.
+    # A name that no longer exists makes the weight wrong and the step unrunnable.
+    calls = meta.get("calls") or []
+    if calls and meta.get("tier") != "flow":
+        bad("F13", "calls declared on a skill that is not tier: flow")
+    for name in calls:
+        if known and name not in known:
+            bad("F13", f"calls unknown skill '{name}'")
+    if meta.get("tier") == "flow" and not calls:
+        bad("F13", "tier: flow without a calls list")
 
     # F10: role and allowed-tools must agree. Claude Code enforces the latter;
     # everywhere else the role is the only statement, so they cannot drift.
@@ -232,9 +243,10 @@ def main(argv):
         return 1
 
     rules = core_rules(core) if core.is_dir() else {}
+    known = {p.parent.name for p in files}
     seen, problems = {}, []
     for path in files:
-        check_skill(path, seen, problems, rules)
+        check_skill(path, seen, problems, rules, known)
     if core.is_dir():
         check_core(core, problems)
 

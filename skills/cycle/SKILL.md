@@ -3,6 +3,7 @@ name: cycle
 description: Use to run the implementation loop, building and debugging until the tests are green
 budget: 300
 tier: flow
+calls: [build, verify, debug]
 role: write
 ---
 

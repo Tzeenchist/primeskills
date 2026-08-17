@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Print the one authoritative status block, generated from the repository.
 
+Three different numbers get confused with each other, so they are printed apart.
+What every session pays is the descriptions plus the pointer in the host's
+always-loaded file -- `core/` itself is fetched on the first skill call, not
+before. A single skill therefore costs that base plus one body; a flow costs the
+base plus every body it can call, which is what its `calls` list is for.
+
 Written because the documents drifted: three files claimed three different
 skill counts, and support was described as four agents while two profiles were
 unverified. Numbers that are typed by hand go stale; these are read.
 """
+import importlib.machinery
+import importlib.util
 import re
 import subprocess
 from pathlib import Path
@@ -29,6 +37,33 @@ def words(p):
     return len(p.read_text(encoding="utf-8").split())
 
 
+def bootstrap_words():
+    """The pointer the installer writes into each host's always-loaded file."""
+    spec = importlib.util.spec_from_loader(
+        "primeskills_install",
+        importlib.machinery.SourceFileLoader(
+            "primeskills_install", str(ROOT / "bin" / "primeskills-install")))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.bootstrap_text().split()
+
+
+def expand(name, call_map, seen=None):
+    """A flow that calls a flow pays for its chain too. Depth-first, no repeats."""
+    seen = seen if seen is not None else []
+    if name in seen:
+        return seen
+    seen.append(name)
+    for child in call_map.get(name, []):
+        expand(child, call_map, seen)
+    return seen
+
+
+def calls_of(path):
+    m = re.search(r"^calls:\s*\[(.*?)\]", path.read_text(encoding="utf-8"), re.M)
+    return [n.strip() for n in m.group(1).split(",")] if m else []
+
+
 def description(p):
     """The one line every agent carries for every skill, always."""
     m = re.search(r"^description:\s*(.+)$", p.read_text(encoding="utf-8"), re.M)
@@ -51,17 +86,29 @@ def main():
                           capture_output=True, text=True).stdout.strip()
 
     descs = sum(len(d.split()) for d in (description(p) for p in skills))
-    pipeline = ["brief", "plan", "build", "verify", "vet", "land"]
-    pass_words = sum(body_words(ROOT / "skills" / n / "SKILL.md") for n in pipeline)
+    pointer = len(bootstrap_words())
+    bodies = {p.parent.name: body_words(p) for p in skills}
+    always = descs + pointer
+    base = always + core          # what the first skill call has cost by the time it starts
+    singles = {n: w for n, w in bodies.items() if n not in {f.parent.name for f in flows}}
 
     print(f"primeskills @ {head}")
-    print(f"  skills            {len(skills)} (of which flows: {len(flows)})")
-    print(f"  always in context {core + descs} words "
-          f"(core {core} + {len(skills)} descriptions {descs})")
-    print(f"  one pass          {core + descs + pass_words} words "
-          f"({' -> '.join(pipeline)})")
-    print(f"  whole set         {total + core} words, if every body were loaded")
-    print(f"  refs, on demand   {on_demand} words")
+    print(f"  skills             {len(skills)} (of which flows: {len(flows)})")
+    print(f"  always in context  {always} words "
+          f"({len(skills)} descriptions {descs} + core pointer {pointer})")
+    print(f"  core, once a session {core} words, read on the first skill call")
+    print(f"  one skill          {base + min(singles.values())}"
+          f" … {base + max(singles.values())} words "
+          f"(base {base} + one body {min(singles.values())}–{max(singles.values())})")
+    print("  a flow             base + every body it can call:")
+    call_map = {p.parent.name: calls_of(p) for p in skills}
+    for f in sorted(flows, key=lambda p: p.parent.name):
+        name = f.parent.name
+        reached = expand(name, call_map)
+        chain = sum(bodies[n] for n in reached)
+        print(f"      {name:<9} {base + chain:>6}   " + " + ".join(reached))
+    print(f"  whole set          {total + core} words, if every body were loaded")
+    print(f"  refs, on demand    {on_demand} words")
     print("\n  agent        install                                        role isolation")
     for name, install, isolation in SUPPORT:
         print(f"  {name:<12} {install:<45} {isolation}")
