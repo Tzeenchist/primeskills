@@ -30,6 +30,11 @@
 | [docs/GSTACK-ETHOS.md](docs/GSTACK-ETHOS.md) | философия gstack: девять пунктов берём, четыре отвергаем |
 | [docs/DONOR-PHILOSOPHY.md](docs/DONOR-PHILOSOPHY.md) | философия остальных доноров |
 
+## Лицензия
+
+MIT, `LICENSE`. Что взято у доноров, под какими лицензиями и от кого —
+`ATTRIBUTIONS.md`; построчный разбор — `docs/SKILL-SOURCES.md`.
+
 ## Источники
 
 Клоны в `vendor/` (в `.gitignore`): gstack, superpowers, andrej-karpathy-skills,
