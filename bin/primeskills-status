@@ -108,7 +108,7 @@ def main():
     print(f"  skills             {len(skills)} (of which flows: {len(flows)})")
     print(f"  always in context  {always} words "
           f"({len(skills)} descriptions {descs} + core pointer {pointer})")
-    print(f"  core, once a session {core} words, read on the first skill call")
+    print(f"  core, once a session {core} words, read at session start via the pointer")
     print(f"  one skill          {base + min(singles.values())}"
           f" … {base + max(singles.values())} words "
           f"(base {base} + one body {min(singles.values())}–{max(singles.values())})")

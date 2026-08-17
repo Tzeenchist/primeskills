@@ -40,7 +40,21 @@ RULES = [
     (r"manage\.py\s+flush", "manage.py flush empties the database"),
     (r"git\s+push\s+.*(-f\b|--force)", "force-push rewrites remote history; others may lose work"),
     (r"git\s+reset\s+--hard", "git reset --hard discards all uncommitted changes"),
-    (r"git\s+(checkout|restore)\s+\.", "this discards all uncommitted changes in the working tree"),
+    # `git restore -- path` and `git checkout -- path` throw away uncommitted
+    # work as surely as `rm`, and an external review walked all of these past
+    # the guard on 2026-08-17.
+    (r"git\s+(checkout|restore)\s+(\.|--\s|-f\b|--force)",
+     "this discards uncommitted changes in the working tree"),
+    (r"git\s+switch\s+(-f\b|--force|--discard-changes)",
+     "git switch --force discards uncommitted changes"),
+    (r"git\s+stash\s+(drop|clear)", "this deletes stashed work with no way back"),
+    (r"git\s+branch\s+-D\b", "git branch -D deletes a branch even if unmerged"),
+    (r"\bfind\b[^|;&]*\s-(delete|exec\s+rm)\b",
+     "find with -delete or -exec rm removes every match, and the match is easy to widen"),
+    (r"rsync[^|;&]*--delete", "rsync --delete removes files at the destination that are missing at the source"),
+    (r"docker\s+volume\s+rm", "docker volume rm destroys the data in that volume"),
+    (r"(?i)\bshred\b|\bmkfs\b|\bdd\s+[^|;&]*of=/dev/",
+     "this overwrites a device or file beyond recovery"),
     (r"git\s+clean\s+-[a-zA-Z]*[fd]", "git clean deletes untracked files, including new work never staged"),
     (r"\bkillall\b", "killall terminates every matching process, not just yours"),
     (r"kubectl\s+delete", "kubectl delete removes cluster resources and may hit production"),

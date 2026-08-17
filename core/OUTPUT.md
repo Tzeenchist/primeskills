@@ -51,6 +51,7 @@ length for a whole answer.
 If `.primeskills/handoff/<branch>.md` exists, read it and say in two sentences
 where the work stands. Do not restate it.
 
-## Nothing leaves the machine
-No usage files, no version pings, no artifact sync, no report to anyone. What
-`.primeskills/` records is written for the next reader here, and stays here.
+## Nothing is reported to anyone
+No usage files, no version pings, no artifact sync, nothing sent to the authors.
+What `.primeskills/` records travels only where you push it — and it is written
+into the repository, so treat it as publishable text.

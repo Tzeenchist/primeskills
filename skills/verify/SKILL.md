@@ -15,8 +15,9 @@ Before any claim of done, fixed, working or passing, before committing or
 pushing, and before handing work to another agent.
 
 ## Invariants
-- Evidence before claims. If you have not run the command in this message, you
-  cannot say it passes.
+- Evidence before claims. Say it passes only from a run you can point at: one
+  you made here, or one recorded in `.primeskills/run/` against this commit.
+  Remembering a green run is not a run.
 - Absence of a crash is not a pass. A pass is an exit code plus the tool's own
   success signal.
 - Never edit a test, fixture, or threshold to turn a build green. If a test

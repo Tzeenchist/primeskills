@@ -28,8 +28,9 @@ you to integrate. `land` prepared it; this puts it in.
    you list who approved, or say the project requires none
 4. Check the branch is current with the base → **verify:** either it merges
    cleanly, or you report the conflict and stop rather than resolving it blind
-5. Merge in the project's own style — merge commit, squash or rebase, whichever
-   the repository already uses → **verify:** the history after matches the shape
+5. Merge in the project's own style — merge commit, squash, or rebase of your
+   own unpushed branch onto the base, whichever the repository uses. Rewriting
+   history anyone else has pulled is outside your authority whatever the style → **verify:** the history after matches the shape
    of the history before
 6. Confirm the result → **verify:** the base branch contains the change and its
    tests are green on the base, not only on the branch

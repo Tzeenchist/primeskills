@@ -20,6 +20,18 @@ COMMANDS = [
     ('{"tool_input":{"command":"git push --force origin main"}}', "ask"),
     ('{"tool_input":{"command":"git clean -fd"}}', "ask"),
     ('{"tool_input":{"command":"killall python"}}', "ask"),
+    # walked past the guard in the external review of 2026-08-17
+    ('{"tool_input":{"command":"git restore -- src/app.py"}}', "ask"),
+    ('{"tool_input":{"command":"git checkout -- src/app.py"}}', "ask"),
+    ('{"tool_input":{"command":"find ./cache -delete"}}', "ask"),
+    ('{"tool_input":{"command":"rsync -a --delete src/ dst/"}}', "ask"),
+    ('{"tool_input":{"command":"docker volume rm important-data"}}', "ask"),
+    ('{"tool_input":{"command":"git stash drop"}}', "ask"),
+    ('{"tool_input":{"command":"git branch -D feature"}}', "ask"),
+    # and the benign neighbours must still pass
+    ('{"tool_input":{"command":"git checkout main"}}', None),
+    ('{"tool_input":{"command":"git restore --staged file"}}', None),
+    ('{"tool_input":{"command":"rsync -a src/ dst/"}}', None),
     ('{"tool_input":{"command":"rm${IFS}-rf${IFS}/"}}', "ask"),
     ('{"tool_input":{"command":"rm -rf $(./wipe-all)/node_modules"}}', "ask"),
     ('{"tool_input":{"command":"rm -rf /\\nrm -rf node_modules"}}', "ask"),

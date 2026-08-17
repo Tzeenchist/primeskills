@@ -71,13 +71,21 @@ def strip_block(text):
 
 
 def profile(agent, apply_it, remove):
-    """Link the read-only profile where the host looks for it."""
+    """Link the read-only profile where the host looks for it.
+
+    Never unlink a file we did not create: another tool may own a profile of the
+    same name, and an installer that deletes it is worse than one that fails.
+    """
     if agent not in PROFILES:
         return None
     dest, src = PROFILES[agent]
+    exists = dest.is_symlink() or dest.exists()
+    ours = dest.is_symlink() and os.path.realpath(dest) == str(src)
+    if exists and not ours:
+        return f"prime-analyst: {dest} exists and is not ours, left alone"
     if apply_it:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.is_symlink() or dest.exists():
+        if exists:
             dest.unlink()
         if not remove:
             dest.symlink_to(src)
@@ -187,6 +195,8 @@ def plan_agent(agent):
 
 
 def apply_claude(dest, src):
+    if (dest.exists() or dest.is_symlink()) and not is_ours(dest):
+        return False
     if dest.is_symlink() or dest.is_file():
         dest.unlink()
     dest.mkdir(parents=True, exist_ok=True)
@@ -199,15 +209,26 @@ def apply_claude(dest, src):
         if out.is_symlink() or out.exists():
             out.unlink()
         out.symlink_to(item)
+    return True
 
 
 def apply_link(dest, src):
-    if dest.is_symlink() or dest.is_file():
-        dest.unlink()
-    elif dest.is_dir():
-        shutil.rmtree(dest)
+    """Replace our own link, never someone else's directory.
+
+    `target_name` prefixes on a first collision but not a second, so without
+    this check a `prime-<name>` belonging to another tool would be removed by
+    `shutil.rmtree`. Refusing is the only safe answer: the caller reports it.
+    """
+    if dest.exists() or dest.is_symlink():
+        if not is_ours(dest):
+            return False
+        if dest.is_symlink() or dest.is_file():
+            dest.unlink()
+        else:
+            shutil.rmtree(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.symlink_to(src, target_is_directory=True)
+    return True
 
 
 def kimi_state():
@@ -271,7 +292,7 @@ def main():
         if not root.parent.exists():
             print(f"{agent}: not installed here, skipped")
             continue
-        renamed = []
+        renamed, refused = [], []
         for kind, dest, src in plan_agent(agent):
             if dest.name != src.name:
                 renamed.append(f"{src.name} -> {dest.name}")
@@ -282,8 +303,11 @@ def main():
                     shutil.rmtree(dest) if dest.is_dir() and not dest.is_symlink() else dest.unlink()
                 continue
             root.mkdir(parents=True, exist_ok=True)
-            (apply_claude if kind == "dir" else apply_link)(dest, src)
+            if not (apply_claude if kind == "dir" else apply_link)(dest, src):
+                refused.append(dest.name)
         note = f"  (renamed on collision: {', '.join(renamed)})" if renamed else ""
+        if refused:
+            note += f"  (LEFT ALONE, not ours: {', '.join(sorted(refused))})"
         print(f"{agent}: {verb} {len(plan_agent(agent))} skills in {root}{note}")
         print(f"{agent}: {bootstrap(agent, args.apply, args.uninstall)}")
         note = profile(agent, args.apply, args.uninstall)
