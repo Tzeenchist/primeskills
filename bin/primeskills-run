@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-"""Per-branch run record: the state a skill leaves for the next skill.
+"""Per-branch run record: what was proved, against which state of the tree.
 
 Written because two external reviews landed on the same defect from different
 directions. The G9 circuit breaker counts failed attempts "per problem, owned by
-whoever runs the loop" — but the owner died with the session, so the counter
+whoever runs the loop" -- but the owner died with the session, so the counter
 reset every time context was cleared. And `release` claims "each stage reads the
 previous one's evidence" while that evidence lived only in the conversation.
 
-Both are the same gap: rules written as prose with no place to write anything
-down. This gives them an address. It is deliberately a program and not another
-paragraph of instructions — a paragraph would be one more thing the model has to
-remember, and remembering is the part that was already failing.
+Records are bound to a state digest: the commit plus a hash of everything not
+committed. Change one byte after a PASS and the record is stale, which is the
+whole point -- a green run from an older tree is not evidence about this one.
 
-The record lives in the repository being worked on, next to the handoff file, so
-it survives a cleared context and reaches another machine through a push.
+The record is local. It lives under `.primeskills/run/`, which carries its own
+`.gitignore`, because it names commands, targets and problems and none of that
+was written to be published. `.primeskills/handoff/` is the opposite: written
+to be read by someone else, and committed on purpose.
 
-    primeskills-run start
-    primeskills-run note verify "pytest -q on dev: 1119 passed, exit 0"
+    primeskills-run note verify "pytest -q: 1119 passed, exit 0"
     primeskills-run fail "export renders 4 pages"     # exits 3 on the third
     primeskills-run clear "export renders 4 pages"
+    primeskills-run check verify                      # exits 2 when stale
     primeskills-run show
 """
+import hashlib
+import json
 import re
 import subprocess
 import sys
@@ -28,21 +31,34 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BREAKER = 3  # G9: three failed attempts on one problem and the loop stops
-COUNTERS = "## Counters"
-LOG = "## Log"
+IGNORE = "# Written by skills, read by skills. Local: it names commands and\n" \
+         "# targets that were never meant to be published.\n*\n"
 
 
 def git(*args):
     p = subprocess.run(("git",) + args, capture_output=True, text=True)
-    return p.stdout.strip() if p.returncode == 0 else ""
+    return p.stdout if p.returncode == 0 else ""
+
+
+def state_digest():
+    """Commit plus everything not in it. Two runs share a digest only when the
+    tree they ran against is byte-identical."""
+    commit = git("rev-parse", "HEAD").strip() or "no-commit"
+    pending = git("diff", "HEAD") + git("status", "--porcelain")
+    return commit, hashlib.sha1(pending.encode("utf-8")).hexdigest()[:12]
 
 
 def record_path():
-    top = git("rev-parse", "--show-toplevel")
+    top = git("rev-parse", "--show-toplevel").strip()
     if not top:
         sys.exit("primeskills-run: not inside a git repository")
-    branch = git("rev-parse", "--abbrev-ref", "HEAD") or "detached"
-    return Path(top) / ".primeskills" / "run" / (slug(branch) + ".md")
+    branch = git("rev-parse", "--abbrev-ref", "HEAD").strip() or "detached"
+    root = Path(top) / ".primeskills" / "run"
+    root.mkdir(parents=True, exist_ok=True)
+    ignore = root / ".gitignore"
+    if not ignore.is_file():
+        ignore.write_text(IGNORE, encoding="utf-8")
+    return root / (slug(branch) + ".jsonl")
 
 
 def slug(text):
@@ -50,61 +66,51 @@ def slug(text):
     return (s or "unnamed")[:60]
 
 
-def ensure(path):
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        branch = git("rev-parse", "--abbrev-ref", "HEAD") or "detached"
-        path.write_text(
-            f"# Run record — {branch}\n\n"
-            "Written by skills, read by skills. Evidence and counters that have "
-            "to outlive one session.\n\n"
-            f"{COUNTERS}\n\n{LOG}\n",
-            encoding="utf-8")
-    return path
-
-
-def read_counters(text):
-    """Counters live as `- <problem> — N` lines under their heading."""
-    out = {}
-    section = text.split(COUNTERS, 1)[-1].split(LOG, 1)[0]
-    for line in section.splitlines():
-        m = re.match(r"- (.+) — (\d+)$", line.strip())
-        if m:
-            out[m.group(1)] = int(m.group(2))
+def read(path):
+    if not path.is_file():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
     return out
 
 
-def write_counters(text, counters):
-    head, rest = text.split(COUNTERS, 1)
-    _, tail = rest.split(LOG, 1)
-    body = "".join(f"- {k} — {v}\n" for k, v in sorted(counters.items()))
-    return f"{head}{COUNTERS}\n\n{body}\n{LOG}{tail}"
+def append(path, entry):
+    commit, digest = state_digest()
+    entry.update({"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                  "commit": commit, "state": digest})
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return entry
 
 
-def stamp():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+def counters(entries):
+    counts = {}
+    for e in entries:
+        if e.get("kind") == "fail":
+            counts[e["problem"]] = counts.get(e["problem"], 0) + 1
+        elif e.get("kind") == "clear":
+            counts.pop(e["problem"], None)
+    return counts
 
 
 def cmd_note(path, argv):
     if len(argv) < 2:
         sys.exit("usage: primeskills-run note <stage> <text>")
-    stage, text = argv[0], " ".join(argv[1:])
-    with path.open("a", encoding="utf-8") as f:
-        f.write(f"- **{stage}** ({stamp()}) — {text}\n")
-    print(f"{path}: noted {stage}")
+    e = append(path, {"kind": "note", "stage": argv[0], "text": " ".join(argv[1:])})
+    print(f"{argv[0]} recorded against {e['commit'][:8]}+{e['state']}")
+    return 0
 
 
 def cmd_fail(path, argv):
     if not argv:
         sys.exit("usage: primeskills-run fail <problem>")
     problem = " ".join(argv)
-    text = path.read_text(encoding="utf-8")
-    counters = read_counters(text)
-    counters[problem] = counters.get(problem, 0) + 1
-    n = counters[problem]
-    text = write_counters(text, counters)
-    text += f"- **attempt {n}** ({stamp()}) — failed on: {problem}\n"
-    path.write_text(text, encoding="utf-8")
+    append(path, {"kind": "fail", "problem": problem})
+    n = counters(read(path)).get(problem, 0)
     if n >= BREAKER:
         print(f"{problem}: {n} — G9 breaker. Restore the G14 snapshot, report "
               f"what each attempt ruled out, ask.")
@@ -117,13 +123,57 @@ def cmd_clear(path, argv):
     if not argv:
         sys.exit("usage: primeskills-run clear <problem>")
     problem = " ".join(argv)
-    text = path.read_text(encoding="utf-8")
-    counters = read_counters(text)
-    if counters.pop(problem, None) is None:
+    if problem not in counters(read(path)):
         print(f"{problem}: no counter")
         return 0
-    path.write_text(write_counters(text, counters), encoding="utf-8")
+    append(path, {"kind": "clear", "problem": problem})
     print(f"{problem}: cleared")
+    return 0
+
+
+def cmd_check(path, argv):
+    """Is the newest record for this stage still about the tree in front of us?"""
+    if not argv:
+        sys.exit("usage: primeskills-run check <stage>")
+    stage = argv[0]
+    hits = [e for e in read(path) if e.get("kind") == "note" and e.get("stage") == stage]
+    if not hits:
+        print(f"{stage}: nothing recorded")
+        return 1
+    last = hits[-1]
+    commit, digest = state_digest()
+    if last["commit"] == commit and last["state"] == digest:
+        print(f"{stage}: current — {last['text']}")
+        return 0
+    what = "the commit" if last["commit"] != commit else "uncommitted work"
+    print(f"{stage}: STALE. Recorded against {last['commit'][:8]}+{last['state']}, "
+          f"now {commit[:8]}+{digest} — {what} changed since. Run it again.")
+    return 2
+
+
+def cmd_show(path):
+    entries = read(path)
+    if not entries:
+        print("nothing recorded yet")
+        return 0
+    commit, digest = state_digest()
+    print(f"# Run record — {path.stem}\n")
+    print(f"Tree now: {commit[:8]}+{digest}\n")
+    counts = counters(entries)
+    if counts:
+        print("## Counters\n")
+        for k, v in sorted(counts.items()):
+            print(f"- {k} — {v}")
+        print()
+    print("## Log\n")
+    for e in entries:
+        mark = "" if e.get("state") == digest and e.get("commit") == commit else "  (stale)"
+        if e["kind"] == "note":
+            print(f"- **{e['stage']}** ({e['ts']}) — {e['text']}{mark}")
+        elif e["kind"] == "fail":
+            print(f"- **attempt** ({e['ts']}) — failed on: {e['problem']}{mark}")
+        else:
+            print(f"- **cleared** ({e['ts']}) — {e['problem']}")
     return 0
 
 
@@ -132,20 +182,21 @@ def main(argv):
         print(__doc__)
         return 0
     action, rest = argv[0], argv[1:]
-    path = ensure(record_path())
+    path = record_path()
     if action == "start":
+        path.touch()  # `start` means the record exists, not that a path was computed
         print(path)
         return 0
     if action == "show":
-        print(path.read_text(encoding="utf-8"), end="")
-        return 0
+        return cmd_show(path)
     if action == "note":
-        cmd_note(path, rest)
-        return 0
+        return cmd_note(path, rest)
     if action == "fail":
         return cmd_fail(path, rest)
     if action == "clear":
         return cmd_clear(path, rest)
+    if action == "check":
+        return cmd_check(path, rest)
     sys.exit(f"primeskills-run: unknown action {action!r}")
 
 

@@ -27,20 +27,50 @@ def main():
         repo = Path(tmp) / "repo"
         repo.mkdir()
         subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
         subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
-                        "commit", "-q", "--allow-empty", "-m", "init"],
+                        "commit", "-q", "-m", "init"],
                        cwd=repo, check=True)
 
         code, out = run(repo, "start")
         checks += 1
-        record = repo / ".primeskills" / "run" / "work.md"
+        record = repo / ".primeskills" / "run" / "work.jsonl"
         if code != 0 or not record.is_file():
             failures.append(f"start: exit {code}, no record at {record}\n{out}")
+
+        # the log is local by construction: its own .gitignore hides it, so a
+        # command line never reaches a commit by accident
+        checks += 1
+        ignored = subprocess.run(["git", "status", "--porcelain"], cwd=repo,
+                                 capture_output=True, text=True).stdout
+        if ".primeskills" in ignored:
+            failures.append("журнал прогона виден для git — он должен быть локальным")
 
         checks += 1
         run(repo, "note", "verify", "pytest -q: 12 passed, exit 0")
         if "12 passed" not in record.read_text(encoding="utf-8"):
-            failures.append("note: the line is not in the record")
+            failures.append("note: запись не попала в журнал")
+
+        # evidence is bound to the tree: one byte and it is no longer about it
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 0 or "current" not in out:
+            failures.append(f"check сразу после записи: exit {code}, {out.strip()!r}")
+        (repo / "seed.txt").write_text("changed\n", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 2 or "STALE" not in out:
+            failures.append(f"один байт не сделал свидетельство протухшим: {out.strip()!r}")
+        checks += 1
+        (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+        code, out = run(repo, "check", "verify")
+        if code != 0:
+            failures.append("возврат дерева не вернул свидетельство в силу")
+        checks += 1
+        code, out = run(repo, "check", "vet")
+        if code != 1:
+            failures.append("check по незаписанной стадии должен отличаться от протухшей")
 
         # G9: the counter belongs to the file, so a new process keeps counting
         for expected in (1, 2):
@@ -53,7 +83,6 @@ def main():
         if code != 3:
             failures.append(f"fail #3: exit {code}, expected 3 (breaker)")
 
-        # a different problem counts separately — G9 is per problem
         code, out = run(repo, "fail", "slow query")
         checks += 1
         if code != 0 or "1 of 3" not in out:
@@ -65,17 +94,16 @@ def main():
         if "1 of 3" not in out:
             failures.append(f"clear: counter not reset, said {out.strip()!r}")
 
-        # the log is append-only: clearing a counter keeps the history
         checks += 1
         text = record.read_text(encoding="utf-8")
-        if text.count("**attempt") < 4 or "12 passed" not in text:
-            failures.append("clear or fail rewrote the log instead of appending")
+        if text.count('"kind": "fail"') < 4 or "12 passed" not in text:
+            failures.append("журнал переписан вместо дописывания")
 
         # a branch with a slash must not become a directory
         subprocess.run(["git", "checkout", "-q", "-b", "feat/thing"], cwd=repo, check=True)
         checks += 1
         code, out = run(repo, "start")
-        if code != 0 or not (repo / ".primeskills" / "run" / "feat-thing.md").is_file():
+        if code != 0 or not (repo / ".primeskills" / "run" / "feat-thing.jsonl").is_file():
             failures.append(f"branch with a slash: exit {code}\n{out}")
 
     # outside a repository it must refuse, not write somewhere surprising

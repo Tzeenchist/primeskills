@@ -53,5 +53,6 @@ where the work stands. Do not restate it.
 
 ## Nothing is reported to anyone
 No usage files, no version pings, no artifact sync, nothing sent to the authors.
-What `.primeskills/` records travels only where you push it — and it is written
-into the repository, so treat it as publishable text.
+`.primeskills/run/` is local and ignored by git: it names commands and targets.
+`.primeskills/handoff/` is the opposite — written to be read by the next agent,
+so write it as publishable text.

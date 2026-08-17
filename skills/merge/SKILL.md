@@ -24,8 +24,9 @@ you to integrate. `land` prepared it; this puts it in.
 2. Fetch and read the latest CI result for **this** head commit → **verify:**
    the run's commit matches `git rev-parse HEAD`, and it passed
 3. Check review state: approvals present, no unresolved blocking comments, and
-   read `.primeskills/run/` for the `vet` and `probe` verdicts → **verify:**
-   you list who approved, or say the project requires none
+   `primeskills-run check vet` for the review verdict → **verify:** you list
+   who approved, or say the project requires none, and no verdict you rely on
+   came back stale
 4. Check the branch is current with the base → **verify:** either it merges
    cleanly, or you report the conflict and stop rather than resolving it blind
 5. Merge in the project's own style — merge commit, squash, or rebase of your

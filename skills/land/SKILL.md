@@ -21,8 +21,10 @@ ran — did not return BLOCK. Not before all three.
 - Never force-push, never rewrite history, never `git add -A`.
 
 ## Procedure
-1. Run the full suite one more time on the final state → **verify:** exit 0 and
-   the counts match what `verify` reported
+1. Ask the record whether the proof is still about this tree:
+   `primeskills-run check verify`. Stale or missing means run the full suite
+   again on the final state → **verify:** exit 0, counts match, and `check`
+   answers `current`
 2. First pass over the whole change (G6): scan for keys, tokens, passwords,
    `.env` changes, real identifiers, absolute paths from your machine
    → **verify:** you name each hit or state there are none
