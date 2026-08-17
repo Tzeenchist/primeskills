@@ -31,10 +31,14 @@ runs; the properties of the diff are `vet`.
 1. Confirm what you are pointed at: URL, branch, commit, database, and how it
    gets reset → **verify:** it is disposable — not a working store, not
    production (G17)
-2. Walk the main path a real user takes, end to end → **verify:** you performed
-   each step, not read the code that implements it
+2. Walk the main path a real user takes, end to end — through the interface if
+   you have a way to drive one, through its endpoints if you do not
+   → **verify:** you performed each step, not read the code that implements it,
+   and you said which of the two you did
 3. At each screen or endpoint, exercise the states: nothing yet, one item,
-   many, slow, failed → **verify:** each state was produced, not imagined
+   many, slow, failed → **verify:** each state was either produced, or named in
+   the report as one you had no way to produce. Both are results; a state you
+   describe without reaching is neither
 4. Push the boundaries: empty input, maximum length, wrong type, duplicate
    submit, back button mid-flow → **verify:** the response is recorded verbatim
 5. For interfaces, walk the keyboard path and read `../ui/ref/ui-states.md`

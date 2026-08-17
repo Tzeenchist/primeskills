@@ -36,6 +36,23 @@ EXPECT = {
         "[НАРУШЕН] воспроизведение до правки",
         "вызовов скиллов: 2 (debug, verify)",
     ],
+    "git-hygiene-violation.jsonl": [
+        "[НАРУШЕН] гигиена git (G11)",
+        "git add -A",
+        "[ok  ] дифф прочитан до коммита",
+    ],
+    "handoff-home.jsonl": [
+        "[НАРУШЕН] чекпоинт в репозитории, не в доме",
+        "/home/admin/.gstack",
+    ],
+    "flow-order-violation.jsonl": [
+        "[НАРУШЕН] порядок цепочки",
+        "land → deploy → merge",
+    ],
+    "green-by-test-edit.jsonl": [
+        "[НАРУШЕН] зелень не куплена правкой теста",
+        "test_totals.py",
+    ],
     "land-and-g17.jsonl": [
         "[НАРУШЕН] дифф прочитан до коммита (G6)",
         # the printed target passes, the bare one does not

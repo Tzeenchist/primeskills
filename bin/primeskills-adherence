@@ -38,6 +38,7 @@ TEST_RUN = re.compile(r"\b(pytest|unittest|manage\.py\s+test|node\s+--test|npm\s
 DESTRUCTIVE = re.compile(r"\b(dropdb|DROP\s+(TABLE|DATABASE)|rm\s+-rf|git\s+clean\s+-[a-z]*f"
                          r"|TRUNCATE|manage\.py\s+(migrate|flush))\b", re.I)
 TARGET_SHOWN = re.compile(r"\b(echo|printf)\b[^;]*\$|^\s*[A-Z_]{3,}=|--settings\b|--database\b|DATABASE_URL")
+GIT_HYGIENE = re.compile(r"\bgit\s+(add\s+(-A|--all|\.)\b|push\s+[^|;]*--force(?!-with-lease)|push\s+[^|;]*-f\b|rebase\b|commit\s+[^|;]*--amend\b|reset\s+--hard\b|filter-repo\b)")
 MUTATING_SHELL = re.compile(r"\b(sed\s+-i|tee\b|>>?\s*[^|&\s]|mv\b|cp\b|rm\b|git\s+(commit|add|apply))")
 
 
@@ -83,6 +84,15 @@ def spans(calls):
 
 def is_test_file(path):
     return bool(path) and bool(TEST_PATH.search(path))
+
+
+def calls_of(skill, skills_dir):
+    """The chain a flow declares in its frontmatter."""
+    md = skills_dir / skill / "SKILL.md"
+    if not md.is_file():
+        return []
+    m = re.search(r"^calls:\s*\[(.*?)\]", md.read_text(encoding="utf-8"), re.M)
+    return [x.strip() for x in m.group(1).split(",")] if m else []
 
 
 def role_of(skill, skills_dir):
@@ -152,12 +162,89 @@ def check_diff_before_commit(span):
     return "violated", f"коммит #{first} без чтения диффа"
 
 
+
+def check_git_hygiene(span):
+    """land, merge, G11: never `git add -A`, never force, never rewrite.
+
+    The cheapest check in the set and the one with the worst failure mode:
+    `git add -A` has twice pulled foreign work into a commit in this project's
+    own history, which is why the rule exists at all.
+    """
+    for c in span["calls"]:
+        if c["tool"] == "Bash":
+            m = GIT_HYGIENE.search(c["cmd"])
+            if m:
+                return "violated", f"#{c['n']}: {m.group(0)}"
+    commits = [c for c in span["calls"]
+               if c["tool"] == "Bash" and re.search(r"\bgit\s+(commit|push|add)\b", c["cmd"])]
+    if not commits:
+        return None, "git в пролёте не вызывался"
+    return "ok", f"{len(commits)} обращений к git, запрещённого нет"
+
+
+def check_checkpoint_in_repo(span):
+    """handoff: the checkpoint has to survive another machine, so it goes into
+    the repository -- a home directory does not travel."""
+    writes = [c for c in span["calls"] if c["tool"] in WRITING_TOOLS and c["path"]]
+    if not writes:
+        return None, "файл чекпоинта не писался"
+    for c in writes:
+        if str(HOME) in c["path"] and "/.primeskills/" not in c["path"]:
+            return "violated", f"#{c['n']} в домашний каталог: {c['path']}"
+    inside = [c for c in writes if "/.primeskills/handoff/" in c["path"]]
+    if inside:
+        return "ok", inside[0]["path"]
+    return None, "путь не опознан как чекпоинт"
+
+
+def check_green_by_editing_test(span):
+    """verify: a test is never edited to turn a build green.
+
+    Detected as the shape it leaves: a failing run, then a test file edited with
+    no source touched, then a run. Innocent explanations exist -- the test was
+    genuinely wrong -- which is why this reports rather than accuses.
+    """
+    runs = [c for c in span["calls"] if c["tool"] == "Bash" and TEST_RUN.search(c["cmd"])]
+    if len(runs) < 2:
+        return None, "меньше двух прогонов — форма не различима"
+    first, last = runs[0]["n"], runs[-1]["n"]
+    between = [c for c in span["calls"] if first < c["n"] < last and c["tool"] in WRITING_TOOLS]
+    if not between:
+        return None, "между прогонами правок нет"
+    if all(is_test_file(c["path"]) for c in between):
+        return "violated", ("между прогонами правились только тесты: "
+                            + ", ".join(c["path"].split("/")[-1] for c in between[:3]))
+    return "ok", "между прогонами правился и код"
+
+
+def check_flow_order(span, call_map, later_skills):
+    """A flow declares its chain in `calls:`; the calls that follow must respect
+    that order. Skipping forward to salvage progress is the failure every flow
+    names in its own stop conditions."""
+    declared = call_map.get(span["skill"]) or []
+    if not declared or not later_skills:
+        return None, "вложенных вызовов нет"
+    seen = [s for s in later_skills if s in declared]
+    if not seen:
+        return None, "ни одно объявленное звено не вызвано"
+    order = [declared.index(s) for s in seen]
+    if order == sorted(order):
+        return "ok", " → ".join(seen)
+    return "violated", f"порядок {' → '.join(seen)} против объявленного {' → '.join(declared)}"
+
+
 PER_SKILL = {
-    "build": [("красная фаза (P7, TDD)", check_red_phase)],
+    "build": [("красная фаза (P7, TDD)", check_red_phase),
+              ("гигиена git (G11)", check_git_hygiene)],
     "cycle": [("красная фаза (P7, TDD)", check_red_phase)],
-    "verify": [("прогон состоялся (G4)", check_suite_ran)],
+    "verify": [("прогон состоялся (G4)", check_suite_ran),
+               ("зелень не куплена правкой теста", check_green_by_editing_test)],
     "debug": [("воспроизведение до правки (P3)", check_repro_first)],
-    "land": [("дифф прочитан до коммита (G6)", check_diff_before_commit)],
+    "land": [("дифф прочитан до коммита (G6)", check_diff_before_commit),
+             ("гигиена git (G11)", check_git_hygiene)],
+    "merge": [("гигиена git (G11)", check_git_hygiene)],
+    "revise": [("гигиена git (G11)", check_git_hygiene)],
+    "handoff": [("чекпоинт в репозитории, не в доме", check_checkpoint_in_repo)],
 }
 
 
@@ -192,10 +279,17 @@ def report(path, skills_dir, quiet=False):
         print(f"  вызовов инструментов: {len(calls)}   вызовов скиллов: {len(found)}")
         print(f"  core/ прочитан: {'действие #' + str(core_at) if core_at else 'нет'}")
 
-    for span in found:
+    order = [s["skill"] for s in found]
+    for i, span in enumerate(found):
         checks = list(PER_SKILL.get(span["skill"], []))
         if role_of(span["skill"], skills_dir) == "read-only":
             checks.append(("не пишет (G7)", check_read_only))
+        declared = calls_of(span["skill"], skills_dir)
+        if declared:
+            call_map = {span["skill"]: declared}
+            later = order[i + 1:]
+            checks.append(("порядок цепочки",
+                           lambda sp, cm=call_map, lt=later: check_flow_order(sp, cm, lt)))
         if not quiet:
             print(f"  · {span['skill']} (вызван #{span['at']}, "
                   f"{len(span['calls'])} действий в пролёте)")
