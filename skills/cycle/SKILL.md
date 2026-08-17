@@ -13,9 +13,10 @@ role: write
 An approved plan, when you want the loop closed without stopping between steps.
 
 ## Invariants
-- This flow owns the attempt counter (G9), and keeps it in `primeskills-run`,
-  not in your head. Skills report attempts; only this increments, and three
-  means three in total, not three each.
+- The attempt counter (G9) lives in `primeskills-run`, not in your head, and
+  has exactly one writer: `debug`, which increments where the attempt failed.
+  This flow reads it. Two writers counted one failure twice and tripped the
+  breaker at a hypothesis and a half.
 - No step starts before the previous one has a PASS.
 
 ## Procedure
@@ -23,9 +24,9 @@ An approved plan, when you want the loop closed without stopping between steps.
    recorded red run exist
 2. Read the verification `build` already ran; run `verify` yourself only if it
    did not → **verify:** PASS or FAIL, with evidence, and the suite ran once
-3. On FAIL, call `debug`, then return to 2 after
-   `primeskills-run fail "<problem>"` → **verify:** it printed a count below
-   three and exited 0
+3. On FAIL, call `debug` — it records the attempt — then read the count with
+   `primeskills-run show` and return to 2 → **verify:** the count rose by one,
+   not two, and is below three
 4. When it exits 3, stop: restore the G14 snapshot, report what each
    attempt ruled out, ask → **verify:** the tree is back and the user has the
    ledger, not a summary of it

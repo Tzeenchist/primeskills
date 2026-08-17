@@ -127,14 +127,14 @@ def render(skills, reader_lang):
     # link. The section at the bottom answers only the first direction.
     used_by = {}
     for f in flows:
-        for n in f["calls"] + f["optional"]:
+        for n in f["calls"]:
             used_by.setdefault(n, []).append(
                 f["name"] + ("?" if n in f["optional"] else ""))
 
     def chain_of(s):
-        parts = [f"`/{c}`" for c in s["calls"]] + [
-            f"`/{o}` (if needed)" for o in s["optional"]]
-        return " → ".join(parts)
+        return " → ".join(
+            f"`/{c}`" + (" (if needed)" if c in s["optional"] else "")
+            for c in s["calls"])
 
     placed = set()
     for key, names in STAGES:

@@ -1,7 +1,7 @@
 ---
 name: fence
 description: Use to arm destructive-command warnings and restrict edits to a directory
-budget: 200
+budget: 240
 role: write
 hooks:
   PreToolUse:
@@ -25,7 +25,9 @@ unattended session. Also on request: "be careful", "lock edits here".
 
 ## Invariants
 - The command guard warns; it never silently allows what it could not parse.
-- A boundary applies to every write, including ones you consider trivial.
+- The boundary hook sees `Edit`, `Write`, `NotebookEdit` — not the shell:
+  `sed -i`, `tee`, `cp` and redirection walk past it. It is a reminder you
+  cannot forget, not a wall.
 - Pattern matching is necessary and never sufficient: destruction usually
   arrives through a harmless command with a misconfigured target (G17).
 

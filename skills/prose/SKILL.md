@@ -34,8 +34,8 @@ not for code comments.
    state its argument in one sentence, and you know who reads it
 2. Identify the language and load the matching column of `ref/tells.md`
    → **verify:** you say which language rules you are applying
-3. Mechanical pass: grep each pattern, count hits, record the rate per hundred
-   words → **verify:** you have counts, not impressions
+3. Mechanical pass: grep each pattern, count hits, record the rate per
+   thousand words, the unit `ref/tells.md` uses → **verify:** you have counts, not impressions
 4. Cut only what exceeds a human rate, keeping the strongest instance of each
    pattern → **verify:** for every cut you can name the pattern and the count
    that justified it

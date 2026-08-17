@@ -19,8 +19,9 @@ backend-only work — this lens costs nothing when it does not run.
 - Report only. You do not write markup here.
 
 ## Procedure
-1. For each component, name the five states and what the user sees in each
-   → **verify:** none is answered with "the same as success"
+1. For each component that waits or carries data, name the five states and what
+   the user sees in each; for a static control say which do not apply and why
+   → **verify:** every component is answered, none is skipped in silence
 2. Check the empty state teaches rather than apologises → **verify:** it says
    what to do next, not only that there is nothing
 3. Check the error state says what happened and what the user can do

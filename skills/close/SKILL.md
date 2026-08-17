@@ -3,7 +3,7 @@ name: close
 description: Use to take verified work through review and testing to a pull request
 budget: 250
 tier: flow
-calls: [verify, vet, land]
+calls: [verify, vet, probe, handoff, land]
 calls_optional: [probe, handoff]
 role: write
 ---
@@ -11,8 +11,9 @@ role: write
 # Close
 
 ## Trigger
-Implementation is finished and the tests are green. Everything between "it
-works" and "it is someone else's turn".
+The user asked for the work to reach a pull request. Finished implementation is
+the precondition, not the trigger: commit, push and PR are changes other people
+see, and nobody asked for them just because the code compiles.
 
 ## Invariants
 - Order is not negotiable: nothing is reviewed before it passes, and nothing

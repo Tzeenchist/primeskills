@@ -33,9 +33,9 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
    observation that will settle it
 4. Cut it into steps a single commit can carry → **verify:** each step has its
    own check, and no step needs a later one to be meaningful
-5. Before a risky step — migration, bulk edit, refactor — snapshot:
-   `git stash create` or a `checkpoint/...` branch, a dump for data
-   → **verify:** the snapshot exists and you can name it (G14)
+5. Before a risky step — migration, bulk edit, refactor — take a snapshot that
+   covers untracked files too, and a dump for data (G14) → **verify:** you
+   restored it somewhere disposable and saw your newest file come back
 6. **Red.** Write the test that fails for the right reason → **verify:** run it,
    record the failure message verbatim — that record is the red half of the
    proof and `verify` will read it rather than re-deriving it

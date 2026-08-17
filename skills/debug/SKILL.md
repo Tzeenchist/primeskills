@@ -31,9 +31,10 @@ attempt, not after the third.
 2. Reproduce it once, cleanly → **verify:** the failure appears, and you can
    state the exact command and starting condition
 3. Ask whether it ever worked: `git log --oneline -20 -- <files in the
-   failure>` and, if a good commit is known, check out and run there
-   → **verify:** you can say "regression, and the cause is inside this diff" or
-   "never worked", and you say which
+   failure>`, and run at a known-good commit — in a separate worktree, never by
+   checking out over a dirty tree → **verify:** you can say "regression, and the
+   cause is inside this diff" or "never worked", and the working tree is
+   untouched
 4. Shrink to a minimal failing example: strip inputs, mocks, and steps until
    removing anything more makes it pass → **verify:** the MRE still fails and
    fits in a screen

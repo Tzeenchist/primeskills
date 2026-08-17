@@ -65,7 +65,8 @@ def main():
 
         # both directions of the relation
         checks += 1
-        if "runs: `/verify` → `/vet` → `/land`" not in out:
+        # the declared order is the order the procedure runs, conditionals in place
+        if "runs: `/verify` → `/vet` → `/probe` (if needed)" not in out:
             failures.append("последовательность не показывает цепочку в списке")
         checks += 1
         if "part of: `/close`, `/release`" not in out:

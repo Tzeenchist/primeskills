@@ -46,5 +46,7 @@ harness. Do not disable it to make a run proceed.
 ## Backup before risk
 
 Before a migration or a bulk operation on data: take the dump first. A backup
-made after the operation records the damage. For code the equivalent is
-`git stash create` or a `checkpoint/...` branch (G14).
+made after the operation records the damage. For code the equivalent is a copy that
+includes untracked files — `git stash create` skips them and a branch records
+nothing uncommitted, so neither is one on its own (G14). Prove it by restoring
+into a scratch directory and finding your newest file there.

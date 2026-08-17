@@ -87,21 +87,13 @@ def is_test_file(path):
 
 
 def calls_of(skill, skills_dir):
-    """The chain a flow declares, conditional links included.
-
-    Order is checked against both lists: a conditional link is still taken in
-    its declared place, so leaving it out would flag a legitimate run.
-    """
+    """The chain a flow declares, in the order it runs. `calls_optional` only
+    marks which of these are conditional, so order comes from one list."""
     md = skills_dir / skill / "SKILL.md"
     if not md.is_file():
         return []
-    text = md.read_text(encoding="utf-8")
-    out = []
-    for key in ("calls", "calls_optional"):
-        m = re.search(rf"^{key}:\s*\[(.*?)\]", text, re.M)
-        if m:
-            out += [x.strip() for x in m.group(1).split(",") if x.strip()]
-    return out
+    m = re.search(r"^calls:\s*\[(.*?)\]", md.read_text(encoding="utf-8"), re.M)
+    return [x.strip() for x in m.group(1).split(",") if x.strip()] if m else []
 
 
 def role_of(skill, skills_dir):
@@ -149,9 +141,12 @@ def check_repro_first(span):
 
 
 def check_read_only(span):
-    """G7: a read-only skill does not write, and the shell counts."""
+    """G7: the skill does not touch the work. A `reports` skill may still write
+    its verdict under .primeskills/ -- a verdict nobody can read is not one."""
     for c in span["calls"]:
         if c["tool"] in WRITING_TOOLS:
+            if "/.primeskills/" in c["path"]:
+                continue
             return "violated", f"#{c['n']} {c['tool']} {c['path']}"
         if c["tool"] == "Bash" and MUTATING_SHELL.search(c["cmd"]):
             return "violated", f"#{c['n']} shell: {c['cmd'].splitlines()[0][:50]}"
@@ -306,7 +301,7 @@ def report(path, skills_dir, quiet=False):
     order = [s["skill"] for s in found]
     for i, span in enumerate(found):
         checks = list(PER_SKILL.get(span["skill"], []))
-        if role_of(span["skill"], skills_dir) == "read-only":
+        if role_of(span["skill"], skills_dir) in ("read-only", "reports"):
             checks.append(("не пишет (G7)", check_read_only))
         declared = calls_of(span["skill"], skills_dir)
         if declared:

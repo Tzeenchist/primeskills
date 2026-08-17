@@ -59,6 +59,13 @@ def expand(name, call_map, seen=None):
     return seen
 
 
+def calls_optional_of(name, skills):
+    for p in skills:
+        if p.parent.name == name:
+            return calls_of(p, "calls_optional")
+    return []
+
+
 def budget_of(path):
     m = re.search(r"^budget:\s*(\d+)", path.read_text(encoding="utf-8"), re.M)
     return int(m.group(1)) if m else 800
@@ -114,9 +121,9 @@ def main():
     print(f"  headroom           {3000 - base - budgets[worst_name]} words before "
           f"C3 refuses (budget of '{worst_name}' is {budgets[worst_name]})")
     print("  a flow             base + every body it can call:")
-    certain = {p.parent.name: calls_of(p) for p in skills}
-    everything = {p.parent.name: calls_of(p) + calls_of(p, "calls_optional")
-                  for p in skills}
+    everything = {p.parent.name: calls_of(p) for p in skills}
+    certain = {k: [c for c in v if c not in calls_optional_of(k, skills)]
+               for k, v in everything.items()}
     for f in sorted(flows, key=lambda p: p.parent.name):
         name = f.parent.name
         always, reached = expand(name, certain), expand(name, everything)

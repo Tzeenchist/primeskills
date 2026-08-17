@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 SECTIONS = ["Trigger", "Invariants", "Procedure", "Stop conditions", "Output", "References"]
-ROLES = {"read-only", "write"}
+ROLES = {"read-only", "reports", "write"}
 WRITING_TOOLS = {"Edit", "Write", "NotebookEdit"}
 DESC_MAX = 140
 DEFAULT_BUDGET = 800
@@ -145,9 +145,10 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
 
     # F13: a flow's cost is the sum of what it calls, so the list has to resolve.
     # A name that no longer exists makes the weight wrong and the step unrunnable.
-    # `calls` is the chain a flow always runs; `calls_optional` is the links it
-    # takes only under a condition. They are split because counting a
-    # conditional link as certain overstated every flow's weight.
+    # `calls` is the chain in the order the flow runs it; `calls_optional` names
+    # which of those links are conditional. Keeping order and condition in one
+    # list needed a sigil YAML rejects, and keeping them in two disjoint lists
+    # lost the position: `close` runs probe before land but declared it after.
     calls = meta.get("calls") or []
     optional = meta.get("calls_optional") or []
     if (calls or optional) and meta.get("tier") != "flow":
@@ -156,15 +157,17 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
         if known and name not in known:
             bad("F13", f"calls unknown skill '{name}'")
     for name in optional:
-        if name in calls:
-            bad("F13", f"'{name}' is in both calls and calls_optional")
+        if name not in calls:
+            bad("F13", f"'{name}' is optional but missing from the ordered calls")
     if meta.get("tier") == "flow" and not calls:
         bad("F13", "tier: flow without a calls list")
 
     # F10: role and allowed-tools must agree. Claude Code enforces the latter;
     # everywhere else the role is the only statement, so they cannot drift.
     tools = meta.get("allowed-tools")
-    if meta.get("role") == "read-only":
+    # `reports` is read-only about the work and writes only its verdict under
+    # .primeskills/, so it carries the same tool list as read-only.
+    if meta.get("role") in ("read-only", "reports"):
         if not tools:
             bad("F10", "read-only skill without allowed-tools")
         elif WRITING_TOOLS & set(tools):

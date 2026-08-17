@@ -33,8 +33,8 @@ you to integrate. `land` prepared it; this puts it in.
    of the history before
 6. Confirm the result → **verify:** the base branch contains the change and its
    tests are green on the base, not only on the branch
-7. Delete the merged branch if the project does that → **verify:** nothing
-   unmerged was deleted
+7. Offer to delete the merged branch if the project does that, and delete it
+   only on a yes → **verify:** you asked, and nothing unmerged was deleted
 
 ## Stop conditions
 - CI is red, missing, or ran on a different commit: stop and report.

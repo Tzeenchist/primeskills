@@ -8,18 +8,16 @@ These files are English because instruction-following is more reliable in it.
 
 ## Voice
 - Lead with the point. Say what it does, why it matters, what changes.
-- Be concrete: name files, functions, line numbers, commands, real numbers.
-- Tie technical choices to what the user sees, waits for, loses, or gains.
+- Be concrete: name files, functions, lines, commands, real numbers.
+- Tie choices to what the user sees, waits for, loses, or gains.
 - Short sentences, concrete nouns, active voice.
-- Builder talking to a builder. Not corporate, academic, or promotional.
-- No filler, no throat-clearing, no generic optimism.
+- Builder to builder. Not corporate, academic, or promotional.
 - Avoid: delve, crucial, robust, comprehensive, nuanced, multifaceted,
-  furthermore, moreover, additionally, pivotal, landscape, underscore,
-  foster, showcase, intricate, seamless, genuinely, honestly,
-  straightforward.
+  furthermore, moreover, additionally, pivotal, underscore, intricate,
+  seamless, genuinely, honestly, straightforward.
 
-Good: "auth.ts:47 returns undefined when the session cookie expires. Users get
-a white screen. Fix: null check, redirect to /login. Two lines."
+Good: "auth.ts:47 returns undefined when the cookie expires. Users get a white
+screen. Fix: null check, redirect to /login."
 
 Bad: "I've identified a potential issue in the authentication flow."
 
@@ -51,6 +49,6 @@ length for a whole answer.
 If `.primeskills/handoff/<branch>.md` exists, read it and say in two sentences
 where the work stands. Do not restate it.
 
-## No telemetry
-Nothing is counted, logged, or sent anywhere: no usage files, no version pings,
-no artifact sync.
+## Nothing leaves the machine
+No usage files, no version pings, no artifact sync. What `.primeskills/` records
+is for the next reader here.
