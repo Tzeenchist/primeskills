@@ -11,6 +11,7 @@ is switched on.
 Exit 0 when every check passes.
 """
 import json
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -99,6 +100,22 @@ def check_profile(r, agent, dest):
         r.line(OK, agent, "prime-analyst profile", dest.parent.name + "/")
 
 
+def check_command(r):
+    """Six skills name `primeskills-run`. If the shell cannot find it, those
+    instructions fail silently -- the exact failure this tool exists to catch."""
+    found = shutil.which("primeskills-run")
+    if not found:
+        r.line(FAIL, "shared", "primeskills-run on PATH", "not found")
+        return
+    target = ROOT / "bin" / "primeskills-run"
+    if Path(found).resolve() != target.resolve():
+        r.line(WARN, "shared", "primeskills-run on PATH", f"{found} is not ours")
+        return
+    p = subprocess.run([sys.executable, str(target), "--help"],
+                       capture_output=True, text=True)
+    r.line(OK if p.returncode == 0 else FAIL, "shared", "primeskills-run on PATH", found)
+
+
 def main():
     r = Report()
     print("primeskills doctor\n")
@@ -134,6 +151,7 @@ def main():
         r.line(WARN, "kimi", "skills linked", "no config")
 
     check_guards(r)
+    check_command(r)
 
     print(f"\n{r.failed} failed")
     return 1 if r.failed else 0
