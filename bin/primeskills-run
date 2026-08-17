@@ -16,7 +16,7 @@ The record lives in the repository being worked on, next to the handoff file, so
 it survives a cleared context and reaches another machine through a push.
 
     primeskills-run start
-    primeskills-run note verify "pytest -q on shop-dev: 1119 passed, exit 0"
+    primeskills-run note verify "pytest -q on dev: 1119 passed, exit 0"
     primeskills-run fail "export renders 4 pages"     # exits 3 on the third
     primeskills-run clear "export renders 4 pages"
     primeskills-run show
