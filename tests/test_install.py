@@ -5,6 +5,7 @@ Written after an external review found two unconditional deletions: a foreign
 `prime-analyst.md` was unlinked, and a `prime-<name>` directory belonging to
 another tool would have gone through `shutil.rmtree`.
 """
+import json
 import os
 import subprocess
 import sys
@@ -75,6 +76,50 @@ def main():
         checks += 1
         if not (squat / "SKILL.md").is_file() or not (first / "SKILL.md").is_file():
             failures.append("uninstall удалил чужой каталог")
+
+    # a damaged marker block must stop the rewrite, not be repaired blindly
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        (h / ".claude").mkdir(parents=True)
+        (h / ".claude" / "CLAUDE.md").write_text(
+            "mine\n<!-- primeskills:begin -->\nno closing marker\n", encoding="utf-8")
+        (h / ".codex").mkdir()
+        out = run(home, "claude", "--apply").stdout
+        checks += 1
+        if "markers are damaged" not in out:
+            failures.append("повреждённые маркеры не остановили правку")
+        checks += 1
+        if "no closing marker" not in (h / ".claude" / "CLAUDE.md").read_text(encoding="utf-8"):
+            failures.append("файл с повреждёнными маркерами всё-таки переписан")
+
+    # a config is never left half-written, and a backup exists after the change
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        (h / ".claude").mkdir(parents=True)
+        (h / ".claude" / "CLAUDE.md").write_text("my own notes\n", encoding="utf-8")
+        (h / ".codex").mkdir()
+        run(home, "claude", "--apply")
+        checks += 1
+        backup = h / ".claude" / "CLAUDE.md.primeskills-backup"
+        if not backup.is_file() or "my own notes" not in backup.read_text(encoding="utf-8"):
+            failures.append("бэкап конфига не создан до правки")
+        checks += 1
+        if "my own notes" not in (h / ".claude" / "CLAUDE.md").read_text(encoding="utf-8"):
+            failures.append("правка конфига затёрла чужой текст")
+        checks += 1
+        if list((h / ".claude").glob("*.primeskills-tmp")):
+            failures.append("остался временный файл после атомарной записи")
+
+        # uninstall follows the manifest and puts the file back to its own content
+        run(home, "claude", "--uninstall", "--apply")
+        checks += 1
+        left = list((h / ".claude" / "skills").glob("*/SKILL.md")) if (h / ".claude" / "skills").is_dir() else []
+        if left:
+            failures.append(f"после uninstall осталось {len(left)} наших навыков")
+        checks += 1
+        manifest = h / ".primeskills" / "installed.json"
+        if manifest.is_file() and json.loads(manifest.read_text(encoding="utf-8")):
+            failures.append("манифест не опустел после uninstall")
 
     for f in failures:
         print(f)
