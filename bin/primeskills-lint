@@ -140,12 +140,19 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
 
     # F13: a flow's cost is the sum of what it calls, so the list has to resolve.
     # A name that no longer exists makes the weight wrong and the step unrunnable.
+    # `calls` is the chain a flow always runs; `calls_optional` is the links it
+    # takes only under a condition. They are split because counting a
+    # conditional link as certain overstated every flow's weight.
     calls = meta.get("calls") or []
-    if calls and meta.get("tier") != "flow":
+    optional = meta.get("calls_optional") or []
+    if (calls or optional) and meta.get("tier") != "flow":
         bad("F13", "calls declared on a skill that is not tier: flow")
-    for name in calls:
+    for name in list(calls) + list(optional):
         if known and name not in known:
             bad("F13", f"calls unknown skill '{name}'")
+    for name in optional:
+        if name in calls:
+            bad("F13", f"'{name}' is in both calls and calls_optional")
     if meta.get("tier") == "flow" and not calls:
         bad("F13", "tier: flow without a calls list")
 

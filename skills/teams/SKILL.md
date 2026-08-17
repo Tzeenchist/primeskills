@@ -3,7 +3,8 @@ name: teams
 description: Use to run the full review panel over an existing plan and consolidate what it finds
 budget: 250
 tier: flow
-calls: [ceo, eng, beauty]
+calls: [ceo, eng]
+calls_optional: [beauty]
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---

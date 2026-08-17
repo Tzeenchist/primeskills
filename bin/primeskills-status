@@ -59,9 +59,9 @@ def expand(name, call_map, seen=None):
     return seen
 
 
-def calls_of(path):
-    m = re.search(r"^calls:\s*\[(.*?)\]", path.read_text(encoding="utf-8"), re.M)
-    return [n.strip() for n in m.group(1).split(",")] if m else []
+def calls_of(path, key="calls"):
+    m = re.search(rf"^{key}:\s*\[(.*?)\]", path.read_text(encoding="utf-8"), re.M)
+    return [n.strip() for n in m.group(1).split(",") if n.strip()] if m else []
 
 
 def description(p):
@@ -101,12 +101,17 @@ def main():
           f" … {base + max(singles.values())} words "
           f"(base {base} + one body {min(singles.values())}–{max(singles.values())})")
     print("  a flow             base + every body it can call:")
-    call_map = {p.parent.name: calls_of(p) for p in skills}
+    certain = {p.parent.name: calls_of(p) for p in skills}
+    everything = {p.parent.name: calls_of(p) + calls_of(p, "calls_optional")
+                  for p in skills}
     for f in sorted(flows, key=lambda p: p.parent.name):
         name = f.parent.name
-        reached = expand(name, call_map)
-        chain = sum(bodies[n] for n in reached)
-        print(f"      {name:<9} {base + chain:>6}   " + " + ".join(reached))
+        always, reached = expand(name, certain), expand(name, everything)
+        usual = base + sum(bodies[n] for n in always)
+        worst = base + sum(bodies[n] for n in reached)
+        span = f"{usual}" if usual == worst else f"{usual}–{worst}"
+        marks = " + ".join(n + ("?" if n not in always else "") for n in reached)
+        print(f"      {name:<9} {span:>12}   {marks}")
     print(f"  whole set          {total + core} words, if every body were loaded")
     print(f"  refs, on demand    {on_demand} words")
     print("\n  agent        install                                        role isolation")

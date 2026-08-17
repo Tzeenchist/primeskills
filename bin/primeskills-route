@@ -78,6 +78,7 @@ def main(argv):
 
     problems = 0
     checked = 0
+    unscorable = 0
     for line in table.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "->" not in line:
@@ -98,6 +99,14 @@ def main(argv):
         ranked = sorted(((score(q, d), n) for n, d in pool.items()), reverse=True)
         top_score, top_name = ranked[0]
         runner = ranked[1][0] if len(ranked) > 1 else 0.0
+        # No word of the query appears in any description. Naming a winner here
+        # reports the alphabet, not a routing decision -- and a Russian query
+        # against English descriptions lands here every time (see PS-015).
+        if top_score == 0.0:
+            print(f"R4: {query!r} — ни одного общего слова ни с одним описанием, "
+                  f"проверка неприменима")
+            unscorable += 1
+            continue
         if top_name != expected:
             print(f"R1: {query!r} -> {top_name} (expected {expected}); ranking {ranked}")
             problems += 1
@@ -105,7 +114,8 @@ def main(argv):
             print(f"R2: {query!r} -> {expected} wins by {top_score - runner:.2f} < {MARGIN}")
             problems += 1
 
-    print(f"{checked} queries, {problems} problems")
+    tail = f", {unscorable} без общих слов (не проверены)" if unscorable else ""
+    print(f"{checked} queries, {problems} problems{tail}")
     return 1 if problems else 0
 
 
