@@ -143,6 +143,21 @@ def render(lang, skills):
         w("order is not a ritual, it is a way not to forget the check before you")
         w("hand something over.\n")
 
+    # Which sequences reach a given skill, so the reader sees the relation from
+    # both ends: the chain when reading a sequence, the callers when reading a
+    # link. The section at the bottom answers only the first direction.
+    used_by = {}
+    for f in flows:
+        for n in f["calls"] + f["optional"]:
+            used_by.setdefault(n, []).append(
+                f["name"] + ("?" if n in f["optional"] else ""))
+
+    def chain_of(s):
+        parts = [f"`/{c}`" for c in s["calls"]] + [
+            f"`/{o}`" + (" (если нужно)" if lang == "ru" else " (if needed)")
+            for o in s["optional"]]
+        return " → ".join(parts)
+
     placed = set()
     for key, names in STAGES:
         rows = [skills[n] for n in names if n in skills]
@@ -154,6 +169,16 @@ def render(lang, skills):
             mark = " *(последовательность)*" if (s["flow"] and lang == "ru") else \
                    " *(a sequence)*" if s["flow"] else ""
             w(f"- **`/{s['name']}`**{mark} — {s['description']}")
+            if s["flow"]:
+                label = "запускает" if lang == "ru" else "runs"
+                w(f"  {label}: {chain_of(s)}")
+            elif s["name"] in used_by:
+                label = "входит в" if lang == "ru" else "part of"
+                names_ = ", ".join(
+                    f"`/{u.rstrip('?')}`" + (" (если нужно)" if u.endswith("?") and lang == "ru"
+                                             else " (if needed)" if u.endswith("?") else "")
+                    for u in used_by[s["name"]])
+                w(f"  {label}: {names_}")
         w("")
 
     rest = [s for n, s in skills.items() if n not in placed]
@@ -169,8 +194,7 @@ def render(lang, skills):
         w("решение за вами: слить, выкатить, одобрить план. Они не решают за вас —")
         w("они не дают проскочить шаг.\n")
         for s in sorted(flows, key=lambda x: x["name"]):
-            chain = " → ".join(s["calls"] + [f"{o} (если нужно)" for o in s["optional"]])
-            w(f"- **`/{s['name']}`**: {chain}")
+            w(f"- **`/{s['name']}`**: {chain_of(s)}")
         w("")
         w("## Что записывается на диск\n")
         w("- `.primeskills/run/<ветка>.md` — что проверено, какой вердикт у ревью,")
@@ -201,8 +225,7 @@ def render(lang, skills):
         w("merge, deploy, approve a plan. They decide nothing for you; they keep a")
         w("step from being skipped.\n")
         for s in sorted(flows, key=lambda x: x["name"]):
-            chain = " → ".join(s["calls"] + [f"{o} (if needed)" for o in s["optional"]])
-            w(f"- **`/{s['name']}`**: {chain}")
+            w(f"- **`/{s['name']}`**: {chain_of(s)}")
         w("")
         w("## What gets written to disk\n")
         w("- `.primeskills/run/<branch>.md` — what was checked, what the review said,")

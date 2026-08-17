@@ -65,6 +65,26 @@ def main():
         if "primeskills-help --set-lang en" not in run(["--lang", "ru"], home).stdout:
             failures.append("русская справка не говорит, как сменить язык")
 
+        # both directions of the relation: a sequence shows what it runs, and a
+        # link shows which sequences reach it
+        checks += 1
+        ru_body = run(["--lang", "ru"], home).stdout
+        if "запускает: `/verify` → `/vet` → `/land`" not in ru_body:
+            failures.append("последовательность не показывает свою цепочку в списке")
+        checks += 1
+        if "входит в: `/close`, `/release`" not in ru_body:
+            failures.append("навык не показывает, в какие последовательности входит")
+        checks += 1
+        if "(если нужно)" not in ru_body:
+            failures.append("условное звено не помечено")
+        checks += 1
+        en_body = run(["--lang", "en"], home).stdout
+        if "part of: `/close`" not in en_body or "runs: `/verify`" not in en_body:
+            failures.append("английская версия без связей в обе стороны")
+        checks += 1
+        if "<br>" in ru_body or "<br>" in en_body:
+            failures.append("в тексте осталась разметка HTML")
+
         checks += 1
         ru = run(["--lang", "ru"], home).stdout
         if "skills" in ru.rsplit("---", 1)[-1]:
