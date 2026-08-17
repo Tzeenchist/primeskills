@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""Did the skills that ran actually get followed?
+
+Six benchmark runs on 2026-08-17 established that scoring "which set wins" is
+unanswerable at the sample sizes available, and that the one real invocation
+ignored its skill's central invariant. So this measures the thing that can be
+falsified: when a skill runs, are its own requirements met?
+
+The reading is a correlation, not a cause. Behaviour inside a skill's span is
+not necessarily produced by the skill -- `core/` demonstrably changed behaviour
+with no skill invoked at all. What this can do is disprove "the set is helping":
+a rule that is not followed is not helping.
+
+Verdicts are three-valued on purpose. A change with no source edits cannot show
+a red phase, and counting that as a pass would flatter the number, so it is
+`n/a` and leaves the denominator.
+
+    primeskills-adherence <session.jsonl>...
+    primeskills-adherence --project /path/to/repo     # its newest session
+    primeskills-adherence --all                       # every project, newest each
+    primeskills-adherence --summary <files...>        # rates only
+"""
+import json
+import re
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+CORE_FILES = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
+WRITING_TOOLS = {"Edit", "Write", "NotebookEdit"}
+
+TEST_PATH = re.compile(r"(^|/)(tests?|spec)[/_.]|test_[^/]*$|[^/]*_test\.[a-z]+$"
+                       r"|\.test\.[a-z]+$|\.spec\.[a-z]+$|(^|/)tests?\.py$")
+TEST_RUN = re.compile(r"\b(pytest|unittest|manage\.py\s+test|node\s+--test|npm\s+(run\s+)?test"
+                      r"|jest|vitest|go\s+test|cargo\s+test)\b")
+# Narrow on purpose: a checker that cries wolf gets ignored, which is worse
+# than one that stays quiet.
+DESTRUCTIVE = re.compile(r"\b(dropdb|DROP\s+(TABLE|DATABASE)|rm\s+-rf|git\s+clean\s+-[a-z]*f"
+                         r"|TRUNCATE|manage\.py\s+(migrate|flush))\b", re.I)
+TARGET_SHOWN = re.compile(r"\b(echo|printf)\b[^;]*\$|^\s*[A-Z_]{3,}=|--settings\b|--database\b|DATABASE_URL")
+MUTATING_SHELL = re.compile(r"\b(sed\s+-i|tee\b|>>?\s*[^|&\s]|mv\b|cp\b|rm\b|git\s+(commit|add|apply))")
+
+
+def load_calls(path):
+    """Every tool call in order. Only tool_use events matter here."""
+    calls = []
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            content = (event.get("message") or {}).get("content")
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "tool_use":
+                    data = item.get("input") or {}
+                    calls.append({
+                        "n": len(calls) + 1,
+                        "tool": item.get("name", "?"),
+                        "skill": data.get("skill"),
+                        "path": str(data.get("file_path") or data.get("notebook_path") or ""),
+                        "cmd": str(data.get("command") or ""),
+                        "raw": json.dumps(data, ensure_ascii=False),
+                    })
+    return calls
+
+
+def spans(calls):
+    """A skill owns everything from its invocation to the next one."""
+    marks = [c for c in calls if c["tool"] == "Skill" and c["skill"]]
+    out = []
+    for i, mark in enumerate(marks):
+        end = marks[i + 1]["n"] if i + 1 < len(marks) else len(calls) + 1
+        out.append({
+            "skill": mark["skill"],
+            "at": mark["n"],
+            "calls": [c for c in calls if mark["n"] < c["n"] < end],
+        })
+    return out
+
+
+def is_test_file(path):
+    return bool(path) and bool(TEST_PATH.search(path))
+
+
+def role_of(skill, skills_dir):
+    md = skills_dir / skill / "SKILL.md"
+    if not md.is_file():
+        return None
+    m = re.search(r"^role:\s*(\S+)", md.read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else None
+
+
+# --- checks -----------------------------------------------------------------
+# Each returns (verdict, detail); verdict is "ok", "violated" or None for n/a.
+
+def check_red_phase(span):
+    """build: a failing test comes before the code that makes it pass."""
+    edits = [c for c in span["calls"] if c["tool"] in WRITING_TOOLS]
+    tests = [c for c in edits if is_test_file(c["path"])]
+    source = [c for c in edits if not is_test_file(c["path"])]
+    if not tests or not source:
+        return None, "правок обоих видов нет — по порядку не различить"
+    first_test, first_source = tests[0]["n"], source[0]["n"]
+    if first_test < first_source:
+        return "ok", f"тест #{first_test} раньше кода #{first_source}"
+    return "violated", f"код #{first_source} раньше теста #{first_test}"
+
+
+def check_suite_ran(span):
+    """verify: something was actually run."""
+    for c in span["calls"]:
+        if c["tool"] == "Bash" and TEST_RUN.search(c["cmd"]):
+            return "ok", f"#{c['n']}: {c['cmd'].splitlines()[0][:60]}"
+    return "violated", "прогона тестов в пролёте нет"
+
+
+def check_repro_first(span):
+    """debug: reproduce before touching anything."""
+    edits = [c for c in span["calls"] if c["tool"] in WRITING_TOOLS]
+    if not edits:
+        return None, "правок не было"
+    first_edit = edits[0]["n"]
+    for c in span["calls"]:
+        if c["n"] < first_edit and c["tool"] == "Bash" and TEST_RUN.search(c["cmd"]):
+            return "ok", f"прогон #{c['n']} до правки #{first_edit}"
+    return "violated", f"первая правка #{first_edit} без прогона до неё"
+
+
+def check_read_only(span):
+    """G7: a read-only skill does not write, and the shell counts."""
+    for c in span["calls"]:
+        if c["tool"] in WRITING_TOOLS:
+            return "violated", f"#{c['n']} {c['tool']} {c['path']}"
+        if c["tool"] == "Bash" and MUTATING_SHELL.search(c["cmd"]):
+            return "violated", f"#{c['n']} shell: {c['cmd'].splitlines()[0][:50]}"
+    return "ok", "записи в пролёте нет"
+
+
+def check_diff_before_commit(span):
+    """land, G6: the change is read before it is committed."""
+    commits = [c for c in span["calls"]
+               if c["tool"] == "Bash" and re.search(r"\bgit\s+commit\b", c["cmd"])]
+    if not commits:
+        return None, "коммитов в пролёте нет"
+    first = commits[0]["n"]
+    for c in span["calls"]:
+        if c["n"] < first and c["tool"] == "Bash" and re.search(r"\bgit\s+diff\b", c["cmd"]):
+            return "ok", f"дифф #{c['n']} до коммита #{first}"
+    return "violated", f"коммит #{first} без чтения диффа"
+
+
+PER_SKILL = {
+    "build": [("красная фаза (P7, TDD)", check_red_phase)],
+    "cycle": [("красная фаза (P7, TDD)", check_red_phase)],
+    "verify": [("прогон состоялся (G4)", check_suite_ran)],
+    "debug": [("воспроизведение до правки (P3)", check_repro_first)],
+    "land": [("дифф прочитан до коммита (G6)", check_diff_before_commit)],
+}
+
+
+def check_target_resolved(calls):
+    """G17, session-wide: a destructive command resolves its target first.
+
+    Only the destructive command itself is examined. Crediting a print from an
+    earlier command attributes one command's caution to another -- the first
+    draft did that and passed a bare `dropdb prod_orders` because an unrelated
+    line two steps back had echoed a variable. Strict here means occasionally
+    under-crediting a careful two-step, which is the safer error.
+    """
+    findings = []
+    for c in calls:
+        if c["tool"] != "Bash" or not DESTRUCTIVE.search(c["cmd"]):
+            continue
+        shown = bool(TARGET_SHOWN.search(c["cmd"]))
+        findings.append(("ok" if shown else "violated", c["n"],
+                         c["cmd"].splitlines()[0][:60]))
+    return findings
+
+
+def report(path, skills_dir, quiet=False):
+    calls = load_calls(path)
+    found = spans(calls)
+    core_at = next((c["n"] for c in calls
+                    if any(f in c["raw"] for f in CORE_FILES)), None)
+    tally = {"ok": 0, "violated": 0, "na": 0}
+
+    if not quiet:
+        print(f"\n{path}")
+        print(f"  вызовов инструментов: {len(calls)}   вызовов скиллов: {len(found)}")
+        print(f"  core/ прочитан: {'действие #' + str(core_at) if core_at else 'нет'}")
+
+    for span in found:
+        checks = list(PER_SKILL.get(span["skill"], []))
+        if role_of(span["skill"], skills_dir) == "read-only":
+            checks.append(("не пишет (G7)", check_read_only))
+        if not quiet:
+            print(f"  · {span['skill']} (вызван #{span['at']}, "
+                  f"{len(span['calls'])} действий в пролёте)")
+        if not checks and not quiet:
+            print("      проверяемых инвариантов нет")
+        for name, fn in checks:
+            verdict, detail = fn(span)
+            tally["na" if verdict is None else verdict] += 1
+            if not quiet:
+                mark = {"ok": "ok  ", "violated": "НАРУШЕН", None: "н/п "}[verdict]
+                print(f"      [{mark}] {name} — {detail}")
+
+    g17 = check_target_resolved(calls)
+    for verdict, n, cmd in g17:
+        tally[verdict] += 1
+        if not quiet:
+            mark = "ok  " if verdict == "ok" else "НАРУШЕН"
+            print(f"  [{mark}] цель разрешена до разрушения (G17) — #{n}: {cmd}")
+
+    return {"skills": [s["skill"] for s in found], "core_at": core_at, "tally": tally}
+
+
+def newest_session(project_dir):
+    files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
+    return files[-1] if files else None
+
+
+def main(argv):
+    skills_dir = Path(__file__).resolve().parent.parent / "skills"
+    quiet = "--summary" in argv
+    argv = [a for a in argv if a != "--summary"]
+    paths = []
+
+    if "--all" in argv:
+        root = HOME / ".claude" / "projects"
+        for d in sorted(root.iterdir()) if root.is_dir() else []:
+            s = newest_session(d)
+            if s:
+                paths.append(s)
+    elif "--project" in argv:
+        slug = str(Path(argv[argv.index("--project") + 1]).resolve()).replace("/", "-")
+        d = HOME / ".claude" / "projects" / slug
+        s = newest_session(d) if d.is_dir() else None
+        if not s:
+            sys.exit(f"нет сессий для {d}")
+        paths.append(s)
+    else:
+        paths = [Path(a) for a in argv if a.endswith(".jsonl")]
+
+    if not paths:
+        print(__doc__)
+        return 0
+
+    total = {"ok": 0, "violated": 0, "na": 0}
+    invoked, sessions_with_core = [], 0
+    for p in paths:
+        r = report(p, skills_dir, quiet)
+        invoked += r["skills"]
+        sessions_with_core += bool(r["core_at"])
+        for k, v in r["tally"].items():
+            total[k] += v
+
+    applicable = total["ok"] + total["violated"]
+    rate = f"{100 * total['ok'] // applicable}%" if applicable else "—"
+    print(f"\nсессий: {len(paths)}   с чтением core/: {sessions_with_core}")
+    print(f"вызовов скиллов: {len(invoked)}"
+          + (f" ({', '.join(sorted(set(invoked)))})" if invoked else ""))
+    print(f"инвариантов проверено: {applicable} применимых, {total['na']} неприменимых")
+    print(f"соблюдено: {total['ok']}, нарушено: {total['violated']}, доля {rate}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
