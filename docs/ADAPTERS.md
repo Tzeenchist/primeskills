@@ -26,8 +26,9 @@ python3 bin/primeskills-install claude --apply   # только один аге�
 
 ## Ролевая изоляция: что проверено, а что нет
 
-Десять аналитических скиллов (`brief`, `plan`, `ceo`, `eng`, `beauty`, `teams`,
-`autoplan`, `vet`, `probe`, `baby`) не должны иметь возможности писать.
+Двенадцать аналитических скиллов (`brief`, `plan`, `ceo`, `eng`, `beauty`,
+`teams`, `autoplan`, `vet`, `probe`, `baby`, `measure`, `study`) не должны
+иметь возможности писать.
 
 | агент | механизм | статус |
 |---|---|---|

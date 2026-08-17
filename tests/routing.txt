@@ -23,3 +23,9 @@ get this reviewed and into a pull request -> close
 merge the approved branch into main -> merge
 put this on the staging server -> deploy
 take it all the way out to production -> release
+the reviewer asked for changes, rework the branch -> revise
+answer the review comments and rework -> revise
+this endpoint got slower, where is the time going -> measure
+set a baseline and find the bottleneck -> measure
+how is this unfamiliar code structured -> study
+understand a module I did not write and report back -> study

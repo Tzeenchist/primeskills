@@ -29,6 +29,12 @@ def words(p):
     return len(p.read_text(encoding="utf-8").split())
 
 
+def description(p):
+    """The one line every agent carries for every skill, always."""
+    m = re.search(r"^description:\s*(.+)$", p.read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else ""
+
+
 def body_words(p):
     text = p.read_text(encoding="utf-8")
     return len(re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.S).split())
@@ -44,12 +50,18 @@ def main():
     head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
 
+    descs = sum(len(d.split()) for d in (description(p) for p in skills))
+    pipeline = ["brief", "plan", "build", "verify", "vet", "land"]
+    pass_words = sum(body_words(ROOT / "skills" / n / "SKILL.md") for n in pipeline)
+
     print(f"primeskills @ {head}")
     print(f"  skills            {len(skills)} (of which flows: {len(flows)})")
-    print(f"  skill bodies      {total} words")
-    print(f"  core, always      {core} words")
-    print(f"  loaded on demand  {on_demand} words")
-    print(f"  always-on total   {total + core} words")
+    print(f"  always in context {core + descs} words "
+          f"(core {core} + {len(skills)} descriptions {descs})")
+    print(f"  one pass          {core + descs + pass_words} words "
+          f"({' -> '.join(pipeline)})")
+    print(f"  whole set         {total + core} words, if every body were loaded")
+    print(f"  refs, on demand   {on_demand} words")
     print("\n  agent        install                                        role isolation")
     for name, install, isolation in SUPPORT:
         print(f"  {name:<12} {install:<45} {isolation}")
