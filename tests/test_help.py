@@ -26,77 +26,69 @@ def main():
             failures.append("свежий дом: язык должен быть 'unset'")
 
         checks += 1
-        if run([], home).stdout.count("how to use this set") != 1:
-            failures.append("без выбора язык по умолчанию должен быть английским")
+        body = run([], home).stdout
+        if "how to use this set" not in body:
+            failures.append("справка должна печататься по-английски")
 
-        for lang, marker in (("ru", "как этим пользоваться"), ("en", "how to use this set")):
+        checks += 1
+        if "No language is remembered yet" not in body:
+            failures.append("без выбора справка не сообщает, что язык не задан")
+
+        # any language, not a list of two: a fixed list is what limited this
+        for value in ("ru", "日本語", "Português"):
             checks += 1
-            out = run(["--lang", lang], home).stdout
-            if marker not in out:
-                failures.append(f"--lang {lang}: нет заголовка {marker!r}")
+            run(["--set-lang", value], home)
+            if run(["--which-lang"], home).stdout.strip() != value:
+                failures.append(f"язык {value!r} не запомнился")
 
         checks += 1
-        if run(["--which-lang"], home).stdout.strip() != "unset":
-            failures.append("--lang не должен запоминать выбор")
+        if f"remembered as: Português" not in run([], home).stdout:
+            failures.append("справка не называет запомненный язык")
 
         checks += 1
-        run(["--set-lang", "ru"], home)
-        if run(["--which-lang"], home).stdout.strip() != "ru":
-            failures.append("--set-lang не запомнил язык")
+        if run(["--set-lang"], home).returncode == 0:
+            failures.append("--set-lang без значения должен падать")
+        checks += 1
+        if run(["--set-lang", "x" * 40], home).returncode == 0:
+            failures.append("абзац вместо языка должен отвергаться")
+
+        # every skill appears: a guide that silently drops one is worse than none
+        checks += 1
+        out = run([], home).stdout
+        missing = [n for n in names if f"`/{n}`" not in out]
+        if missing:
+            failures.append(f"в справке нет навыков {missing}")
 
         checks += 1
-        if "как этим пользоваться" not in run([], home).stdout:
-            failures.append("запомненный язык не применяется без флага")
+        if "Not yet placed" in out:
+            failures.append("навыки попали в запасной раздел")
 
+        # both directions of the relation
         checks += 1
-        if run(["--set-lang", "de"], home).returncode == 0:
-            failures.append("неизвестный язык должен отвергаться")
-
-        # every skill appears, in both languages: a guide that silently drops a
-        # skill is worse than no guide
-        for lang in ("en", "ru"):
-            out = run(["--lang", lang], home).stdout
-            missing = [n for n in names if f"`/{n}`" not in out]
-            checks += 1
-            if missing:
-                failures.append(f"{lang}: в справке нет навыков {missing}")
-
+        if "runs: `/verify` → `/vet` → `/land`" not in out:
+            failures.append("последовательность не показывает цепочку в списке")
         checks += 1
-        if "primeskills-help --set-lang en" not in run(["--lang", "ru"], home).stdout:
-            failures.append("русская справка не говорит, как сменить язык")
-
-        # both directions of the relation: a sequence shows what it runs, and a
-        # link shows which sequences reach it
+        if "part of: `/close`, `/release`" not in out:
+            failures.append("навык не показывает, куда входит")
         checks += 1
-        ru_body = run(["--lang", "ru"], home).stdout
-        if "запускает: `/verify` → `/vet` → `/land`" not in ru_body:
-            failures.append("последовательность не показывает свою цепочку в списке")
-        checks += 1
-        if "входит в: `/close`, `/release`" not in ru_body:
-            failures.append("навык не показывает, в какие последовательности входит")
-        checks += 1
-        if "(если нужно)" not in ru_body:
+        if "(if needed)" not in out:
             failures.append("условное звено не помечено")
         checks += 1
-        en_body = run(["--lang", "en"], home).stdout
-        if "part of: `/close`" not in en_body or "runs: `/verify`" not in en_body:
-            failures.append("английская версия без связей в обе стороны")
-        checks += 1
-        if "<br>" in ru_body or "<br>" in en_body:
+        if "<br>" in out:
             failures.append("в тексте осталась разметка HTML")
-
         checks += 1
-        ru = run(["--lang", "ru"], home).stdout
-        if "skills" in ru.rsplit("---", 1)[-1]:
-            failures.append("подпись русской справки осталась английской")
+        if "primeskills-help --set-lang" not in out:
+            failures.append("справка не говорит, как сменить язык")
 
-        # the fallback bucket is a safety net, not a place skills live
+    # the preference must never be written outside the given HOME
+    with tempfile.TemporaryDirectory() as home:
         checks += 1
-        for lang in ("en", "ru"):
-            out = run(["--lang", lang], home).stdout
-            bucket = "Not yet placed" if lang == "en" else "Ещё не поставлены"
-            if bucket in out:
-                failures.append(f"{lang}: навыки попали в запасной раздел")
+        real = Path.home() / ".primeskills" / "lang"
+        before = real.read_text(encoding="utf-8") if real.is_file() else None
+        run(["--set-lang", "test-isolation"], home)
+        after = real.read_text(encoding="utf-8") if real.is_file() else None
+        if before != after:
+            failures.append("настройка утекла из временного HOME в настоящий")
 
     for f in failures:
         print(f)

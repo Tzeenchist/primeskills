@@ -5,13 +5,19 @@ A hand-written guide drifts: this project has already shipped a README claiming
 nineteen skills when there were twenty-two, and three documents claiming three
 different weights. Everything here that can be counted is counted at print time.
 
-    primeskills-help                 # in the remembered language
-    primeskills-help --lang ru       # once, without remembering
-    primeskills-help --set-lang ru   # remember and print
-    primeskills-help --which-lang    # print the remembered language or 'unset'
+    primeskills-help                  # the guide, in English
+    primeskills-help --set-lang <any> # remember the reader's language
+    primeskills-help --which-lang     # print it, or 'unset'
 
-The choice lives in ~/.primeskills/lang because it belongs to the reader, not
-to any repository.
+The guide is written once, in English, and whoever hands it to a reader
+translates it. Keeping a second copy of the prose in the program bought two
+languages and cost a class of bug: the two copies drifted twice on the day they
+were written -- an English footer under a Russian guide, and a skill filed in
+the wrong section on one side only.
+
+The remembered language lives in ~/.primeskills/lang because it belongs to the
+reader, not to any repository. Any language may be named; the program does not
+translate, it only remembers who to translate for.
 """
 import re
 import sys
@@ -20,7 +26,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 PREF = Path.home() / ".primeskills" / "lang"
-LANGS = ("en", "ru")
 
 # The pipeline in the order work actually moves. A skill absent from here is
 # still listed, under "other", so a new skill can never fall out of the guide.
@@ -35,22 +40,14 @@ STAGES = [
 ]
 
 TITLES = {
-    "en": {"understand": "Work out what is wanted",
-           "plan": "Decide what to do, and check the decision",
-           "make": "Write the code",
-           "check": "Prove it works",
-           "hand over": "Give it to someone else",
-           "ship": "Put it in front of users",
-           "keep": "Everything else",
-           "other": "Not yet placed in the order"},
-    "ru": {"understand": "Понять, что нужно",
-           "plan": "Решить, что делать, и проверить решение",
-           "make": "Написать код",
-           "check": "Доказать, что работает",
-           "hand over": "Передать другому",
-           "ship": "Показать пользователям",
-           "keep": "Всё остальное",
-           "other": "Ещё не поставлены в порядок"},
+    "understand": "Work out what is wanted",
+    "plan": "Decide what to do, and check the decision",
+    "make": "Write the code",
+    "check": "Prove it works",
+    "hand over": "Give it to someone else",
+    "ship": "Put it in front of users",
+    "keep": "Everything else",
+    "other": "Not yet placed in the order",
 }
 
 
@@ -82,9 +79,11 @@ def load():
 
 
 def lang_pref():
+    """Whatever the reader called their language. Not validated against a list:
+    a fixed list is what limited this to two."""
     if PREF.is_file():
-        value = PREF.read_text(encoding="utf-8").strip().lower()
-        if value in LANGS:
+        value = PREF.read_text(encoding="utf-8").strip()
+        if value and len(value) <= 32 and "\n" not in value:
             return value
     return None
 
@@ -99,7 +98,7 @@ def core_words():
                for n in ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md"))
 
 
-def render(lang, skills):
+def render(skills, reader_lang):
     out = []
     w = out.append
     flows = [s for s in skills.values() if s["flow"]]
@@ -108,40 +107,20 @@ def render(lang, skills):
     core = core_words()
     heaviest = max(s["words"] for s in singles)
 
-    if lang == "ru":
-        w("# primeskills — как этим пользоваться\n")
-        w("Набор коротких инструкций для агента разработки. Каждая описывает один")
-        w("вид работы: как чинить баг, как проверять, как отдавать изменение.\n")
-        w("## Как это устроено\n")
-        w("Агент всё время видит только названия и по одной строке про каждый навык.")
-        w(f"Навыков в наборе: {len(skills)}; слов во всех описаниях вместе: {descs}.")
-        w("Полный текст навыка подгружается только когда навык понадобился, а общие")
-        w(f"правила читаются один раз за сессию (слов в них: {core}). Поэтому набор")
-        w("не занимает место, пока не нужен.\n")
-        w("Вызвать навык можно самому — командой с косой чертой, например")
-        w("`/debug`. Обычно этого не требуется: агент выбирает сам по описанию.\n")
-        w("Описания ниже — оригинальные, английские: это ровно тот текст, по")
-        w("которому агент выбирает навык, и хранить его перевод значило бы завести")
-        w("вторую копию, расходящуюся с первой. Если справку печатает агент, он")
-        w("переводит эти строки на ходу, из текущего оригинала.\n")
-        w("## Порядок работы\n")
-        w("Навыки расставлены по ходу работы. Пропускать шаги можно, порядок —")
-        w("не обряд, а способ не забыть проверку перед тем, как отдать результат.\n")
-    else:
-        w("# primeskills — how to use this set\n")
-        w("A set of short instructions for a coding agent. Each one covers a single")
-        w("kind of work: how to chase a bug, how to check a change, how to hand it on.\n")
-        w("## How it works\n")
-        w("The agent always sees only the names and one line about each skill —")
-        w(f"{descs} words for all {len(skills)}. The full text of a skill loads only")
-        w("when that skill is needed, and the shared rules are read once per session")
-        w(f"({core} words). The set costs nothing while it is not in use.\n")
-        w("You can call a skill yourself with a slash command, `/debug` for example.")
-        w("Usually you do not have to: the agent picks by the description.\n")
-        w("## The order of work\n")
-        w("Skills are laid out along the way work moves. Skipping is allowed — the")
-        w("order is not a ritual, it is a way not to forget the check before you")
-        w("hand something over.\n")
+    w("# primeskills — how to use this set\n")
+    w("A set of short instructions for a coding agent. Each one covers a single")
+    w("kind of work: how to chase a bug, how to check a change, how to hand it on.\n")
+    w("## How it works\n")
+    w("The agent always sees only the names and one line about each skill —")
+    w(f"{descs} words for all {len(skills)}. The full text of a skill loads only")
+    w("when that skill is needed, and the shared rules are read once per session")
+    w(f"({core} words). The set costs nothing while it is not in use.\n")
+    w("You can call a skill yourself with a slash command, `/debug` for example.")
+    w("Usually you do not have to: the agent picks by the description.\n")
+    w("## The order of work\n")
+    w("Skills are laid out along the way work moves. Skipping is allowed — the")
+    w("order is not a ritual, it is a way not to forget the check before you")
+    w("hand something over.\n")
 
     # Which sequences reach a given skill, so the reader sees the relation from
     # both ends: the chain when reading a sequence, the callers when reading a
@@ -154,8 +133,7 @@ def render(lang, skills):
 
     def chain_of(s):
         parts = [f"`/{c}`" for c in s["calls"]] + [
-            f"`/{o}`" + (" (если нужно)" if lang == "ru" else " (if needed)")
-            for o in s["optional"]]
+            f"`/{o}` (if needed)" for o in s["optional"]]
         return " → ".join(parts)
 
     placed = set()
@@ -164,122 +142,84 @@ def render(lang, skills):
         placed.update(n for n in names if n in skills)
         if not rows:
             continue
-        w(f"### {TITLES[lang][key]}\n")
+        w(f"### {TITLES[key]}\n")
         for s in rows:
-            mark = " *(последовательность)*" if (s["flow"] and lang == "ru") else \
-                   " *(a sequence)*" if s["flow"] else ""
+            mark = " *(a sequence)*" if s["flow"] else ""
             w(f"- **`/{s['name']}`**{mark} — {s['description']}")
             if s["flow"]:
-                label = "запускает" if lang == "ru" else "runs"
+                label = "runs"
                 w(f"  {label}: {chain_of(s)}")
             elif s["name"] in used_by:
-                label = "входит в" if lang == "ru" else "part of"
+                label = "part of"
                 names_ = ", ".join(
-                    f"`/{u.rstrip('?')}`" + (" (если нужно)" if u.endswith("?") and lang == "ru"
-                                             else " (if needed)" if u.endswith("?") else "")
+                    f"`/{u.rstrip('?')}`" + (" (if needed)" if u.endswith("?") else "")
                     for u in used_by[s["name"]])
                 w(f"  {label}: {names_}")
         w("")
 
     rest = [s for n, s in skills.items() if n not in placed]
     if rest:
-        w(f"### {TITLES[lang]['other']}\n")
+        w(f"### {TITLES['other']}\n")
         for s in rest:
             w(f"- **`/{s['name']}`** — {s['description']}")
         w("")
 
-    if lang == "ru":
-        w("## Последовательности\n")
-        w("Несколько навыков вызывают другие по порядку и останавливаются там, где")
-        w("решение за вами: слить, выкатить, одобрить план. Они не решают за вас —")
-        w("они не дают проскочить шаг.\n")
-        for s in sorted(flows, key=lambda x: x["name"]):
-            w(f"- **`/{s['name']}`**: {chain_of(s)}")
-        w("")
-        w("## Что записывается на диск\n")
-        w("- `.primeskills/run/<ветка>.md` — что проверено, какой вердикт у ревью,")
-        w("  сколько было неудачных попыток. Нужно, чтобы это пережило перезапуск.")
-        w("- `.primeskills/handoff/<ветка>.md` — состояние работы для следующего")
-        w("  агента или для вас завтра: решения, остаток, что пробовали зря.\n")
-        w("## Правила, которые действуют всегда\n")
-        w("Их читает агент, не вы, но знать полезно:\n")
-        w("- сначала падающий тест, потом код;")
-        w("- «прошло» — это код возврата и счётчик тестов, а не отсутствие ошибки;")
-        w("- перед всем разрушительным вслух назвать, что именно будет затронуто;")
-        w("- три неудачные попытки подряд — остановиться и спросить;")
-        w("- трогать только то, что относится к задаче;")
-        w("- решение слить, выкатить или удалить — всегда ваше.\n")
-        w("## Безопасность\n")
-        w("`/fence` включает две проверки: опасная команда в терминале требует")
-        w("подтверждения, а правки ограничиваются одним каталогом. Пока не включили —")
-        w("не работают.\n")
-        w("## Язык этой справки\n")
-        w(f"Сейчас: русский. Сменить — `primeskills-help --set-lang en`.")
-        w("Запомненный выбор лежит в `~/.primeskills/lang`.\n")
-        w("## Если что-то не работает\n")
-        w("`primeskills-doctor` отвечает на вопрос «подключено ли оно вообще» —")
-        w("запускать первым. `primeskills-status` печатает состав и вес.")
+    w("## Sequences\n")
+    w("A few skills call others in order and stop where the decision is yours:")
+    w("merge, deploy, approve a plan. They decide nothing for you; they keep a")
+    w("step from being skipped.\n")
+    for s in sorted(flows, key=lambda x: x["name"]):
+        w(f"- **`/{s['name']}`**: {chain_of(s)}")
+    w("")
+    w("## What gets written to disk\n")
+    w("- `.primeskills/run/<branch>.md` — what was checked, what the review said,")
+    w("  how many attempts failed. It has to outlive a restart.")
+    w("- `.primeskills/handoff/<branch>.md` — the state of the work for the next")
+    w("  agent, or for you tomorrow: decisions, what is left, what was tried in")
+    w("  vain.\n")
+    w("## Rules that always apply\n")
+    w("The agent reads these, not you, but they are worth knowing:\n")
+    w("- the failing test comes before the code;")
+    w("- \"it passed\" means an exit code and a test count, not the absence of an")
+    w("  error message;")
+    w("- before anything destructive, say out loud what will be touched;")
+    w("- three failed attempts on one problem: stop and ask;")
+    w("- touch only what the task needs;")
+    w("- merging, deploying and deleting are always your call.\n")
+    w("## Safety\n")
+    w("`/fence` turns on two checks: a dangerous shell command asks first, and")
+    w("edits are confined to one directory. Until you turn it on, neither runs.\n")
+    w("## The language of this guide\n")
+    w("This text is written in English. Whoever hands it to you translates it,")
+    w("which is why any language works and none is built in.")
+    if reader_lang:
+        w(f"Your language is remembered as: {reader_lang}.")
     else:
-        w("## Sequences\n")
-        w("A few skills call others in order and stop where the decision is yours:")
-        w("merge, deploy, approve a plan. They decide nothing for you; they keep a")
-        w("step from being skipped.\n")
-        for s in sorted(flows, key=lambda x: x["name"]):
-            w(f"- **`/{s['name']}`**: {chain_of(s)}")
-        w("")
-        w("## What gets written to disk\n")
-        w("- `.primeskills/run/<branch>.md` — what was checked, what the review said,")
-        w("  how many attempts failed. It has to outlive a restart.")
-        w("- `.primeskills/handoff/<branch>.md` — the state of the work for the next")
-        w("  agent, or for you tomorrow: decisions, what is left, what was tried in")
-        w("  vain.\n")
-        w("## Rules that always apply\n")
-        w("The agent reads these, not you, but they are worth knowing:\n")
-        w("- the failing test comes before the code;")
-        w("- \"it passed\" means an exit code and a test count, not the absence of an")
-        w("  error message;")
-        w("- before anything destructive, say out loud what will be touched;")
-        w("- three failed attempts on one problem: stop and ask;")
-        w("- touch only what the task needs;")
-        w("- merging, deploying and deleting are always your call.\n")
-        w("## Safety\n")
-        w("`/fence` turns on two checks: a dangerous shell command asks first, and")
-        w("edits are confined to one directory. Until you turn it on, neither runs.\n")
-        w("## The language of this guide\n")
-        w("Now: English. To change it: `primeskills-help --set-lang ru`.")
-        w("The choice is remembered in `~/.primeskills/lang`.\n")
-        w("## If something seems broken\n")
-        w("`primeskills-doctor` answers \"is it even connected\" — run it first.")
-        w("`primeskills-status` prints what is in the set and what it weighs.")
+        w("No language is remembered yet, so you are reading the original.")
+    w("To change it: `primeskills-help --set-lang <language>`, remembered in")
+    w("`~/.primeskills/lang`.\n")
+    w("## If something seems broken\n")
+    w("`primeskills-doctor` answers \"is it even connected\" — run it first.")
+    w("`primeskills-status` prints what is in the set and what it weighs.")
 
-    if lang == "ru":
-        w(f"\n---\nВсего навыков: {len(skills)}, из них последовательностей: "
-          f"{len(flows)}. Самый длинный текст навыка, слов: {heaviest}.")
-    else:
-        w(f"\n---\n{len(skills)} skills in all, {len(flows)} of them sequences. "
-          f"The longest skill text runs {heaviest} words.")
+    w(f"\n---\n{len(skills)} skills in all, {len(flows)} of them sequences. "
+      f"The longest skill text runs {heaviest} words.")
     return "\n".join(out)
 
 
 def main(argv):
-    lang = None
     if "--which-lang" in argv:
         print(lang_pref() or "unset")
         return 0
     if "--set-lang" in argv:
-        value = argv[argv.index("--set-lang") + 1].lower()
-        if value not in LANGS:
-            sys.exit(f"language must be one of {', '.join(LANGS)}")
+        try:
+            value = argv[argv.index("--set-lang") + 1].strip()
+        except IndexError:
+            sys.exit("--set-lang needs a language")
+        if not value or len(value) > 32 or "\n" in value:
+            sys.exit("a language is a short name, not a paragraph")
         set_lang(value)
-        lang = value
-    elif "--lang" in argv:
-        lang = argv[argv.index("--lang") + 1].lower()
-        if lang not in LANGS:
-            sys.exit(f"language must be one of {', '.join(LANGS)}")
-    else:
-        lang = lang_pref() or "en"
-
-    print(render(lang, load()))
+    print(render(load(), lang_pref()))
     return 0
 
 
