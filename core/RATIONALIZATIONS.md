@@ -18,6 +18,8 @@ The sentence on the left arrives sounding reasonable. That is the tell.
 | "The push was rejected, force-push fixes it" | A rejected push is information |
 | "It's obviously what they want" | Then it costs nothing to ask |
 | "Both models agree, so it's correct" | Agreement is signal, not proof |
+| "Let me reframe this so it fits the rule" | The reframing is the signal to stop |
+| "This failure does not really matter" | You are explaining it away; go read it |
 | "I'll change it and tell them after" | Ask first |
 | "The test is wrong" | Then say so and stop. Do not edit it green |
 | "This fix is small, skip the review" | Unreviewed small fixes are how regressions ship |

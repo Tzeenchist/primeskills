@@ -18,7 +18,9 @@ Touch only what you must. Do not improve adjacent code, comments, or
 formatting. Do not refactor what is not broken. Match existing style even if
 you would do it differently. Notice unrelated dead code — mention it, do not
 delete it. Remove only the orphans your own change created.
-**The test: every changed line traces to the request.**
+**The test: every changed line traces to the request.** Judge the radius by the
+whole diff, not the line in front of you: ten edits defensible alone still add
+up to a refactor nobody asked for.
 
 ## 4. Cut what you build, not the paths through it
 - **Feature surface** — cut hard. Speculative flexibility, extra entities,
@@ -39,7 +41,10 @@ Two questions, one habit. Before writing: "has someone solved this?" — checkin
 is near-free, not checking reinvents something worse. Before working out how an
 existing tool behaves: read its documentation first. Probing, decompiling and
 trial-and-error are what you do *after* the docs fall short, never instead.
-Knowing what exists earns the right to write your own 30 lines (§2).
+Knowing what exists earns the right to write your own 30 lines (§2). Same for your own
+reach: before saying you cannot — no access, no tool, no data — check whether
+the capability exists and is merely not loaded. "I can't" is a claim, and claims
+need evidence (G15).
 
 ## 7. Turn tasks into verifiable goals
 "Add validation" → "write tests for invalid input, then make them pass".
