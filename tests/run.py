@@ -10,13 +10,14 @@ ROUTE = ROOT / "bin" / "primeskills-route"
 FIXTURES = ROOT / "tests" / "fixtures"
 
 # cases whose skills live in a skills/ subdir because they carry their own core/
-NESTED = {"f12-paraphrase", "f12-cited"}
+NESTED = {"f12-paraphrase", "f12-cited", "c3-over"}
 
 EXPECT = {
     "ok": None,
     "f12-paraphrase": "F12",
     "f12-cited": None,
     "f13-unknown-call": "F13",
+    "c3-over": "C3",
     "f1-no-frontmatter": "F1",
     "f2-name-mismatch": "F2",
     "f3-long-description": "F3",

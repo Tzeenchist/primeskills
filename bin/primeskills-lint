@@ -19,6 +19,11 @@ REF_BUDGET = 700             # one reference file
 REF_TOTAL_BUDGET = 1200      # all references of one skill
 PARAPHRASE = 0.34            # share of a core rule's words an invariant may echo
 CORE_BUDGET = 1700          # always-loaded files; a ceiling, not a target
+# What one skill call actually costs: core, every description, the pointer the
+# installer writes, and the body. This is the number that matters -- C1 and F4
+# are guards underneath it. Raising core spends skill headroom and vice versa,
+# and the arithmetic is meant to be visible when either moves.
+CALL_BUDGET = 3000
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 
@@ -229,6 +234,48 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
         bad("F11", f"references total {total} words > {REF_TOTAL_BUDGET}")
 
 
+def pointer_words(root):
+    """The block the installer writes into each host's always-loaded file."""
+    try:
+        import importlib.machinery
+        import importlib.util
+        loader = importlib.machinery.SourceFileLoader(
+            "_pi", str(root / "bin" / "primeskills-install"))
+        spec = importlib.util.spec_from_loader("_pi", loader)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return len(mod.bootstrap_text().split())
+    except Exception:
+        return 0
+
+
+def check_call_cost(root, files, core_dir, problems):
+    """C3: no single skill call costs more than CALL_BUDGET.
+
+    Flows are excluded: they pay for a chain by design, and their cost is
+    reported by primeskills-status rather than capped here.
+    """
+    core = sum(len((core_dir / n).read_text(encoding="utf-8").split())
+               for n in CORE_ALWAYS if (core_dir / n).is_file())
+    descs, worst, worst_name = 0, 0, None
+    for path in files:
+        meta, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+        if not isinstance(meta, dict):
+            continue
+        descs += len(str(meta.get("description", "")).split())
+        if meta.get("tier") == "flow":
+            continue
+        budget = meta.get("budget", DEFAULT_BUDGET)
+        if budget > worst:
+            worst, worst_name = budget, meta.get("name")
+    base = core + descs + pointer_words(root)
+    total = base + worst
+    if total > CALL_BUDGET:
+        problems.append((core_dir, "C3",
+                         f"худший вызов {total} слов > {CALL_BUDGET} "
+                         f"(база {base} + бюджет '{worst_name}' {worst})"))
+
+
 def check_core(core_dir, problems):
     """C1: the always-loaded part of core/ pays on every session. Cap it."""
     files = [core_dir / n for n in CORE_ALWAYS]
@@ -256,6 +303,7 @@ def main(argv):
         check_skill(path, seen, problems, rules, known)
     if core.is_dir():
         check_core(core, problems)
+        check_call_cost(root.parent, files, core, problems)
 
     for path, rule, msg in problems:
         print(f"{path}: {rule}: {msg}")

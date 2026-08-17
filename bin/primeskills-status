@@ -100,6 +100,8 @@ def main():
     print(f"  one skill          {base + min(singles.values())}"
           f" … {base + max(singles.values())} words "
           f"(base {base} + one body {min(singles.values())}–{max(singles.values())})")
+    print(f"  headroom           {3000 - base - max(singles.values())} words "
+          f"before a call hits the 3000 ceiling (C3)")
     print("  a flow             base + every body it can call:")
     certain = {p.parent.name: calls_of(p) for p in skills}
     everything = {p.parent.name: calls_of(p) + calls_of(p, "calls_optional")
