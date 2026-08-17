@@ -65,6 +65,19 @@ def main():
         if "primeskills-help --set-lang en" not in run(["--lang", "ru"], home).stdout:
             failures.append("русская справка не говорит, как сменить язык")
 
+        checks += 1
+        ru = run(["--lang", "ru"], home).stdout
+        if "skills" in ru.rsplit("---", 1)[-1]:
+            failures.append("подпись русской справки осталась английской")
+
+        # the fallback bucket is a safety net, not a place skills live
+        checks += 1
+        for lang in ("en", "ru"):
+            out = run(["--lang", lang], home).stdout
+            bucket = "Not yet placed" if lang == "en" else "Ещё не поставлены"
+            if bucket in out:
+                failures.append(f"{lang}: навыки попали в запасной раздел")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

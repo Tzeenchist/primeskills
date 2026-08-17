@@ -31,7 +31,7 @@ STAGES = [
     ("check", ["verify", "vet", "probe", "measure", "ui"]),
     ("hand over", ["land", "revise", "merge", "close"]),
     ("ship", ["deploy", "release"]),
-    ("keep", ["handoff", "fence", "prose"]),
+    ("keep", ["handoff", "fence", "prose", "primeskills"]),
 ]
 
 TITLES = {
@@ -229,7 +229,12 @@ def render(lang, skills):
         w("`primeskills-doctor` answers \"is it even connected\" — run it first.")
         w("`primeskills-status` prints what is in the set and what it weighs.")
 
-    w(f"\n---\n{len(singles)} skills, {len(flows)} sequences, heaviest {heaviest} words.")
+    if lang == "ru":
+        w(f"\n---\nВсего навыков: {len(skills)}, из них последовательностей: "
+          f"{len(flows)}. Самый длинный текст навыка, слов: {heaviest}.")
+    else:
+        w(f"\n---\n{len(skills)} skills in all, {len(flows)} of them sequences. "
+          f"The longest skill text runs {heaviest} words.")
     return "\n".join(out)
 
 
