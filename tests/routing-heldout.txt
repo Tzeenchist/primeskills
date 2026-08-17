@@ -1,6 +1,16 @@
 # Held-out routing queries. Written as a user actually asks, deliberately not
-# from the skill descriptions, and half in Russian. The lexical linter cannot
-# score these -- that is the point; they exist for the model-based check.
+# from the skill descriptions, and half in Russian.
+#
+# This is not a corpus for the lexical linter and never will be. Descriptions
+# stay English by decision (core/OUTPUT.md, PLAN section 8): the model follows
+# English instructions more reliably, and it answers in the user's language.
+# A Russian query therefore shares no words with any description, and the
+# linter reports R4 -- unscorable, not failed.
+#
+# Routing across that gap is the model's job, and it does work: the SHOP-009
+# session of 2026-08-17 took a Russian prompt against English descriptions and
+# invoked `build` as its third action (bench/RUN-6-LOG.md). Checking it needs a
+# model, not a regular expression.
 # format: query -> expected skill
 у меня падает тест, разберись -> debug
 почему при делении сумма не сходится -> debug
