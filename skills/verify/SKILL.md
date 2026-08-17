@@ -1,7 +1,7 @@
 ---
 name: verify
 description: Use before claiming tests pass or work is done, and before any commit or PR
-budget: 400
+budget: 430
 role: write
 refs:
   - path: ref/harness.md
@@ -51,7 +51,8 @@ pushing, and before handing work to another agent.
 
 ## Output
 `PASS` or `FAIL`, the command, its exit code, the pass/fail counts, and the
-names of failing tests. No adjectives.
+names of failing tests. No adjectives. Record it where the next skill can
+read it: `primeskills-run note verify "<command>: <counts>, exit <code>"`.
 
 ## References
 `ref/harness.md` for isolation, seeds, and teardown when the run touches shared

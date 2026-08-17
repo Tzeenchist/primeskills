@@ -1,7 +1,7 @@
 ---
 name: merge
 description: Use to merge an approved change into the base branch once CI is green
-budget: 400
+budget: 430
 role: write
 ---
 
@@ -23,8 +23,9 @@ you to integrate. `land` prepared it; this puts it in.
    target, commit → **verify:** you can quote where the user asked for it
 2. Fetch and read the latest CI result for **this** head commit → **verify:**
    the run's commit matches `git rev-parse HEAD`, and it passed
-3. Check review state: approvals present, no unresolved blocking comments
-   → **verify:** you list who approved, or say the project requires none
+3. Check review state: approvals present, no unresolved blocking comments, and
+   read `.primeskills/run/` for the `vet` and `probe` verdicts → **verify:**
+   you list who approved, or say the project requires none
 4. Check the branch is current with the base → **verify:** either it merges
    cleanly, or you report the conflict and stop rather than resolving it blind
 5. Merge in the project's own style — merge commit, squash or rebase, whichever

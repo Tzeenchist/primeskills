@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Per-branch run record: the state a skill leaves for the next skill.
+
+Written because two external reviews landed on the same defect from different
+directions. The G9 circuit breaker counts failed attempts "per problem, owned by
+whoever runs the loop" — but the owner died with the session, so the counter
+reset every time context was cleared. And `release` claims "each stage reads the
+previous one's evidence" while that evidence lived only in the conversation.
+
+Both are the same gap: rules written as prose with no place to write anything
+down. This gives them an address. It is deliberately a program and not another
+paragraph of instructions — a paragraph would be one more thing the model has to
+remember, and remembering is the part that was already failing.
+
+The record lives in the repository being worked on, next to the handoff file, so
+it survives a cleared context and reaches another machine through a push.
+
+    primeskills-run start
+    primeskills-run note verify "pytest -q on shop-dev: 1119 passed, exit 0"
+    primeskills-run fail "export renders 4 pages"     # exits 3 on the third
+    primeskills-run clear "export renders 4 pages"
+    primeskills-run show
+"""
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+BREAKER = 3  # G9: three failed attempts on one problem and the loop stops
+COUNTERS = "## Counters"
+LOG = "## Log"
+
+
+def git(*args):
+    p = subprocess.run(("git",) + args, capture_output=True, text=True)
+    return p.stdout.strip() if p.returncode == 0 else ""
+
+
+def record_path():
+    top = git("rev-parse", "--show-toplevel")
+    if not top:
+        sys.exit("primeskills-run: not inside a git repository")
+    branch = git("rev-parse", "--abbrev-ref", "HEAD") or "detached"
+    return Path(top) / ".primeskills" / "run" / (slug(branch) + ".md")
+
+
+def slug(text):
+    s = re.sub(r"[^a-zA-Z0-9._-]+", "-", text.strip()).strip("-")
+    return (s or "unnamed")[:60]
+
+
+def ensure(path):
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        branch = git("rev-parse", "--abbrev-ref", "HEAD") or "detached"
+        path.write_text(
+            f"# Run record — {branch}\n\n"
+            "Written by skills, read by skills. Evidence and counters that have "
+            "to outlive one session.\n\n"
+            f"{COUNTERS}\n\n{LOG}\n",
+            encoding="utf-8")
+    return path
+
+
+def read_counters(text):
+    """Counters live as `- <problem> — N` lines under their heading."""
+    out = {}
+    section = text.split(COUNTERS, 1)[-1].split(LOG, 1)[0]
+    for line in section.splitlines():
+        m = re.match(r"- (.+) — (\d+)$", line.strip())
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def write_counters(text, counters):
+    head, rest = text.split(COUNTERS, 1)
+    _, tail = rest.split(LOG, 1)
+    body = "".join(f"- {k} — {v}\n" for k, v in sorted(counters.items()))
+    return f"{head}{COUNTERS}\n\n{body}\n{LOG}{tail}"
+
+
+def stamp():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def cmd_note(path, argv):
+    if len(argv) < 2:
+        sys.exit("usage: primeskills-run note <stage> <text>")
+    stage, text = argv[0], " ".join(argv[1:])
+    with path.open("a", encoding="utf-8") as f:
+        f.write(f"- **{stage}** ({stamp()}) — {text}\n")
+    print(f"{path}: noted {stage}")
+
+
+def cmd_fail(path, argv):
+    if not argv:
+        sys.exit("usage: primeskills-run fail <problem>")
+    problem = " ".join(argv)
+    text = path.read_text(encoding="utf-8")
+    counters = read_counters(text)
+    counters[problem] = counters.get(problem, 0) + 1
+    n = counters[problem]
+    text = write_counters(text, counters)
+    text += f"- **attempt {n}** ({stamp()}) — failed on: {problem}\n"
+    path.write_text(text, encoding="utf-8")
+    if n >= BREAKER:
+        print(f"{problem}: {n} — G9 breaker. Restore the G14 snapshot, report "
+              f"what each attempt ruled out, ask.")
+        return 3
+    print(f"{problem}: {n} of {BREAKER}")
+    return 0
+
+
+def cmd_clear(path, argv):
+    if not argv:
+        sys.exit("usage: primeskills-run clear <problem>")
+    problem = " ".join(argv)
+    text = path.read_text(encoding="utf-8")
+    counters = read_counters(text)
+    if counters.pop(problem, None) is None:
+        print(f"{problem}: no counter")
+        return 0
+    path.write_text(write_counters(text, counters), encoding="utf-8")
+    print(f"{problem}: cleared")
+    return 0
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    action, rest = argv[0], argv[1:]
+    path = ensure(record_path())
+    if action == "start":
+        print(path)
+        return 0
+    if action == "show":
+        print(path.read_text(encoding="utf-8"), end="")
+        return 0
+    if action == "note":
+        cmd_note(path, rest)
+        return 0
+    if action == "fail":
+        return cmd_fail(path, rest)
+    if action == "clear":
+        return cmd_clear(path, rest)
+    sys.exit(f"primeskills-run: unknown action {action!r}")
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

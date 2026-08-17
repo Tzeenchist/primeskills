@@ -37,10 +37,20 @@ agent-skills, prompt-eng-interactive-tutorial, loopx. Там же
 python3 bin/primeskills-doctor            # подключено ли всё у каждого агента
 python3 bin/primeskills-status            # состав и статус, из репозитория
 python3 bin/primeskills-lint              # формат: F1-F11, C1-C2
+python3 bin/primeskills-run show          # запись прогона текущей ветки
 python3 bin/primeskills-route skills tests/routing.txt
 python3 bin/primeskills-install --apply   # разложить по агентам
 python3 tests/run.py                      # весь прогон
 ```
+
+## Запись прогона
+
+`.primeskills/run/<branch>.md` в репозитории, с которым идёт работа. Туда
+`verify` кладёт результат прогона, `vet` и `probe` — вердикты, `cycle` держит
+счётчик G9; `merge` читает это перед слиянием. Заведено после двух внешних
+разборов: счётчик и «evidence» жили в памяти агента и умирали вместе с сессией.
+Программа, а не ещё один абзац инструкций — помнить абзацы и было тем, что
+не работало.
 
 ## Статус
 

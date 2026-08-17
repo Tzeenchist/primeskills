@@ -64,11 +64,13 @@ def main():
     print(f"{len(EXPECT) + 2} checks, {len(failures)} failed")
 
     fence = subprocess.run([sys.executable, str(Path(__file__).parent / "test_fence.py")])
+    record = subprocess.run([sys.executable, str(Path(__file__).parent / "test_run.py")])
 
     # routing over the real skill set, not just fixtures
     live = subprocess.run([sys.executable, str(ROUTE), str(ROOT / "skills"),
                            str(ROOT / "tests" / "routing.txt")])
-    return 1 if (failures or fence.returncode or live.returncode) else 0
+    return 1 if (failures or fence.returncode or record.returncode
+                 or live.returncode) else 0
 
 
 if __name__ == "__main__":

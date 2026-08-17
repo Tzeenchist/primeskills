@@ -57,7 +57,7 @@ not the running system — that is `probe`.
 ## Output
 Findings grouped blocking / worth fixing / optional, each with file, line, and
 the failure it causes. Then a verdict: merge, merge after the blocking ones, or
-rework.
+rework — recorded with `primeskills-run note vet "<verdict>"`.
 
 ## References
 `ref/security.md` for the input, auth, storage and integration checklist.

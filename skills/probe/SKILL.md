@@ -53,7 +53,8 @@ runs; the properties of the diff are `vet`.
 ## Output
 A verdict first: `PASS`, `BLOCK`, or `NOT RUN` with the reason. `BLOCK` when any
 defect stops a user completing the main path. Then defects ranked by impact,
-each with steps, observed, expected, and what was not covered.
+each with steps, observed, expected, and what was not covered. Record the
+verdict: `primeskills-run note probe "<verdict>"`.
 
 ## References
 `../ui/ref/ui-states.md` for the state matrix. `vet` covers the diff.
