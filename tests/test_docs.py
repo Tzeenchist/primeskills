@@ -81,8 +81,11 @@ def main():
                 failures.append(f"{doc.name}: «{flat[:80]}» — чекпоинт локальный")
 
     # 3. Ceilings quoted in prose must be the ceilings the linter enforces.
+    #    Both READMEs say it, in two languages, so the number is found by the
+    #    rule name next to it rather than by a sentence in one of them.
     for doc, pattern, want, name in (
-        (ROOT / "README.md", r"— (\d[\d\s ]*) слов\*\* \(правило C3\)", lint.CALL_BUDGET, "C3"),
+        (ROOT / "README.md", r"(\d[\d\s ]*)\s*(?:words|слов)\*\*[^\n]*C3", lint.CALL_BUDGET, "C3"),
+        (ROOT / "README.ru.md", r"(\d[\d\s ]*)\s*(?:words|слов)\*\*[^\n]*C3", lint.CALL_BUDGET, "C3"),
         (ROOT / "docs" / "SKILL-FORMAT.md", r"≤ (\d[\d\s ]*) слов \(`CORE_BUDGET`", lint.CORE_BUDGET, "C1"),
     ):
         checks += 1
@@ -92,6 +95,34 @@ def main():
         elif int(re.sub(r"\D", "", hit.group(1))) != want:
             failures.append(f"{doc.name}: {name} назван {hit.group(1).strip()}, "
                             f"линтер держит {want}")
+
+    # 3b. Two READMEs are one statement in two languages. What they must not do
+    #     is disagree about the facts, so the numbers are compared.
+    en = (ROOT / "README.md").read_text(encoding="utf-8")
+    ru = (ROOT / "README.ru.md").read_text(encoding="utf-8")
+    def numbers(text):
+        body = re.sub(r"^```[\s\S]*?^```", "", text, count=1, flags=re.M)  # без арта
+        return sorted(int(re.sub(r"\D", "", n)) for n in re.findall(r"\b\d[\d\s ]{2,}\b", body))
+    checks += 1
+    if numbers(en) != numbers(ru):
+        failures.append(f"README и README.ru разошлись в числах: "
+                        f"{numbers(en)} против {numbers(ru)}")
+
+    # 3c. The guide is generated from the set, except two hand-written parts —
+    #     and those are exactly the parts that went stale. Each claim below is
+    #     tied to something the code decides.
+    guide = (ROOT / "bin" / "primeskills-help").read_text(encoding="utf-8")
+    installer = (ROOT / "bin" / "primeskills-install").read_text(encoding="utf-8")
+    checks += 1
+    if "hooks armed in settings.json" in installer and "installer arms them" not in guide:
+        failures.append("справка не говорит, что ограничители ставит установщик")
+    checks += 1
+    if "устанавливаю с закреплённого коммита" in installer and "pinned" not in guide:
+        failures.append("справка молчит про пин по умолчанию")
+    checks += 1
+    core_rules_text = (ROOT / "core" / "GUARDRAILS.md").read_text(encoding="utf-8")
+    if "G18" in core_rules_text and "never an order" not in guide:
+        failures.append("справка не перечисляет правило G18 среди всегда действующих")
 
     # 4. VERSION and the newest CHANGELOG entry are one statement in two files.
     checks += 1

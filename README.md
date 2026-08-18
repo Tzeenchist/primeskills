@@ -14,144 +14,147 @@
 
 # primeskills
 
-Набор инструкций для агента-программиста — того, что пишет код по вашей просьбе:
-Claude Code, Codex, Kimi Code, OpenCode. Каждая инструкция покрывает один род
-работы: как искать причину бага, как проверить изменение, как передать работу
-дальше.
+*English · [Русский](README.ru.md)*
 
-Такие наборы обычно занимают место в голове у агента постоянно. Этот — почти
-нет. Полный текст инструкции подгружается, только когда она нужна.
+Instructions for a coding agent — the kind that writes code when you ask:
+Claude Code, Codex, Kimi Code, OpenCode. Each one covers a single kind of work:
+how to chase a bug to its cause, how to check a change, how to hand work on.
 
-> Я люблю gstack и пользовался им с момента появления, но сейчас он стал
-> настолько жирным и дорогим, что скоро сам Гэрри Тэн его не потянет.
-> Агентская разработка — это экономия: усилий, времени, денег. Этой философии я
-> и придерживался, создавая PRIMESKILLS.
+Sets like this usually sit in the agent's head the whole time. This one barely
+does. A skill's full text loads only when that skill is needed.
+
+> I love gstack and have used it since it appeared, but by now it has grown so
+> fat and so expensive that soon Garry Tan himself will not be able to afford
+> it. Agentic development is thrift: of effort, of time, of money. That is the
+> philosophy I built PRIMESKILLS on.
 >
-> — Илья Приймак, автор набора
+> — Ilya Priymak, author
 
 ```
-постоянно в контексте        443 слова на все 27 навыков
-общие правила                2 545 слов, один раз за сессию
-один вызов навыка            3 242 … 3 654 слова
+always in context        443 words for all 27 skills
+shared rules             2 545 words, once per session
+one skill call           3 242 … 3 654 words
 ```
 
-**Потолок одного вызова — 4 000 слов** (правило C3), и его держит проверка, а не
-обещание: линтер откажется принять навык, который выводит вызов за потолок. Для
-сравнения, один проход набора gstack стоит около 92 000 слов — замер в
-`bench/RESULT.md`.
+**The ceiling on one call is 4 000 words** (rule C3), and a check holds it
+rather than a promise: the linter refuses a skill that pushes a call over the
+ceiling. For comparison, one pass of the gstack set costs about 92 000 words —
+measured in `bench/RESULT.md`.
 
-## Дисциплина и доказательство
+## Discipline and evidence
 
-**Порядок вместо памяти.** Падающий тест раньше кода. «Прошло» — это код
-возврата и число тестов, а не отсутствие ошибки в выводе. Перед разрушительной
-командой вслух назвать, чего она коснётся. Три неудачные попытки на одной
-проблеме — остановиться и спросить.
+**Order instead of memory.** The failing test comes before the code. "It
+passed" means an exit code and a test count, not the absence of an error in the
+output. Before a destructive command, say out loud what it will touch. Three
+failed attempts on one problem: stop and ask.
 
-**Доказательство переживает сессию.** Результат прогона тестов записывается на
-диск вместе с отпечатком состояния дерева. Изменили файл после зелёного прогона
-— запись протухла, и следующий шаг это увидит. Агент не может сослаться на
-проверку, которой не было, или на ту, что относилась к другому коду.
+**Evidence outlives the session.** A test run is recorded on disk together with
+a fingerprint of the tree it ran against. Change a file after a green run and
+the record goes stale, and the next step sees that. The agent cannot appeal to
+a check that never happened, or to one that was about different code.
 
-**Полномочия по ступеням.** Коммит, пуш, pull request, слияние, миграции,
-выкатка, откат, удаление — восемь отдельных «да». Разрешение на одно не
-открывает следующее, разрешение для staging не открывает production, а
-разрешение на одну выкатку не действует на завтрашнюю.
+**Authority by rungs.** Commit, push, pull request, merge, migrate, deploy,
+roll back, delete — eight separate yeses. One does not open the next,
+permission for staging does not open production, and permission for one deploy
+does not cover tomorrow's.
 
-**Чужой текст — данные, а не приказ.** Инструкции репозитория, issue,
-документация зависимости, страница в сети: агент проверяет их, а не исполняет
-найденную внутри команду. И не запускает чужой код раньше, чем посмотрит на
-дифф.
+**Text it did not write is data, not orders.** Repository instructions, an
+issue, a dependency's documentation, a page on the web: the agent checks them
+instead of obeying a command found inside. And it does not run someone else's
+code before it has read the diff.
 
-**Ничего не уходит наружу.** Ни телеметрии, ни сети, ни зависимостей.
+**Nothing goes out.** No telemetry, no network, no dependencies.
 
-## Агенты
+## Agents
 
-| агент | как ставится |
+| agent | how it installs |
 |---|---|
-| Claude Code | навыки + указатель на общие правила в `CLAUDE.md`, ограничители в `settings.json` |
-| Codex | навыки + указатель в `~/.codex/AGENTS.md` |
-| Kimi Code | `extra_skill_dirs` в конфиге + указатель + профиль `prime-analyst` |
-| OpenCode | навыки + общие правила в `instructions` + профиль `prime-analyst` |
+| Claude Code | skills + a pointer to the shared rules in `CLAUDE.md`, guards in `settings.json` |
+| Codex | skills + a pointer in `~/.codex/AGENTS.md` |
+| Kimi Code | `extra_skill_dirs` in the config + a pointer + the `prime-analyst` profile |
+| OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile |
 
-У аналитических навыков отобраны редактирующие инструменты, и хосты это
-соблюдают. Оболочка — отдельный канал, её не перехватывает никто, поэтому
-изоляция ролей здесь дисциплина, а не стена; набор говорит это прямо, а не
-подразумевает.
+Analytical skills have their editing tools taken away, and the hosts honour
+that. The shell is a separate channel that nobody intercepts, so role isolation
+here is discipline rather than a wall — the set says so plainly instead of
+implying otherwise.
 
-## Требования
+## Requirements
 
-Python 3 и git. Больше ничего: пакеты не ставятся, сеть не нужна.
+Python 3 and git. Nothing else: no packages to install, no network.
 
-## Установка
+## Installation
 
 ```
-git clone <репозиторий> primeskills
+git clone <repository> primeskills
 cd primeskills
-python3 bin/primeskills-install            # печатает план, ничего не меняет
-python3 bin/primeskills-install --apply    # раскладывает по всем найденным агентам
-python3 bin/primeskills-doctor             # проверяет, что всё подключено
+python3 bin/primeskills-install            # prints the plan, changes nothing
+python3 bin/primeskills-install --apply    # installs into every agent it finds
+python3 bin/primeskills-doctor             # checks that everything is connected
 ```
 
-По умолчанию установка закрепляется на коммите: агенты читают отдельное дерево,
-и правка в рабочей копии на них не влияет, пока вы не поставите заново. Для
-разработки самого набора это лишнее:
+By default the installation is pinned to a commit: the agents read a separate
+tree, and editing the working copy does not reach them until you install again.
+While developing the set itself that is in the way:
 
 ```
-python3 bin/primeskills-install --apply --live   # ставить с рабочей копии
-python3 bin/primeskills-install --pin <коммит>   # закрепить другой коммит
-python3 bin/primeskills-install --unpin          # вернуться на рабочую копию
+python3 bin/primeskills-install --apply --live   # install from the working copy
+python3 bin/primeskills-install --pin <commit>   # pin a different commit
+python3 bin/primeskills-install --unpin          # go back to the working copy
 ```
 
-Установщик забирает только то, что положил сам: чужие навыки и ваши файлы
-внутри его каталогов он не трогает. Снять — `--uninstall --apply`.
+The installer takes back only what it put there: other people's skills and your
+own files inside its directories are left alone. To remove it:
+`--uninstall --apply`.
 
-## Навыки и цепочки
+## Skills and chains
 
-Навык можно вызвать самому — `/debug`, — но обычно не приходится: агент
-выбирает по описанию. Пять навыков вызывают другие по порядку и останавливаются
-там, где решение ваше.
-
-```
-/autoplan   идея → бриф → план → разбор тремя ролями
-/cycle      реализация → проверка → отладка, пока не зелено
-/close      проверка → ревью диффа → прогон приложения → pull request
-/release    pull request → слияние → выкатка
-/teams      разбор плана: продукт, инженерия, интерфейс
-```
-
-Остальные двадцать два вызываются поштучно: `/brief` и `/study` — понять
-задачу и чужой код; `/build`, `/debug`, `/verify` — написать и доказать;
-`/vet`, `/probe`, `/measure`, `/ui` — проверить дифф, живое приложение,
-скорость, состояния интерфейса; `/land`, `/merge`, `/deploy` — отдать
-и выкатить; `/handoff` — сохранить состояние для следующей сессии.
-
-Полное руководство печатает `primeskills-help` — на вашем языке, любом:
-`primeskills-help --set-lang <язык>`, и выбор запоминается.
-
-## Команды
+You can call a skill yourself — `/debug` — but usually you do not have to: the
+agent picks by the description. Five skills call others in order and stop where
+the decision is yours.
 
 ```
-primeskills-help              руководство по набору
-primeskills-doctor            подключено ли всё у каждого агента
-primeskills-status            состав набора и его вес, из репозитория
-primeskills-run show          запись прогона текущей ветки
-primeskills-adherence --all   соблюдались ли инварианты вызванных навыков
-primeskills-lint              формат навыков: правила F и C
-python3 tests/run.py          весь прогон
+/autoplan   idea → brief → plan → review by three roles
+/cycle      implement → verify → debug, until it is green
+/close      verify → review the diff → exercise the app → pull request
+/release    pull request → merge → deploy
+/teams      review a plan: product, engineering, interface
 ```
 
-Числа в документах не набираются руками: их читает `primeskills-status` из
-самого репозитория.
+The other twenty-two are called one at a time: `/brief` and `/study` to
+understand the task and someone else's code; `/build`, `/debug`, `/verify` to
+write and prove; `/vet`, `/probe`, `/measure`, `/ui` to check the diff, the
+running app, the speed, the interface states; `/land`, `/merge`, `/deploy` to
+hand over and ship; `/handoff` to save state for the next session.
 
-## Лицензия
+`primeskills-help` prints the full guide — in your language, any of them:
+`primeskills-help --set-lang <language>`, and the choice is remembered.
 
-MIT — `LICENSE`. Набор собран из шести источников; что откуда взято, под какой
-лицензией и от кого — `ATTRIBUTIONS.md` и `NOTICE`, построчно —
-`docs/SKILL-SOURCES.md`.
+## Commands
 
-## Документы
+```
+primeskills-help              the guide to the set
+primeskills-doctor            is everything connected, per agent
+primeskills-status            what is in the set and what it weighs
+primeskills-run show          the run record of the current branch
+primeskills-adherence --all   were the invariants of called skills followed
+primeskills-lint              skill format: rules F and C
+python3 tests/run.py          the whole suite
+```
 
-`CHANGELOG.md` — что менялось. `PLAN.md` — замысел и принципы.
-`docs/SKILL-FORMAT.md` — формат навыка и правила линтера. `TODOS.md` — очередь
-работ. Версия 0.2.0: набор работает, но ещё не доказал себя замером на живых
-задачах, и `PS-009` заранее описывает, при каких цифрах его свернут.
+Numbers in the documents are not typed by hand: `primeskills-status` reads them
+out of the repository.
+
+## Licence
+
+MIT — `LICENSE`. The set was synthesised from six sources; what came from
+where, under which licence and from whom is in `ATTRIBUTIONS.md` and `NOTICE`,
+line by line in `docs/SKILL-SOURCES.md`.
+
+## Documents
+
+`CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
+`docs/SKILL-FORMAT.md` — the skill format and the linter rules. `TODOS.md` —
+the queue. Version 0.2.0: the set works, but it has not yet proved itself by
+measurement on live tasks, and `PS-009` says in advance at which numbers it
+gets folded back.
