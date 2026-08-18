@@ -34,6 +34,11 @@ TEST_PATH = re.compile(r"(^|/)(tests?|spec)[/_.]|test_[^/]*$|[^/]*_test\.[a-z]+$
                        r"|\.test\.[a-z]+$|\.spec\.[a-z]+$|(^|/)tests?\.py$")
 TEST_RUN = re.compile(r"\b(pytest|unittest|manage\.py\s+test|node\s+--test|npm\s+(run\s+)?test"
                       r"|jest|vitest|go\s+test|cargo\s+test)\b")
+# A command that merely contains the word is not a run: `echo pytest` and
+# `pytest || true` both matched, and both were counted as evidence of a suite.
+# The reading was of a ritual, not of a fact.
+NEUTERED = re.compile(r"^\s*(echo|printf|#)\b|\|\|\s*(true|:)\s*$|--collect-only\b|--help\b")
+RECORDED = re.compile(r"\bprimeskills-run\s+note\b")
 # Narrow on purpose: a checker that cries wolf gets ignored, which is worse
 # than one that stays quiet.
 DESTRUCTIVE = re.compile(r"\b(dropdb|DROP\s+(TABLE|DATABASE)|rm\s+-rf|git\s+clean\s+-[a-z]*f"
@@ -69,16 +74,30 @@ def load_calls(path):
     return calls
 
 
+# How many tool calls after an invocation still read comfortably as that
+# skill's work. "Until the next skill call" swallowed 123 and 294 unrelated
+# actions in the first live sample and charged their violations to `autoplan`
+# and `baby` -- a measurement of the window, not of behaviour.
+#
+# Truncating at the cap was tried first and was worse: the one real violation
+# on record sits at call #68 of a long span, and cutting the window hid it. So
+# nothing is dropped. A span past the cap is marked, its verdicts are counted
+# separately, and the reader is told which numbers rest on a long window.
+SPAN_CAP = 40
+
+
 def spans(calls):
-    """A skill owns everything from its invocation to the next one."""
+    """A skill owns what follows its invocation, up to the next one or the cap."""
     marks = [c for c in calls if c["tool"] == "Skill" and c["skill"]]
     out = []
     for i, mark in enumerate(marks):
         end = marks[i + 1]["n"] if i + 1 < len(marks) else len(calls) + 1
+        owned = [c for c in calls if mark["n"] < c["n"] < end]
         out.append({
             "skill": mark["skill"],
             "at": mark["n"],
-            "calls": [c for c in calls if mark["n"] < c["n"] < end],
+            "calls": owned,
+            "long": len(owned) > SPAN_CAP,
         })
     return out
 
@@ -116,15 +135,31 @@ def check_red_phase(span):
     if not tests or not source:
         return None, "правок обоих видов нет — по порядку не различить"
     first_test, first_source = tests[0]["n"], source[0]["n"]
-    if first_test < first_source:
-        return "ok", f"тест #{first_test} раньше кода #{first_source}"
-    return "violated", f"код #{first_source} раньше теста #{first_test}"
+    if first_test > first_source:
+        return "violated", f"код #{first_source} раньше теста #{first_test}"
+    # Order alone proves the files were touched in sequence, not that anything
+    # was ever red. A red phase is a run that failed, so require a run between
+    # the test and the code it is supposed to have failed against.
+    between = [c["n"] for c in span["calls"]
+               if first_test < c["n"] < first_source and ran_tests(c)]
+    if not between:
+        return "violated", (f"тест #{first_test} раньше кода #{first_source}, "
+                            f"но прогона между ними не было — красноты никто не видел")
+    return "ok", f"тест #{first_test}, прогон #{between[0]}, код #{first_source}"
+
+
+def ran_tests(c):
+    return (c["tool"] == "Bash" and TEST_RUN.search(c["cmd"])
+            and not NEUTERED.search(c["cmd"].strip()))
 
 
 def check_suite_ran(span):
-    """verify: something was actually run."""
+    """verify: something was actually run, and preferably written down."""
     for c in span["calls"]:
-        if c["tool"] == "Bash" and TEST_RUN.search(c["cmd"]):
+        if c["tool"] == "Bash" and RECORDED.search(c["cmd"]):
+            return "ok", f"#{c['n']}: записан в run-запись"
+    for c in span["calls"]:
+        if ran_tests(c):
             return "ok", f"#{c['n']}: {c['cmd'].splitlines()[0][:60]}"
     return "violated", "прогона тестов в пролёте нет"
 
@@ -136,7 +171,7 @@ def check_repro_first(span):
         return None, "правок не было"
     first_edit = edits[0]["n"]
     for c in span["calls"]:
-        if c["n"] < first_edit and c["tool"] == "Bash" and TEST_RUN.search(c["cmd"]):
+        if c["n"] < first_edit and ran_tests(c):
             return "ok", f"прогон #{c['n']} до правки #{first_edit}"
     return "violated", f"первая правка #{first_edit} без прогона до неё"
 
@@ -292,7 +327,7 @@ def report(path, skills_dir, quiet=False):
     found = spans(calls)
     core_at = next((c["n"] for c in calls
                     if any(f in c["raw"] for f in CORE_FILES)), None)
-    tally = {"ok": 0, "violated": 0, "na": 0}
+    tally = {"ok": 0, "violated": 0, "na": 0, "far": 0}
 
     if not quiet:
         print(f"\n{path}")
@@ -313,13 +348,17 @@ def report(path, skills_dir, quiet=False):
             checks.append(("порядок цепочки",
                            lambda sp, cm=call_map, lt=later: check_flow_order(sp, cm, lt)))
         if not quiet:
+            tail = (f" — длиннее отсечки в {SPAN_CAP}, приписано с оговоркой"
+                    if span.get("long") else "")
             print(f"  · {span['skill']} (вызван #{span['at']}, "
-                  f"{len(span['calls'])} действий в пролёте)")
+                  f"{len(span['calls'])} действий в пролёте{tail})")
         if not checks and not quiet:
             print("      проверяемых инвариантов нет")
         for name, fn in checks:
             verdict, detail = fn(span)
             tally["na" if verdict is None else verdict] += 1
+            if verdict is not None and span.get("long"):
+                tally["far"] = tally.get("far", 0) + 1
             if not quiet:
                 mark = {"ok": "ok  ", "violated": "НАРУШЕН", None: "н/п "}[verdict]
                 print(f"      [{mark}] {name} — {detail}")
@@ -371,7 +410,7 @@ def main(argv):
         print(__doc__)
         return 0
 
-    total = {"ok": 0, "violated": 0, "na": 0}
+    total = {"ok": 0, "violated": 0, "na": 0, "far": 0}
     invoked, sessions_with_core = [], 0
     for p in paths:
         r = report(p, skills_dir, quiet)
@@ -387,6 +426,10 @@ def main(argv):
           + (f" ({', '.join(sorted(set(invoked)))})" if invoked else ""))
     print(f"инвариантов проверено: {applicable} применимых, {total['na']} неприменимых")
     print(f"соблюдено: {total['ok']}, нарушено: {total['violated']}, доля {rate}")
+    if total.get("far"):
+        print(f"из них {total['far']} на пролётах длиннее {SPAN_CAP} действий — "
+              f"там скиллу приписано и то, что могло быть посторонней работой; "
+              f"эти смотреть глазами, прежде чем считать")
     return 0
 
 

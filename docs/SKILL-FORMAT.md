@@ -71,7 +71,7 @@ refs:
 ```
 
 Заголовки разделов — **английские и ровно эти шесть, в этом порядке**: линтер
-сверяет список буквально. Скиллы пишутся по-английски (§6), русские подписи
+сверяет список буквально. Скиллы пишутся по-английски (P6), русские подписи
 выше даны как пояснение.
 
 ---
@@ -312,7 +312,7 @@ Before any claim of "done", "fixed", or "passing" — and before commit or PR.
 Not needed for read-only analysis.
 
 ## Invariants
-- Absence of a crash is not a pass. See core/GUARDRAILS § Exit-Code Proof.
+- Absence of a crash is not a pass. See core/GUARDRAILS P Exit-Code Proof.
 - Never edit tests, fixtures, or thresholds to make a build green.
 - A cycle closes only when the new test passes AND the full suite passes.
 

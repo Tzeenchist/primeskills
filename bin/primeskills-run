@@ -316,6 +316,10 @@ def cmd_show(path):
             print(f"- **{e['stage']}** ({e['ts']}) — {e['text']}{mark}")
         elif e["kind"] == "fail":
             print(f"- **attempt** ({e['ts']}) — failed on: {e['problem']}{mark}")
+        elif e["kind"] == "grant":
+            print(f"- **granted** ({e['ts']}) — {e['rung']}: {e['scope']}")
+        elif e["kind"] == "revoke":
+            print(f"- **revoked** ({e['ts']}) — {e['rung']}")
         else:
             print(f"- **cleared** ({e['ts']}) — {e['problem']}")
     return 0

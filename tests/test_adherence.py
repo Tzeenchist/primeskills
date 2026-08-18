@@ -25,7 +25,8 @@ EXPECT = {
     ],
     "build-red-phase-ok.jsonl": [
         "[ok  ] красная фаза",
-        "тест #3 раньше кода #5",
+        # order alone is not a red phase: the run between them is the evidence
+        "тест #3, прогон #4, код #5",
         "доля 100%",
     ],
     "readonly-violation.jsonl": [
