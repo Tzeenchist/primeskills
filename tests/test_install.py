@@ -140,6 +140,63 @@ def main():
             if (h / ".claude" / "skills" / "verify").exists():
                 failures.append("uninstall не убрал наши каталоги без чужого содержимого")
 
+    # the guards are armed by the installer, not by invoking the skill, and
+    # uninstall must leave a stranger's hook and the rest of settings alone
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+        (h / ".claude").mkdir()
+        (h / ".claude" / "settings.json").write_text(json.dumps({
+            "theme": "dark",
+            "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [
+                {"type": "command", "command": "python3 /home/other/guard.py"}]}]},
+        }), encoding="utf-8")
+        run(tmp, "claude", "--apply")
+        settings = json.loads((h / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        armed = json.dumps(settings)
+        checks += 1
+        if "check-commands.py" not in armed or "check-boundary.py" not in armed:
+            failures.append(f"хуки не встали при установке: {armed[:200]}")
+        checks += 1
+        if "/home/other/guard.py" not in armed or settings.get("theme") != "dark":
+            failures.append("установка затёрла чужие настройки")
+        run(tmp, "claude", "--uninstall", "--apply")
+        left = (h / ".claude" / "settings.json").read_text(encoding="utf-8")
+        checks += 1
+        if "check-commands.py" in left:
+            failures.append("uninstall оставил наши хуки")
+        checks += 1
+        if "/home/other/guard.py" not in left or "dark" not in left:
+            failures.append("uninstall снёс чужой хук или чужие настройки")
+
+    # a pin makes the agents read a fixed commit instead of the working copy.
+    # It needs ROOT to be a git repository; where it is not — an extracted copy
+    # of the index, for one — the case is not applicable, and n/a is not a
+    # failure (R4).
+    in_repo = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-dir"],
+                             capture_output=True).returncode == 0
+    if not in_repo:
+        print("пин: не применимо — ROOT не git-репозиторий")
+    with tempfile.TemporaryDirectory() as tmp:
+      if in_repo:
+          h = Path(tmp)
+          (h / ".claude").mkdir()
+          try:
+              run(tmp, "claude", "--pin", "HEAD")
+              link = h / ".claude" / "skills" / "build" / "SKILL.md"
+              checks += 1
+              if not (link.is_symlink() and "/.primeskills/pinned/" in os.path.realpath(link)):
+                  failures.append("пин не переключил ссылки на закреплённое дерево")
+              checks += 1
+              if not (h / ".primeskills" / "pin.json").is_file():
+                  failures.append("пин не записан")
+              run(tmp, "claude", "--unpin")
+              checks += 1
+              if "/.primeskills/pinned/" in os.path.realpath(link):
+                  failures.append("снятие пина не вернуло ссылки на рабочую копию")
+          finally:
+              subprocess.run(["git", "-C", str(ROOT), "worktree", "prune"],
+                             capture_output=True)
+
     # ownership is decided by path components, not by substring: a neighbour
     # directory whose name merely begins with ours is not ours, and the caller
     # of this check is allowed to shutil.rmtree what it owns

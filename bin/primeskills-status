@@ -126,6 +126,17 @@ def main():
     print(f"  skills             {len(skills)} (of which flows: {len(flows)})")
     print(f"  always in context  {always} words "
           f"({len(skills)} descriptions {descs} + core pointer {pointer})")
+    pin = Path.home() / ".primeskills" / "pin.json"
+    if pin.is_file():
+        import json
+        try:
+            state = json.loads(pin.read_text(encoding="utf-8"))
+            print(f"  agents read       pinned {state['commit'][:8]} ({state['ref']}), "
+                  f"not this working copy")
+        except (ValueError, KeyError):
+            print("  agents read       pin.json unreadable — run primeskills-install --unpin")
+    else:
+        print("  agents read       this working copy: an edit here lands in the next call")
     print(f"  core, once a session {core} words, read at session start via the pointer")
     print(f"  one skill          {base + min(singles.values())}"
           f" … {base + max(singles.values())} words "

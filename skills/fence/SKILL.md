@@ -1,20 +1,8 @@
 ---
 name: fence
-description: Use to arm destructive-command warnings and restrict edits to a directory
+description: Use to restrict edits to a directory and report the destructive-command guards that are live
 budget: 350
 role: write
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "python3 $HOME/.claude/skills/fence/bin/check-commands.py"
-          statusMessage: "fence: checking the command"
-    - matcher: "Edit|Write|NotebookEdit"
-      hooks:
-        - type: command
-          command: "python3 $HOME/.claude/skills/fence/bin/check-boundary.py"
-          statusMessage: "fence: checking the boundary"
 ---
 
 # Fence
@@ -34,9 +22,10 @@ unattended session. Also on request: "be careful", "lock edits here".
   arrives through a harmless command with a misconfigured target (G17).
 
 ## Procedure
-1. On Claude Code the hooks are declared in this skill's frontmatter and arm
-   themselves on invocation → **verify:** `primeskills-doctor` reports the
-   guards live, and a known-bad command returns `ask`
+1. On Claude Code the hooks are armed by the installer, in `settings.json`,
+   and stand for every session — this skill does not switch them on
+   → **verify:** `primeskills-doctor` reports the guards live, and a known-bad
+   command returns `ask`
 2. To scope edits, put one absolute path per line in `.primeskills/boundary`
    → **verify:** a path outside it returns `deny`
 3. Report which guards are live → **verify:** the user sees the boundary paths

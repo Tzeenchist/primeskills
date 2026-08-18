@@ -41,8 +41,10 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   misconfigured target. Working and dev stores are not test stores.
 - **G10 Destructive commands.** Recursive deletes, history rewrites, dropped or
   truncated tables, mass process and container kills: stop and ask. `fence`
-  holds the pattern list and the safe exceptions and blocks at call time — you
-  are not asked to memorise it. Necessary, never sufficient: see G17.
+  holds the pattern list and the safe exceptions. On Claude Code the installer
+  arms it, so it blocks at call time from the first command of a session; the
+  other three hosts have no hook mechanism, and there the list is text you
+  follow rather than a guard that fires. Necessary, never sufficient: see G17.
 - **Authority is a ladder, not a switch.** Reading and editing files in the
   work you were asked to do needs no permission. Each rung below is a separate
   yes, and one does not imply the next: commit, push, open a pull request,

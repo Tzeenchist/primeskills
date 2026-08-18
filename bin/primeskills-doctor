@@ -91,12 +91,43 @@ def check_guards(r):
         r.line(OK if got == expect else FAIL, "guards", what, f"decision={got}")
 
 
+def check_pin(r):
+    """Which tree the agents actually read. Unpinned is legitimate and it is
+    also the state in which an edit here changes a running session."""
+    pin = Path.home() / ".primeskills" / "pin.json"
+    if not pin.is_file():
+        r.line(WARN, "shared", "source of truth",
+               "working copy — edits land in running sessions; --pin fixes a commit")
+        return
+    try:
+        state = json.loads(pin.read_text(encoding="utf-8"))
+    except ValueError:
+        r.line(FAIL, "shared", "source of truth", "pin.json unreadable")
+        return
+    live = (Path.home() / ".primeskills" / "pinned").is_dir()
+    r.line(OK if live else FAIL, "shared", "source of truth",
+           f"pinned {state.get('commit', '?')[:8]}" if live
+           else "pin.json points at a worktree that is gone")
+
+
 def check_hooks_declared(r):
-    text = (SKILLS / "fence" / "SKILL.md").read_text(encoding="utf-8")
+    """Read what is actually installed, not what the skill says about itself.
+
+    This used to read fence/SKILL.md, so it reported green while the hook the
+    host would really run was elsewhere or absent.
+    """
+    settings = Path.home() / ".claude" / "settings.json"
+    installed = ""
+    if settings.is_file():
+        try:
+            installed = json.dumps(json.loads(settings.read_text(encoding="utf-8")))
+        except ValueError:
+            installed = ""
     for matcher in ("Bash", "Edit|Write|NotebookEdit"):
-        r.line(OK if matcher in text else FAIL, "claude",
-               f"hook declared for {matcher}",
-               "armed when fence is invoked" if matcher in text else "missing")
+        live = matcher in installed and str(ROOT) in installed
+        r.line(OK if live else FAIL, "claude", f"hook armed for {matcher}",
+               "in settings.json, every session" if live
+               else "not in settings.json — run primeskills-install --apply")
 
 
 def check_profile(r, agent, dest):
@@ -133,6 +164,7 @@ def main():
 
     check_skills(r, "claude", HOME / ".claude" / "skills")
     check_core(r, "claude", HOME / ".claude" / "CLAUDE.md", "primeskills:begin")
+    check_pin(r)
     check_hooks_declared(r)
 
     check_skills(r, "codex", HOME / ".codex" / "skills")
