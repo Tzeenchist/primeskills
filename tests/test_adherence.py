@@ -8,6 +8,7 @@ existed, so it is the regression that matters most.
 """
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,7 +44,7 @@ EXPECT = {
     ],
     "handoff-home.jsonl": [
         "[НАРУШЕН] чекпоинт в репозитории, не в доме",
-        "/home/admin/.gstack",
+        ".gstack/checkpoints",  # the fragment, not one account's home
     ],
     "flow-order-violation.jsonl": [
         "[НАРУШЕН] порядок цепочки",
@@ -79,12 +80,22 @@ FORBIDDEN = {
 def main():
     failures = []
     checks = 0
+    tmp_dir = tempfile.TemporaryDirectory()
+    tmp = tmp_dir.name
 
     for name, wanted in sorted(EXPECT.items()):
         path = FIX / name
         if not path.is_file():
             failures.append(f"{name}: фикстуры нет")
             continue
+        # A fixture about writing outside the repository has to name the home of
+        # whoever is running it. Hard-coding one account made the fixture pass
+        # on one machine and silently stop testing anything on any other, so the
+        # path is a placeholder and is filled in here.
+        raw = path.read_text(encoding="utf-8")
+        if "{HOME}" in raw:
+            path = Path(tmp) / name
+            path.write_text(raw.replace("{HOME}", str(Path.home())), encoding="utf-8")
         p = subprocess.run([sys.executable, str(TOOL), str(path)],
                            capture_output=True, text=True)
         out = p.stdout + p.stderr
