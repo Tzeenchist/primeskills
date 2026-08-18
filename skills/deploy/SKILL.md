@@ -28,12 +28,14 @@ Never on your own initiative, and never as the tail end of merging.
    branch or tag → **verify:** print it and have the user confirm it is what
    they meant, when it is production
 2. State the rollback, its cost in minutes, and whether it is possible at all
-   after the migrations in this release, and record what the user answers:
-   `primeskills-run grant rollback "<procedure>"`, or `grant deploy "forward
-   only, heard and accepted"` when there is no way back → **verify:** it is a
-   concrete command or procedure with its prerequisites checked, or an explicit
-   "forward only" the user has heard before you start, and the record says
-   which
+   after the migrations in this release. Where there is a way back, record the
+   permission to use it: `primeskills-run grant rollback --target <the target>
+   "<procedure>"`. Where there is none, record only that the user heard it —
+   `primeskills-run note deploy "forward only, heard and accepted"` — because
+   understanding that a release cannot be undone is not permission to release
+   it → **verify:** a concrete procedure with its prerequisites checked, or an
+   explicit "forward only" the user has heard before you start, and the record
+   says which
 3. Back up what the deploy can destroy — data, uploaded files, configuration
    → **verify:** the backup exists and you can name how to restore from it (G14)
 4. Check what ships: the commit going out and how it differs from what runs now
@@ -56,8 +58,8 @@ Never on your own initiative, and never as the tail end of merging.
   cannot undo is the user's decision, not your task — but once they have made
   it knowingly, it is a plan, not a blocker.
 - The target cannot be proved to be the intended one: stop (G17, G12).
-- Health check fails: carry out the rollback decided in step 2, which is
-  already granted in the record, and if that decision was "forward only" —
+- Health check fails: `primeskills-run may rollback --target <the target>`,
+  then carry out the rollback decided in step 2, and if that decision was "forward only" —
   because a migration made the old version incompatible — say so and ask. Debugging a live environment while users sit
   on the broken version is the wrong order; rolling into a schema the old code
   cannot read is the wrong direction.

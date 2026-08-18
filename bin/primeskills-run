@@ -108,6 +108,10 @@ def state_digest():
     return commit, hashlib.sha1(pending.encode("utf-8")).hexdigest()[:12]
 
 
+def current_branch():
+    return git("rev-parse", "--abbrev-ref", "HEAD").strip() or "detached"
+
+
 def record_path():
     top = git("rev-parse", "--show-toplevel").strip()
     if not top:
@@ -127,8 +131,17 @@ def record_path():
 
 
 def slug(text):
-    s = re.sub(r"[^a-zA-Z0-9._-]+", "-", text.strip()).strip("-")
-    return (s or "unnamed")[:60]
+    """A readable file name that still tells branches apart.
+
+    The readable part alone was lossy: `feature/a` and `feature-a` became the
+    same name, so did any two branches sharing their first sixty characters,
+    and every detached HEAD became `detached`. Two branches sharing a journal
+    share their permissions and their attempt counters, which is the opposite
+    of what the journal is for. The suffix is a hash of the full name.
+    """
+    plain = re.sub(r"[^a-zA-Z0-9._-]+", "-", text.strip()).strip("-")
+    mark = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+    return f"{(plain or 'unnamed')[:60]}-{mark}"
 
 
 def read(path):
@@ -314,6 +327,7 @@ def cmd_grant(path, argv):
         sys.exit("--for takes minutes as a number")
     e = append(path, {"kind": "grant", "rung": rung, "scope": scope,
                       "target": target, "lifetime": lifetime,
+                      "branch": current_branch(),
                       "once": rung in SENSITIVE})
     once = ", one use" if rung in SENSITIVE else ""
     at = f" for {target}" if target else ""
@@ -344,6 +358,11 @@ def cmd_may(path, argv):
     if not hit:
         print(f"{rung}: not granted, or the grant has run out. Ask, then "
               f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
+        return 1
+    if hit.get("branch") and hit["branch"] != current_branch():
+        print(f"{rung}: granted on branch {hit['branch']!r}, asked on "
+              f"{current_branch()!r}. A permission for one branch is not a "
+              f"permission for another.")
         return 1
     if hit.get("target") and hit["target"] != target:
         print(f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "

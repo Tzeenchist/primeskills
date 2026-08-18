@@ -18,6 +18,14 @@ TOOL = ROOT / "bin" / "primeskills-install"
 
 
 def run(home, *args):
+    """Installation checks are about this working copy, so they ask for it.
+
+    Pinned is the default since 2026-08-18: a plain --apply builds a worktree
+    at HEAD and installs from there, which would test the last commit instead
+    of the change under test.
+    """
+    if "--apply" in args and "--live" not in args and "--pin" not in args:
+        args = args + ("--live",)
     env = dict(os.environ, HOME=home)
     return subprocess.run([sys.executable, str(TOOL), *args],
                           capture_output=True, text=True, env=env)
@@ -190,10 +198,15 @@ def main():
                                  str(ROOT), str(clone)], capture_output=True)
           if made.returncode == 0:
               # the clone carries the committed state; the test is about the
-              # working tree, so the working files go over it
+              # working tree, so the working files go over it — and are
+              # committed there, because a pin checks out a commit and would
+              # otherwise install the code as it was before the change
               for part in ("bin", "core", "skills", "docs", "tests"):
                   if (ROOT / part).is_dir():
                       shutil.copytree(ROOT / part, clone / part, dirs_exist_ok=True)
+              subprocess.run(["git", "-C", str(clone), "-c", "user.email=t@t",
+                              "-c", "user.name=t", "commit", "-qam", "рабочая копия"],
+                             capture_output=True)
           if made.returncode != 0:
               print("пин: не применимо — клон не создан")
           else:

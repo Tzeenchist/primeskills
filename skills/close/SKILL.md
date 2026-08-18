@@ -1,7 +1,7 @@
 ---
 name: close
 description: Use to take verified work through review and testing to a pull request
-budget: 350
+budget: 450
 tier: flow
 calls: [verify, vet, probe, handoff, land]
 calls_optional: [probe, handoff]
@@ -22,22 +22,26 @@ see, and nobody asked for them just because the code compiles.
   on the pull request.
 
 ## Procedure
-1. If the change came from someone else, read before running: the diff of test
-   files, build scripts, CI config and dependency manifests → **verify:** you
-   can say what a test run would execute, and nothing in it reaches the network
-   or the filesystem outside the checkout. Running a suite is executing the
-   change, and the review that would have caught a hostile test comes after it
-2. Call `verify` → **verify:** PASS with exit code and counts
-3. Call `vet` → **verify:** findings sorted, verdict stated
-4. On a blocking finding, return to `build`, then restart at 1 → **verify:** the
+1. If the change came from someone else, `vet` runs **first** and the suite
+   waits for it → **verify:** the diff is reviewed before anything from it is
+   executed. Collecting tests imports the application, so a payload in any
+   imported module runs before a single test does; reading test files is not
+   enough
+2. Still someone else's code after review, and no sandbox to run it in: stop
+   and say so → **verify:** you name what you did not run and why. A suite
+   without a sandbox is trust, and trust is the user's to give
+3. Call `verify` → **verify:** PASS with exit code and counts
+4. Call `vet`, unless step 1 already did → **verify:** findings sorted, verdict
+   stated
+5. On a blocking finding, return to `build`, then restart at 1 → **verify:** the
    finding is struck once fixed, not carried (G16)
-5. Call `probe` if the change touches a running interface → **verify:** it
-   returned PASS; BLOCK returns to step 4, and NOT RUN on a change
+6. Call `probe` if the change touches a running interface → **verify:** it
+   returned PASS; BLOCK returns to step 5, and NOT RUN on a change
    that touches an interface is not a pass — it is an unknown
-6. Call `handoff` if work remains, before landing → **verify:** the checkpoint
+7. Call `handoff` if work remains, before landing → **verify:** the checkpoint
    names what is left and stays in this tree — it is local and does not go
    into the pull request
-7. Call `land` → **verify:** PR exists, criteria marked, secrets pass done, and
+8. Call `land` → **verify:** PR exists, criteria marked, secrets pass done, and
    no file from `.primeskills/` is in the diff
 
 ## Stop conditions

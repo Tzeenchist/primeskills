@@ -280,14 +280,34 @@ def write_atomic(path, text, check=None):
 
     A half-written CLAUDE.md or opencode.json is worse than an unmodified one,
     and a crash between truncate and write leaves exactly that.
+
+    Three details are security, not tidiness. The temp name used to be
+    predictable, so anyone able to write in that directory could pre-create it
+    as a symlink and have us write through it; O_EXCL and O_NOFOLLOW refuse
+    that, and a random suffix removes the guess. The mode used to come from the
+    umask, so a config kept at 0600 came back 0644 with whatever token was
+    inside it readable by the group; the original mode is carried over, and a
+    new file starts at 0600. And fsync before the rename means a power cut
+    leaves the old file, not an empty one.
     """
     if check is not None:
         check(text)
-    tmp = path.with_name(path.name + ".primeskills-tmp")
-    tmp.write_text(text, encoding="utf-8")
-    if check is not None:
-        check(tmp.read_text(encoding="utf-8"))
-    os.replace(tmp, path)
+    tmp = path.with_name(f".{path.name}.primeskills-{os.urandom(6).hex()}")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    fd = os.open(tmp, flags, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        if check is not None:
+            check(tmp.read_text(encoding="utf-8"))
+        if path.exists() and not path.is_symlink():
+            os.chmod(tmp, path.stat().st_mode & 0o7777)
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def backup_once(path):
@@ -496,8 +516,10 @@ def pin(ref, agents, force=False):
     made = git("-C", str(ROOT), "worktree", "add", "--detach", str(PINNED), sha)
     if made.returncode != 0:
         sys.exit(f"primeskills-install: worktree failed — {made.stderr.strip()}")
+    # --live on the inner call: the pinned tree installs itself from itself,
+    # and without the flag it would try to pin again, forever.
     out = subprocess.run([sys.executable, str(PINNED / "bin" / "primeskills-install"),
-                          *agents, "--apply"], text=True)
+                          *agents, "--apply", "--live"], text=True)
     if out.returncode != 0:
         git("-C", str(ROOT), "worktree", "remove", "--force", str(PINNED))
         if previous is not None:
@@ -525,7 +547,7 @@ def unpin(agents, force=False):
         sys.exit(f"primeskills-install: {PINNED} has uncommitted work. Commit it, "
                  f"move it, or repeat with --force to discard it.")
     code = subprocess.run([sys.executable, str(Path(__file__).resolve()),
-                           *agents, "--apply"], text=True).returncode
+                           *agents, "--apply", "--live"], text=True).returncode
     if code != 0:
         sys.exit("primeskills-install: возврат на рабочую копию не удался, "
                  "пин оставлен как был")
@@ -546,12 +568,24 @@ def main():
                     help="go back to installing from the working copy")
     ap.add_argument("--force", action="store_true",
                     help="with --pin/--unpin: discard uncommitted work in the pinned tree")
+    ap.add_argument("--live", action="store_true",
+                    help="install from the working copy instead of a pinned commit")
     args = ap.parse_args()
 
     if args.pin:
         return pin(args.pin, args.agents, args.force)
     if args.unpin:
         return unpin(args.agents, args.force)
+    # Pinned by default. An installation that follows a working copy is a
+    # supply chain the length of one editor: every save reaches four agents and
+    # the hooks they run, in sessions already in flight. Development wants that
+    # and says so with --live; everyone else gets a fixed commit.
+    if (args.apply and not args.live and ROOT != PINNED
+            and not PIN_FILE.is_file()):
+        if git("-C", str(ROOT), "rev-parse", "--git-dir").returncode == 0:
+            print("устанавливаю с закреплённого коммита (--live ставит с рабочей копии)")
+            return pin("HEAD", args.agents, args.force)
+        print("не git-репозиторий: ставлю с рабочей копии, закрепить нечего")
     state = pin_state()
     if state and Path(__file__).resolve().parent.parent != PINNED:
         print(f"note: agents are pinned to {state['commit'][:8]}; this command "
@@ -633,8 +667,25 @@ def main():
         if args.uninstall:
             manifest_write(recorded)
         else:
+            # A skill dropped from the set leaves its link behind otherwise, and
+            # a link nobody maintains is a stale instruction that still loads.
+            ours = {p.parent.name for p in SKILLS.glob("*/SKILL.md")}
+            stale = [dest for dest, src in recorded.items()
+                     if Path(src).name not in ours and Path(dest).exists()]
+            for dest in stale:
+                if is_ours(Path(dest)):
+                    remove_ours(Path(dest))
+                    recorded.pop(dest, None)
+            if stale:
+                print(f"снято устаревших: {len(stale)} "
+                      f"({', '.join(Path(d).name for d in stale)})")
             recorded.update(created)
             manifest_write(recorded)
+        if args.live and PIN_FILE.is_file():
+            # The links now point at the working copy, so a pin record left
+            # behind would describe an installation that no longer exists.
+            PIN_FILE.unlink()
+            print(f"пин снят: агенты читают {ROOT}")
     else:
         print("\nnothing changed. Re-run with --apply.")
     return 0

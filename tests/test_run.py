@@ -35,7 +35,10 @@ def main():
 
         code, out = run(repo, "start")
         checks += 1
-        record = repo / ".primeskills" / "run" / "work.jsonl"
+        # the name carries a hash of the full branch name, so `feature/a` and
+        # `feature-a` cannot share a journal — and its permissions
+        records = list((repo / ".primeskills" / "run").glob("work-*.jsonl"))
+        record = records[0] if records else repo / ".primeskills" / "run" / "missing"
         if code != 0 or not record.is_file():
             failures.append(f"start: exit {code}, no record at {record}\n{out}")
 
@@ -103,7 +106,7 @@ def main():
         subprocess.run(["git", "checkout", "-q", "-b", "feat/thing"], cwd=repo, check=True)
         checks += 1
         code, out = run(repo, "start")
-        if code != 0 or not (repo / ".primeskills" / "run" / "feat-thing.jsonl").is_file():
+        if code != 0 or not list((repo / ".primeskills" / "run").glob("feat-thing-*.jsonl")):
             failures.append(f"branch with a slash: exit {code}\n{out}")
 
     # evidence must expire when an untracked file's CONTENT changes, not only
@@ -211,6 +214,29 @@ def main():
         code, out = run(repo, "may", "commit")
         if code != 1:
             failures.append(f"истёкший мандат всё ещё действует:\n{out}")
+
+    # two branch names that used to collapse into one journal must not share
+    # permissions: slug() alone mapped feature/a and feature-a to one file
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "feature/a"], cwd=repo, check=True)
+        # без коммита имя ветки не разрешается и обе читаются как detached
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
+        run(repo, "grant", "push", "первая ветка")
+        subprocess.run(["git", "checkout", "-q", "-b", "feature-a"], cwd=repo, check=True)
+        checks += 1
+        code, out = run(repo, "may", "push")
+        if code != 1:
+            failures.append(f"мандат перетёк между feature/a и feature-a:\n{out}")
+        # `may` ничего не пишет, поэтому второй журнал появляется от записи
+        run(repo, "grant", "commit", "вторая ветка")
+        checks += 1
+        names = sorted(p.name for p in (repo / ".primeskills" / "run").glob("*.jsonl"))
+        if len(names) != 2:
+            failures.append(f"две ветки пишут в один журнал: {names}")
 
     # outside a repository it must refuse, not write somewhere surprising
     with tempfile.TemporaryDirectory() as bare:
