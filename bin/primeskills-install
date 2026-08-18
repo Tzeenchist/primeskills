@@ -304,6 +304,32 @@ def apply_claude(dest, src):
     return True
 
 
+def remove_ours(dest):
+    """Take back what we put there and nothing else.
+
+    Uninstall used to `shutil.rmtree` a directory the manifest called ours. The
+    directory is ours; the files someone added inside it afterwards are not, and
+    they went with it. Now the links pointing into this repository are removed,
+    the directory goes only if it empties, and whatever is left is reported by
+    name rather than deleted.
+    """
+    if dest.is_symlink() or dest.is_file():
+        dest.unlink()
+        return 0
+    if not dest.is_dir():
+        return 0
+    for item in sorted(dest.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if item.is_symlink() and under_root(item):
+            item.unlink()
+        elif item.is_dir() and not any(item.iterdir()):
+            item.rmdir()
+    left = list(dest.iterdir())
+    if not left:
+        dest.rmdir()
+        return 0
+    return len(left)
+
+
 def apply_link(dest, src):
     """Replace our own link, never someone else's directory.
 
@@ -406,7 +432,9 @@ def main():
                 if os.path.realpath(dest) != want and not is_ours(dest):
                     refused.append(f"{dest.name} (points elsewhere now)")
                     continue
-                shutil.rmtree(dest) if dest.is_dir() and not dest.is_symlink() else dest.unlink()
+                leftover = remove_ours(dest)
+                if leftover:
+                    refused.append(f"{dest.name} (kept: {leftover} file(s) not ours)")
                 recorded.pop(str(dest), None)
                 continue
             root.mkdir(parents=True, exist_ok=True)

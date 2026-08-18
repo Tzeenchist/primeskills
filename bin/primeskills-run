@@ -36,6 +36,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BREAKER = 3  # G9: three failed attempts on one problem and the loop stops
+BIG_FILE = 4 * 1024 * 1024  # past this, an untracked file is hashed by size+mtime
 # The rungs of the authority ladder, in order. Each is a separate yes and one
 # never implies the next; `may` refuses anything not on this list rather than
 # guessing what a new word means.
@@ -71,6 +72,17 @@ def untracked_content():
             if not f.is_file() or f.is_symlink():
                 continue
             out.update(str(f).encode("utf-8"))
+            # Hashing every untracked byte on every call turns a note into a
+            # scan of whatever the tree happens to be carrying. Past the cap,
+            # size and mtime stand in: they still change when the file does,
+            # and they cost nothing.
+            try:
+                stat = f.stat()
+            except OSError:
+                continue
+            if stat.st_size > BIG_FILE:
+                out.update(f"{stat.st_size}:{stat.st_mtime_ns}".encode("utf-8"))
+                continue
             with f.open("rb") as fh:
                 for chunk in iter(lambda: fh.read(65536), b""):
                     out.update(chunk)
@@ -129,7 +141,13 @@ def append(path, entry):
 FILLER = {"the", "a", "an", "is", "are", "was", "were", "this", "that", "it",
           "its", "and", "or", "of", "to", "in", "on", "at", "for", "with",
           "when", "after", "before", "again", "still", "now", "not"}
-SAME_PROBLEM = 0.5  # share of shared words at which two phrasings are one
+# Share of shared words at which two phrasings are one problem. 0.5 merged
+# "export renders 4 pages" with "export fails on 4 pages" -- two different bugs
+# on one counter, which trips the breaker on one and a half real attempts. That
+# is the failure PS-020 already recorded from the other side, so the threshold
+# now errs towards splitting: a wrongly split counter costs an extra attempt, a
+# wrongly merged one stops work that was going fine.
+SAME_PROBLEM = 0.75
 
 
 def problem_tokens(text):

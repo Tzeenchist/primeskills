@@ -11,6 +11,7 @@ line). No file, no boundary, everything allowed.
 """
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,8 +29,24 @@ def deny(reason):
     })
 
 
+def repo_root():
+    """The boundary belongs to the repository, not to whatever directory the
+    hook happened to start in. Resolving it relative to cwd meant a call made
+    from a subdirectory found no file, and no file means everything allowed --
+    the boundary disappeared exactly when the work went one level deep."""
+    try:
+        out = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode == 0 and out.stdout.strip():
+            return Path(out.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def boundaries(root=None):
-    path = (Path(root) / BOUNDARY_FILE) if root else BOUNDARY_FILE
+    base = Path(root) if root else repo_root()
+    path = (base / BOUNDARY_FILE) if base else BOUNDARY_FILE
     if not path.is_file():
         return []
     out = []

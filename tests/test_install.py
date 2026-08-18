@@ -121,6 +121,25 @@ def main():
         if manifest.is_file() and json.loads(manifest.read_text(encoding="utf-8")):
             failures.append("манифест не опустел после uninstall")
 
+    # a file the user added into our directory must survive uninstall
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+        (h / ".claude").mkdir()          # the installer skips a host that is not here
+        run(tmp, "claude", "--apply")
+        theirs = h / ".claude" / "skills" / "build" / "notes.md"
+        if theirs.parent.is_dir():
+            theirs.write_text("мои заметки\n", encoding="utf-8")
+            out = run(tmp, "claude", "--uninstall", "--apply")
+            checks += 1
+            if not theirs.is_file():
+                failures.append("uninstall снёс чужой файл внутри нашего каталога")
+            checks += 1
+            if "not ours" not in (out.stdout + out.stderr):
+                failures.append("uninstall промолчал про оставленное")
+            checks += 1
+            if (h / ".claude" / "skills" / "verify").exists():
+                failures.append("uninstall не убрал наши каталоги без чужого содержимого")
+
     # ownership is decided by path components, not by substring: a neighbour
     # directory whose name merely begins with ours is not ours, and the caller
     # of this check is allowed to shutil.rmtree what it owns

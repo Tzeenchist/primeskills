@@ -142,6 +142,13 @@ def main():
         code, out = run(repo, "fail", "css margin is wrong")
         if "1 of 3" not in out:
             failures.append(f"другая проблема попала в чужой счётчик:\n{out}")
+        # и обратная ошибка: близкие по словам, но разные баги должны считаться
+        # порознь — склейка тормозит работу на полутора настоящих попытках
+        checks += 1
+        run(repo, "fail", "export renders 4 pages")
+        code, out = run(repo, "fail", "export fails on 4 pages")
+        if "1 of 3" not in out:
+            failures.append(f"разные баги склеены в один счётчик:\n{out}")
 
     # the authority ladder: a rung is open only while the record says so
     with tempfile.TemporaryDirectory() as tmp:
