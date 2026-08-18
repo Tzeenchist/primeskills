@@ -22,16 +22,23 @@ see, and nobody asked for them just because the code compiles.
   on the pull request.
 
 ## Procedure
-1. Call `verify` → **verify:** PASS with exit code and counts
-2. Call `vet` → **verify:** findings sorted, verdict stated
-3. On a blocking finding, return to `build`, then restart at 1 → **verify:** the
+1. If the change came from someone else, read before running: the diff of test
+   files, build scripts, CI config and dependency manifests → **verify:** you
+   can say what a test run would execute, and nothing in it reaches the network
+   or the filesystem outside the checkout. Running a suite is executing the
+   change, and the review that would have caught a hostile test comes after it
+2. Call `verify` → **verify:** PASS with exit code and counts
+3. Call `vet` → **verify:** findings sorted, verdict stated
+4. On a blocking finding, return to `build`, then restart at 1 → **verify:** the
    finding is struck once fixed, not carried (G16)
-4. Call `probe` if the change touches a running interface → **verify:** it
-   returned PASS, BLOCK or NOT RUN; on BLOCK return to step 3
-5. Call `handoff` if work remains, before landing → **verify:** the checkpoint
-   names what is left and is part of the change `land` will push
-6. Call `land` → **verify:** PR exists, criteria marked, secrets pass done, and
-   the checkpoint went up with it
+5. Call `probe` if the change touches a running interface → **verify:** it
+   returned PASS; BLOCK returns to step 4, and NOT RUN on a change
+   that touches an interface is not a pass — it is an unknown
+6. Call `handoff` if work remains, before landing → **verify:** the checkpoint
+   names what is left and stays in this tree — it is local and does not go
+   into the pull request
+7. Call `land` → **verify:** PR exists, criteria marked, secrets pass done, and
+   no file from `.primeskills/` is in the diff
 
 ## Stop conditions
 - Three trips back to `build` on the same finding: stop and ask (G9).

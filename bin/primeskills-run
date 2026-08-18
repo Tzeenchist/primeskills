@@ -11,11 +11,16 @@ Records are bound to a state digest: the commit plus a hash of everything not
 committed. Change one byte after a PASS and the record is stale, which is the
 whole point -- a green run from an older tree is not evidence about this one.
 
-The record is local. It lives under `.primeskills/run/`, which carries its own
-`.gitignore`, because it names commands, targets and problems and none of that
-was written to be published. `.primeskills/handoff/` is the opposite: written
-to be read by someone else, and committed on purpose.
+The record is local. `.primeskills/` carries its own `.gitignore` covering
+everything under it: `run/` names commands, targets and problems, and `handoff/`
+carries blockers and dead ends. The handoff used to be committed so another
+machine could pick the work up. Three external reviews landed on the same
+consequence: it is read automatically at session start, so committing it lets
+anyone who can push to a branch write the next agent's opening context.
 
+    primeskills-run grant push "ветка feature/x, до PR"   # a rung the user opened
+    primeskills-run may push                          # exits 1 when never granted
+    primeskills-run revoke push
     primeskills-run note verify "pytest -q: 1119 passed, exit 0"
     primeskills-run fail "export renders 4 pages"     # exits 3 on the third
     primeskills-run clear "export renders 4 pages"
@@ -31,8 +36,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BREAKER = 3  # G9: three failed attempts on one problem and the loop stops
-IGNORE = "# Written by skills, read by skills. Local: it names commands and\n" \
-         "# targets that were never meant to be published.\n*\n"
+# The rungs of the authority ladder, in order. Each is a separate yes and one
+# never implies the next; `may` refuses anything not on this list rather than
+# guessing what a new word means.
+RUNGS = ("commit", "push", "pr", "merge", "deploy", "rollback", "delete")
+IGNORE = "# Written by skills, read by skills, and never committed.\n" \
+         "# run/ names commands, targets and problems. handoff/ carries blockers,\n" \
+         "# dead ends and internal context — and a committed handoff is read by\n" \
+         "# the next agent as context, so anyone who can push to the branch can\n" \
+         "# write it.\n*\n"
 
 
 def git(*args):
@@ -80,7 +92,7 @@ def record_path():
     branch = git("rev-parse", "--abbrev-ref", "HEAD").strip() or "detached"
     root = Path(top) / ".primeskills" / "run"
     root.mkdir(parents=True, exist_ok=True)
-    ignore = root / ".gitignore"
+    ignore = root.parent / ".gitignore"
     if not ignore.is_file():
         ignore.write_text(IGNORE, encoding="utf-8")
     return root / (slug(branch) + ".jsonl")
@@ -197,6 +209,63 @@ def cmd_clear(path, argv):
     return 0
 
 
+def mandates(entries):
+    """rung -> the entry that opened it, minus anything revoked since."""
+    out = {}
+    for e in entries:
+        if e.get("kind") == "grant":
+            out[e["rung"]] = e
+        elif e.get("kind") == "revoke":
+            out.pop(e.get("rung"), None)
+    return out
+
+
+def cmd_grant(path, argv):
+    """Record that the user opened a rung, and for what.
+
+    The ladder in GUARDRAILS says each rung is a separate yes. It was being
+    walked anyway, because permission lived in the conversation and the body of
+    a skill said "commit atomically" with no way to tell whether anyone had
+    agreed. Writing it down does not create authority -- it makes the claim to
+    it checkable, and survives the session that heard it.
+    """
+    if not argv or argv[0] not in RUNGS:
+        sys.exit(f"usage: primeskills-run grant <{'|'.join(RUNGS)}> [scope]")
+    rung, scope = argv[0], " ".join(argv[1:]).strip()
+    if not scope:
+        sys.exit("grant needs a scope: what the permission covers, in the "
+                 "user's own words. An unbounded yes is not a yes.")
+    e = append(path, {"kind": "grant", "rung": rung, "scope": scope})
+    print(f"{rung}: granted — {scope} (recorded against {e['commit'][:8]})")
+    return 0
+
+
+def cmd_revoke(path, argv):
+    if not argv or argv[0] not in RUNGS:
+        sys.exit(f"usage: primeskills-run revoke <{'|'.join(RUNGS)}>")
+    rung = argv[0]
+    if rung not in mandates(read(path)):
+        print(f"{rung}: not granted")
+        return 0
+    append(path, {"kind": "revoke", "rung": rung})
+    print(f"{rung}: revoked")
+    return 0
+
+
+def cmd_may(path, argv):
+    """Exit 0 when the rung is open, 1 when it is not. Meant for a skill step."""
+    if not argv or argv[0] not in RUNGS:
+        sys.exit(f"usage: primeskills-run may <{'|'.join(RUNGS)}>")
+    rung = argv[0]
+    hit = mandates(read(path)).get(rung)
+    if not hit:
+        print(f"{rung}: not granted on this branch. Ask, then "
+              f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
+        return 1
+    print(f"{rung}: granted — {hit['scope']}")
+    return 0
+
+
 def cmd_check(path, argv):
     """Is the newest record for this stage still about the tree in front of us?"""
     if not argv:
@@ -225,6 +294,15 @@ def cmd_show(path):
     commit, digest = state_digest()
     print(f"# Run record — {path.stem}\n")
     print(f"Tree now: {commit[:8]}+{digest}\n")
+    open_rungs = mandates(entries)
+    print("## Authority\n")
+    if open_rungs:
+        for rung in RUNGS:
+            if rung in open_rungs:
+                print(f"- **{rung}** — {open_rungs[rung]['scope']}")
+    else:
+        print("- nothing granted: every rung of the ladder still asks")
+    print()
     counts = counters(entries)
     if counts:
         print("## Counters\n")
@@ -263,6 +341,12 @@ def main(argv):
         return cmd_clear(path, rest)
     if action == "check":
         return cmd_check(path, rest)
+    if action == "grant":
+        return cmd_grant(path, rest)
+    if action == "revoke":
+        return cmd_revoke(path, rest)
+    if action == "may":
+        return cmd_may(path, rest)
     sys.exit(f"primeskills-run: unknown action {action!r}")
 
 

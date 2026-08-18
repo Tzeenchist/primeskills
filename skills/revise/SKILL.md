@@ -29,12 +29,15 @@ opened; this handles what someone else said after.
    → **verify:** none is left unclassified, and you can say why for each
 3. Reply to the declined and the uncertain ones **before** touching code
    → **verify:** the reviewer can respond before you have spent work on it
-4. Rework the accepted ones, grouped by theme, one commit per theme
-   → **verify:** every changed line traces to a comment you can name
+4. Rework the accepted ones, grouped by theme, one commit per theme, each
+   behind `primeskills-run may commit` → **verify:** the rung is open, and
+   every changed line traces to a comment you can name
 5. Call `verify` on the full suite → **verify:** PASS, recorded with
    `primeskills-run note revise "<result>"`
-6. Push, then answer each thread with the commit that addresses it
-   → **verify:** every thread carries either a commit or a stated reason
+6. `primeskills-run may push`, then push and answer each thread with the
+   commit that addresses it. An open pull request does not carry a standing
+   permission to add to it → **verify:** the rung is open, and every thread
+   carries either a commit or a stated reason
 7. Update the description and the acceptance criteria if the change moved
    → **verify:** someone reading only the description gets the current diff
 

@@ -28,30 +28,33 @@ attempt, not after the third.
 1. Preflight: read the repository's agent instructions, note what is already
    dirty and whose it is, and find the real test command → **verify:** you can
    reproduce from a state you can describe
-2. Reproduce it once, cleanly → **verify:** the failure appears, and you can
+2. Resolve and print what reproduction will touch — database, cache,
+   directories (G17) → **verify:** every target is disposable; a shared or
+   production-like one stops here and escalates
+3. Reproduce it once, cleanly → **verify:** the failure appears, and you can
    state the exact command and starting condition
-3. Ask whether it ever worked: `git log --oneline -20 -- <files in the
+4. Ask whether it ever worked: `git log --oneline -20 -- <files in the
    failure>`, and run at a known-good commit — in a separate worktree, never by
    checking out over a dirty tree → **verify:** you can say "regression, and the
    cause is inside this diff" or "never worked", and the working tree is
    untouched
-4. Shrink to a minimal failing example: strip inputs, mocks, and steps until
+5. Shrink to a minimal failing example: strip inputs, mocks, and steps until
    removing anything more makes it pass → **verify:** the MRE still fails and
    fits in a screen
-5. Read the actual values at the boundary — types, nulls, empties, encodings.
+6. Read the actual values at the boundary — types, nulls, empties, encodings.
    Print them, do not infer them → **verify:** you can name what the data is,
    not what it should be
-6. Name the layer the fault lives in: agent behaviour, data and state, harness
+7. Name the layer the fault lives in: agent behaviour, data and state, harness
    mismatch, or process gap → **verify:** the layer explains every symptom you
    observed, not just the loudest one
-7. State one hypothesis and the experiment that would falsify it → **verify:**
+8. State one hypothesis and the experiment that would falsify it → **verify:**
    the experiment can come out either way
-8. Run the experiment → **verify:** the result is read, not assumed
-9. If it failed, run `primeskills-run fail "<problem>"` and write the ledger
+9. Run the experiment → **verify:** the result is read, not assumed
+10. If it failed, run `primeskills-run fail "<problem>"` and write the ledger
    line before touching anything: "hypothesis N failed because X; hypothesis
    N+1 does Y differently" → **verify:** N+1 is different in kind, not in
    cosmetics (G13), and the counter is below three
-10. Fix at the lowest durable layer, then hand to `verify` → **verify:** the MRE
+11. Fix at the lowest durable layer, then hand to `verify` → **verify:** the MRE
    passes and the full suite passes
 
 ## Stop conditions
@@ -62,7 +65,7 @@ attempt, not after the third.
 - Two guesses at a third-party format have failed: stop guessing and go read.
   A third guess is rarely the one that works.
 - The fix would add a null guard or an empty catch over a bad value: that is
-  the symptom talking. Go back to step 5.
+  the symptom talking. Go back to step 6.
 
 ## Output
 The MRE, the root cause and its layer, the fix, the ruled-out hypotheses, and

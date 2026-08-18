@@ -21,7 +21,9 @@ pushing, and before handing work to another agent.
 - Absence of a crash is not a pass. A pass is an exit code plus the tool's own
   success signal.
 - Never edit a test, fixture, or threshold to turn a build green. If a test
-  looks wrong, say so and stop.
+  looks wrong, say so and stop. Changing a test because the requirement changed
+  is different work, not an exception to this: name the requirement, change the
+  test deliberately, and never in the same step as making it pass.
 - The cycle closes only when the new test passes and the full suite passes.
 
 ## Procedure

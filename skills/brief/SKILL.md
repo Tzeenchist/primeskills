@@ -41,7 +41,7 @@ they want.
 
 ## Stop conditions
 - Two readings of the request would lead to different work: stop and ask which.
-  Do not pick the likelier one silently (PRINCIPLES §1).
+  Do not pick the likelier one silently (PRINCIPLES 1).
 - The user asks you to start building mid-conversation: that is their call.
   Say what is still unknown, then proceed.
 - You have asked five questions and the picture is not clearer: the request may

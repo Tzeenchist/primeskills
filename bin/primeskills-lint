@@ -72,7 +72,11 @@ def core_rules(core_dir):
             rules[m.group(1)] = m.group(2)
     pr = (core_dir / "PRINCIPLES.md")
     if pr.is_file():
-        for m in re.finditer(r"^## (\d+)\. (.+?)\n(.*?)(?=\n## |\Z)",
+        # `## P3.` today, `## 3.` before the notation was unified. Accepting both
+        # is not politeness: when the headings changed and this pattern did not,
+        # F12 quietly stopped checking principles and the linter still printed
+        # "0 problems". C4 below is the guard against the next such silence.
+        for m in re.finditer(r"^## P?(\d+)\. (.+?)\n(.*?)(?=\n## |\Z)",
                              pr.read_text(encoding="utf-8"), re.S | re.M):
             rules["P" + m.group(1)] = m.group(2) + " " + m.group(3)
     return {k: significant(v) for k, v in rules.items()}
@@ -161,13 +165,18 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
     tools = meta.get("allowed-tools")
     # `reports` is read-only about the work and writes only its verdict under
     # .primeskills/, so it carries the same tool list as read-only.
-    if meta.get("role") in ("read-only", "reports"):
+    if meta.get("role") in ("read-only", "reports", "exercises"):
         if not tools:
             bad("F10", "read-only skill without allowed-tools")
         elif WRITING_TOOLS & set(tools):
             bad("F10", f"read-only skill allows {sorted(WRITING_TOOLS & set(tools))}")
     elif tools and not (WRITING_TOOLS & set(tools)):
         bad("F10", "write skill whose allowed-tools cannot write")
+    # F15: `exercises` is the role that admits it leaves data behind, so it has
+    # to say where. A skill that drives the system under test without naming the
+    # environment is indistinguishable from one pointed at production.
+    if meta.get("role") == "exercises" and not str(meta.get("environment", "")).strip():
+        bad("F15", "role 'exercises' without an 'environment' declaration")
 
     desc = str(meta.get("description", ""))
     if len(desc) > DESC_MAX:
@@ -292,6 +301,14 @@ def check_core(core_dir, problems):
     words = sum(len(f.read_text(encoding="utf-8").split()) for f in files)
     if words > CORE_BUDGET:
         problems.append((core_dir, "C1", f"core {words} words > budget {CORE_BUDGET}"))
+    # C4: a rule registry that parses nothing is indistinguishable from a clean
+    # run. F12 depends on it, so an empty side of it is a linter defect, not a
+    # clean repository.
+    rules = core_rules(core_dir)
+    for prefix, source in (("P", "PRINCIPLES.md"), ("G", "GUARDRAILS.md")):
+        if (core_dir / source).is_file() and not any(k.startswith(prefix) for k in rules):
+            problems.append((core_dir, "C4",
+                             f"no {prefix}-rules parsed from {source}: F12 is checking nothing"))
 
 
 def main(argv):

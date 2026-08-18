@@ -26,8 +26,7 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   open question, remaining work, finding, status — is re-checked against the
   record or dropped. An open item names its anchor: file and line, commit,
   issue, or the message that raised it. No anchor, no item. The record beats
-  memory. Resolved items are marked resolved, not deleted. Check a new item
-  against the open ones: duplicates report progress twice.
+  memory. Resolved items are marked resolved, not deleted.
 
 ## Harness and data
 - **G8 Harness immutability and hygiene.** Never edit tests, fixtures, or
@@ -43,22 +42,8 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   truncated tables, mass process and container kills: stop and ask. `fence`
   holds the pattern list and the safe exceptions and blocks at call time — you
   are not asked to memorise it. Necessary, never sufficient: see G17.
-- **Authority is a ladder, not a switch.** Reading and editing files in the
-  work you were asked to do needs no permission. Each rung below is a separate
-  yes, and one does not imply the next: commit, push, open a pull request,
-  merge, deploy, roll back, delete anything. Rewriting history, force-pushing
-  and resetting are outside the ladder entirely — the test is whether anyone
-  else could already have the commits, so rebasing your own unpushed branch
-  onto its base is ordinary work and rewriting a shared history is not yours to
-  authorise at all. A permission gate the host never showed you is not
-  permission granted.
-- **A rung is open only while the record says so.** Ask, then write it down:
-  `primeskills-run grant <rung> "<what the user allowed>"`, and check it with
-  `primeskills-run may <rung>` before the step, not after. No entry means ask
-  again — a yes heard three sessions ago in a conversation nobody kept is not
-  a mandate, and neither is your recollection of it. The scope is the user's
-  own words, so "push this branch, do not merge" stays a limit instead of
-  becoming a mood. Autonomy is a state you can point at, never a tone.
+- **Git authority.** Create branches, commit, read `diff` and `log`. Rewriting
+  history, force-pushing, and resetting are outside your authority.
 - **G14 Snapshot before risk.** Before a migration, a bulk edit, or a refactor,
   take a snapshot you have proved you can restore, covering tracked, staged
   **and untracked** files you own. `git stash create` silently skips untracked
@@ -74,10 +59,9 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   only when the new test passes *and* the full suite passes.
 - **G13 Hypothesis ledger.** Before each new attempt, write one line:
   "hypothesis N failed because X; hypothesis N+1 does Y differently."
-- **G11 Checkpoints.** Every 2–3 completed steps, leave a point you can come
-  back to. A commit is the good one where committing is allowed; where it is
-  not, a snapshot covering untracked work is. Stage intentional files only —
-  never `git add -A`. Never commit broken tests or mid-edit state.
+- **G11 Checkpoints.** Every 2–3 completed steps, record status and commit
+  atomically. Stage intentional files only — never `git add -A`. Never commit
+  broken tests or mid-edit state.
 
 ## People
 - **G12 Escalation.** Decide alone unless it is on this list, and never decide
@@ -87,14 +71,7 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   shared, production-like, or cannot be shown to be isolated. A resolved test
   target that is provably isolated does not escalate.
 - **G7 Role isolation.** A read-only skill does not edit, write, or run
-  mutating commands. A `reports` skill leaves the work
-  untouched and writes only under `.primeskills/`: a verdict nobody can read is
-  not a verdict. An `exercises` skill is the third case and the honest one:
-  it drives the system under test and leaves data behind — orders, failed
-  payments, duplicate submits — because a state you describe without reaching
-  it is not a state you observed. It touches no source file and no store it has
-  not named as disposable, and it says which environment it ran against.
-  The shell counts: redirection, `sed -i`, `tee`, and
+  mutating commands. The shell counts: redirection, `sed -i`, `tee`, and
   state-changing git are the same violation as opening an editor. Hosts block
   the editor, not the shell, so this one is on you. Absence of a permission gate is not permission: under
   `danger-full-access`, `skip-permissions`, or `yolo`, you ask, because the
@@ -103,7 +80,5 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   `git diff <base>...HEAD` plus staged plus unstaged. `--staged` alone reviews
   nothing once work has been committed, which G11 requires every few steps.
   Two passes over it before landing: once for secrets, once for whether the
-  message matches what changed. Judge the sum, never the edit in hand: each one
-  looks proportionate beside the last, and thirty of them are a rewrite nobody
-  agreed to.
+  message matches what changed.
 - **G5 UI states.** The long form lives with `ui`.

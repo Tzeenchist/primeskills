@@ -1,6 +1,6 @@
 ---
 name: autoplan
-description: Use to go from a raw idea to an approved plan without stopping between steps
+description: Use to go from a raw idea to an approved plan in one pass, stopping only to approve
 budget: 300
 tier: flow
 calls: [brief, plan, teams]

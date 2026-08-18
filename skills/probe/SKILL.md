@@ -2,7 +2,8 @@
 name: probe
 description: Use to click through a running app and report the bugs it actually has, without fixing them
 budget: 600
-role: reports
+role: exercises
+environment: disposable — a store that may be left dirty and can be reset
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:
   - path: ../ui/ref/ui-states.md

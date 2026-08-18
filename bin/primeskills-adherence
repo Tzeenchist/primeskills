@@ -302,6 +302,8 @@ def report(path, skills_dir, quiet=False):
     order = [s["skill"] for s in found]
     for i, span in enumerate(found):
         checks = list(PER_SKILL.get(span["skill"], []))
+        # `exercises` writes through the application on purpose (G7); holding
+        # it to the read-only check reported its own design as a violation.
         if role_of(span["skill"], skills_dir) in ("read-only", "reports"):
             checks.append(("не пишет (G7)", check_read_only))
         declared = calls_of(span["skill"], skills_dir)

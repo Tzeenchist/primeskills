@@ -29,7 +29,7 @@ you to integrate. `land` prepared it; this puts it in.
    came back stale
 4. Check the branch is current with the base → **verify:** either it merges
    cleanly, or you report the conflict and stop rather than resolving it blind
-5. Merge in the project's own style — merge commit, squash, or rebase of your
+5. `primeskills-run may merge`, then merge in the project's own style — merge commit, squash, or rebase of your
    own unpushed branch onto the base, whichever the repository uses. Rewriting
    history anyone else has pulled is outside your authority whatever the style → **verify:** the history after matches the shape
    of the history before

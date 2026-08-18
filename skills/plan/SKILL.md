@@ -43,7 +43,7 @@ for a change that fits in one file and alters no contract — that gate is G2.
   or go back to `brief`.
 - A task has no observable criterion: you do not yet understand it well enough
   to plan it.
-- The plan is growing past what the request asked for: cut (PRINCIPLES §4).
+- The plan is growing past what the request asked for: cut (PRINCIPLES 4).
 
 ## Output
 The goal, what is out of scope, ordered tasks with acceptance criteria, the

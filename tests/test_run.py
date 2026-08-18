@@ -143,6 +143,43 @@ def main():
         if "1 of 3" not in out:
             failures.append(f"другая проблема попала в чужой счётчик:\n{out}")
 
+    # the authority ladder: a rung is open only while the record says so
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        checks += 1
+        code, out = run(repo, "may", "commit")
+        if code != 1:
+            failures.append(f"незапрошенный commit разрешён: {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "grant", "commit")
+        if code == 0:
+            failures.append("мандат без области принят")
+        run(repo, "grant", "commit", "ветка feature/x, до PR")
+        checks += 1
+        code, out = run(repo, "may", "commit")
+        if code != 0 or "feature/x" not in out:
+            failures.append(f"выданный мандат не читается: {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "may", "push")
+        if code != 1:
+            failures.append("commit открыл push — ступень подразумевает следующую")
+        run(repo, "revoke", "commit")
+        checks += 1
+        code, out = run(repo, "may", "commit")
+        if code != 1:
+            failures.append("отозванный мандат всё ещё действует")
+        checks += 1
+        code, out = run(repo, "grant", "deploy-everything", "всё")
+        if code == 0:
+            failures.append("выдуманная ступень принята")
+        checks += 1
+        run(repo, "grant", "push", "до PR")
+        code, out = run(repo, "show")
+        if "## Authority" not in out or "до PR" not in out:
+            failures.append(f"открытые ступени не видны в записи:\n{out}")
+
     # outside a repository it must refuse, not write somewhere surprising
     with tempfile.TemporaryDirectory() as bare:
         checks += 1

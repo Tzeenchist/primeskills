@@ -1,15 +1,17 @@
 ---
 name: land
 description: Use to commit, push and open a pull request once work is verified and reviewed
-budget: 600
+budget: 750
 role: write
 ---
 
 # Land
 
 ## Trigger
-`verify` reports PASS, `vet` returns no blocking findings, and `probe` — if it
-ran — did not return BLOCK. Not before all three.
+`verify` reports PASS, `vet` returns no blocking findings, and `probe` returned
+PASS. Not before all three. `NOT RUN` counts only when the change touches no
+running interface; when it does, an interface nobody could bring up is an
+unknown, and landing on an unknown is the thing this order exists to prevent.
 
 ## Invariants
 - The commit message describes what the diff does. If you cannot write the
@@ -17,8 +19,10 @@ ran — did not return BLOCK. Not before all three.
 - Two passes over the whole change (G6): once for secrets, once for whether the
   message matches. Neither substitutes for the other.
 - Integration is the user's decision. You prepare it; merging, releasing, and
-  deploying are theirs to choose (PRINCIPLES §8).
+  deploying are theirs to choose (PRINCIPLES 8).
 - Never force-push, never rewrite history, never `git add -A`.
+- Commit, push and pull request are three rungs, not one gesture. Each is
+  checked against the run record before it happens, never remembered afterwards.
 
 ## Procedure
 1. Ask the record whether the proof is still about this tree:
@@ -33,17 +37,24 @@ ran — did not return BLOCK. Not before all three.
    covered by the message
 4. Check the branch: not the default branch → **verify:** you are on a working
    branch, or you create one before committing
-5. Commit in conventional form: type, scope, one-line summary, then why
+5. `primeskills-run may commit`. If it refuses, ask and record the answer
+   before going on → **verify:** the rung is open and its scope covers this
+   branch
+6. Commit in conventional form: type, scope, one-line summary, then why
    → **verify:** the summary reads as what changed, not as what you did today
-6. Push. Open a PR if the remote is hosted; if it is a bare or local remote,
-   there is nothing to open — say so and put the acceptance criteria in the
-   report instead → **verify:** the branch is on the remote, and the criteria
-   are visible either in the PR or in what you hand back
-7. If memory is enabled, record what the code and history do not: a decision and
+7. `primeskills-run may push`, then push. Push is its own rung and a commit
+   mandate never implies it → **verify:** the rung is open, then the branch is
+   on the remote
+8. `primeskills-run may pr`, then open a PR if the remote is hosted; if it is a
+   bare or local remote, there is nothing to open — say so and put the
+   acceptance criteria in the report instead → **verify:** the rung is open, and
+   the criteria are visible either in the PR or in what you hand back
+9. If memory is enabled, record what the code and history do not: a decision and
    its reason, a rare bug with its root, an option rejected and why
    → **verify:** nothing recorded is already derivable from `git log`
-8. Report the PR URL and what remains → **verify:** you state plainly that
-   merging and deploying are the user's next call
+10. Report the PR URL and what remains → **verify:** you state plainly that
+   merging and deploying are the user's next call, and no file from
+   `.primeskills/` went up with the change
 
 ## Stop conditions
 - Tests are red: stop. There is no version of this step that starts here.
