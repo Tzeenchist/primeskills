@@ -50,10 +50,17 @@ def decide(raw, root=None):
     except (ValueError, TypeError):
         return deny("could not read the tool payload while a boundary is set.")
 
-    target = (payload.get("tool_input") or {}).get("file_path")
-    if target is None:
-        return ALLOW  # not a file-writing call
-    if not isinstance(target, str) or not target:
+    # NotebookEdit sends notebook_path, not file_path. Reading only the latter
+    # let every notebook write past a boundary that claims to hold this tool:
+    # the value came back None and None was answered with ALLOW, which is the
+    # fail-open behaviour this file was ported to remove.
+    fields = payload.get("tool_input") or {}
+    target = next((fields[k] for k in ("file_path", "notebook_path", "path")
+                   if isinstance(fields.get(k), str) and fields[k]), None)
+    if not target:
+        # The matcher fires on Edit|Write|NotebookEdit only, so a call with no
+        # path is a shape we do not understand -- and an unrecognised write is
+        # exactly what a boundary must refuse.
         return deny("a boundary is set and this call carries no readable path.")
 
     resolved = os.path.realpath(os.path.abspath(os.path.expanduser(target)))

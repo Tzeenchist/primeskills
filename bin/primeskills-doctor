@@ -18,6 +18,15 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def under_root(path):
+    """Ours by path components, not by substring: a sibling directory whose
+    name merely starts with ours is not ours (same defect as the installer's)."""
+    try:
+        return Path(path).resolve().is_relative_to(ROOT)
+    except (OSError, ValueError):
+        return False
 HOME = Path.home()
 SKILLS = ROOT / "skills"
 FENCE = SKILLS / "fence" / "bin"
@@ -44,7 +53,7 @@ def installed_skills(root):
         skill = entry / "SKILL.md"
         if not skill.exists():
             continue
-        if str(ROOT) in str(Path(skill).resolve()):
+        if under_root(skill):
             found.append(entry.name)
     return found
 
@@ -94,7 +103,7 @@ def check_profile(r, agent, dest):
     """The read-only profile must be where the host looks, and be ours."""
     if not dest.exists():
         r.line(FAIL, agent, "prime-analyst profile", f"missing at {dest}")
-    elif str(ROOT) not in str(dest.resolve()):
+    elif not under_root(dest):
         r.line(WARN, agent, "prime-analyst profile", "present but not ours")
     else:
         r.line(OK, agent, "prime-analyst profile", dest.parent.name + "/")

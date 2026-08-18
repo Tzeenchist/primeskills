@@ -40,11 +40,36 @@ def git(*args):
     return p.stdout if p.returncode == 0 else ""
 
 
+def untracked_content():
+    """Bytes of every untracked file, not just its name.
+
+    `git status --porcelain` names an untracked file and says nothing about
+    what is in it, so a PASS stayed fresh while the new module under test was
+    rewritten -- the one hole in the idea that evidence expires with the tree.
+    Ignored files are still outside the digest: they are excluded on purpose
+    and walking them would drag node_modules into every check.
+    """
+    out = hashlib.sha1()
+    for line in git("status", "--porcelain", "-z").split("\0"):
+        if not line.startswith("?? "):
+            continue
+        target = Path(line[3:])
+        files = sorted(target.rglob("*")) if target.is_dir() else [target]
+        for f in files:
+            if not f.is_file() or f.is_symlink():
+                continue
+            out.update(str(f).encode("utf-8"))
+            with f.open("rb") as fh:
+                for chunk in iter(lambda: fh.read(65536), b""):
+                    out.update(chunk)
+    return out.hexdigest()
+
+
 def state_digest():
     """Commit plus everything not in it. Two runs share a digest only when the
     tree they ran against is byte-identical."""
     commit = git("rev-parse", "HEAD").strip() or "no-commit"
-    pending = git("diff", "HEAD") + git("status", "--porcelain")
+    pending = git("diff", "HEAD") + git("status", "--porcelain") + untracked_content()
     return commit, hashlib.sha1(pending.encode("utf-8")).hexdigest()[:12]
 
 
@@ -87,13 +112,53 @@ def append(path, entry):
     return entry
 
 
+# Words that carry no problem in them. Kept short on purpose: a long list
+# starts merging problems that differ only by a word it decided was filler.
+FILLER = {"the", "a", "an", "is", "are", "was", "were", "this", "that", "it",
+          "its", "and", "or", "of", "to", "in", "on", "at", "for", "with",
+          "when", "after", "before", "again", "still", "now", "not"}
+SAME_PROBLEM = 0.5  # share of shared words at which two phrasings are one
+
+
+def problem_tokens(text):
+    words = re.findall(r"\w+", text.lower(), re.UNICODE)
+    return {w for w in words if len(w) > 2 and w not in FILLER}
+
+
+def problem_key(text):
+    return " ".join(sorted(problem_tokens(text)))
+
+
+def match_key(counts, text):
+    """Which open counter this phrasing belongs to.
+
+    The breaker is keyed by a string the agent types, so `fail "login 500"` and
+    `fail "the login endpoint returns 500"` were two problems and three attempts
+    quietly became six -- the one mechanism holding the worst loop was defeated
+    by a synonym. Now a new phrasing joins the closest open counter when they
+    share half their words. This narrows the hole; a genuinely different
+    description still opens a new counter, and no string comparison would fix
+    that. The ceiling is in docs/ADAPTERS.md.
+    """
+    tokens = problem_tokens(text)
+    best, score = None, 0.0
+    for key in counts:
+        other = set(key.split())
+        if tokens and other:
+            overlap = len(tokens & other) / len(tokens | other)
+            if overlap > score:
+                best, score = key, overlap
+    return best if score >= SAME_PROBLEM else problem_key(text)
+
+
 def counters(entries):
     counts = {}
     for e in entries:
+        key = match_key(counts, e.get("problem", ""))
         if e.get("kind") == "fail":
-            counts[e["problem"]] = counts.get(e["problem"], 0) + 1
+            counts[key] = counts.get(key, 0) + 1
         elif e.get("kind") == "clear":
-            counts.pop(e["problem"], None)
+            counts.pop(key, None)
     return counts
 
 
@@ -110,7 +175,8 @@ def cmd_fail(path, argv):
         sys.exit("usage: primeskills-run fail <problem>")
     problem = " ".join(argv)
     append(path, {"kind": "fail", "problem": problem})
-    n = counters(read(path)).get(problem, 0)
+    counts = counters(read(path))
+    n = counts.get(match_key(counts, problem), 0)
     if n >= BREAKER:
         print(f"{problem}: {n} — G9 breaker. Restore the G14 snapshot, report "
               f"what each attempt ruled out, ask.")
@@ -123,7 +189,7 @@ def cmd_clear(path, argv):
     if not argv:
         sys.exit("usage: primeskills-run clear <problem>")
     problem = " ".join(argv)
-    if problem not in counters(read(path)):
+    if match_key(counters(read(path)), problem) not in counters(read(path)):
         print(f"{problem}: no counter")
         return 0
     append(path, {"kind": "clear", "problem": problem})

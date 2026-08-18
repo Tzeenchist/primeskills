@@ -232,12 +232,21 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
 
 
 def pointer_words(root):
-    """The block the installer writes into each host's always-loaded file."""
+    """The block the installer writes into each host's always-loaded file.
+
+    Loaded from *our own* bin/, never from the tree being linted. It used to
+    take the installer next to the linted skills, which turned `primeskills-lint
+    <someone-else-s-clone>/skills` into arbitrary code execution with the user's
+    rights -- a static format check that runs the checked repository. The count
+    does not depend on the tree anyway: the block is a fixed template plus three
+    path lines of two words each.
+    """
+    del root  # the linted tree is data, never code
     try:
         import importlib.machinery
         import importlib.util
         loader = importlib.machinery.SourceFileLoader(
-            "_pi", str(root / "bin" / "primeskills-install"))
+            "_pi", str(Path(__file__).resolve().parent / "primeskills-install"))
         spec = importlib.util.spec_from_loader("_pi", loader)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

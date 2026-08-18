@@ -22,9 +22,14 @@ ALLOW = "{}"
 # Target tokens exclude ( and backtick so command substitution ending in a
 # whitelisted name cannot ride the exemption.
 ARTIFACTS = r"(node_modules|\.next|dist|__pycache__|\.cache|build|\.turbo|coverage)"
+# The path in front of the artifact name must stay inside the working
+# directory: no leading / or ~, no .. segment. Without that, `rm -rf ~/.cache`
+# and `rm -rf ../../node_modules` rode the exemption -- the name at the end was
+# whitelisted, and the directory it named belonged to someone else.
+SAFE_PREFIX = r"((?!\.\.(/|$))[^\s;&|#(`/~][^\s;&|#(`/]*/)*"
 SAFE_RM = re.compile(
     r"^\s*rm\s+(-[a-zA-Z]*[rR][a-zA-Z]*\s+|--recursive\s+)"
-    rf"(([^\s;&|#(`]*/)?{ARTIFACTS}\s*)+$"
+    rf"({SAFE_PREFIX}{ARTIFACTS}\s*)+$"
 )
 
 OBFUSCATION = re.compile(

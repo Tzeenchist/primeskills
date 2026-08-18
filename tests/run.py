@@ -52,6 +52,27 @@ def main():
             elif code == 0:
                 failures.append(f"{case}: {rule} reported but exit code 0")
 
+    # a linted tree is data, never code. Linting a foreign clone used to load
+    # and execute its bin/primeskills-install, which turned a static format
+    # check into arbitrary code execution with the user's rights.
+    import shutil
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        foreign = Path(tmp) / "clone"
+        shutil.copytree(FIXTURES / "ok", foreign / "skills")
+        shutil.copytree(ROOT / "core", foreign / "core")
+        (foreign / "bin").mkdir()
+        marker = foreign / "EXECUTED"
+        (foreign / "bin" / "primeskills-install").write_text(
+            "from pathlib import Path\n"
+            f"Path({str(marker)!r}).write_text('executed')\n"
+            "def bootstrap_text():\n    return 'x'\n", encoding="utf-8")
+        run([sys.executable, str(LINT), str(foreign / "skills")])
+        failures_before = len(failures)
+        if marker.exists():
+            failures.append("линтер исполнил код из проверяемого дерева")
+        del failures_before
+
     # routing linter: good table passes, colliding table fails
     code, out = run([sys.executable, str(ROUTE), str(FIXTURES / "ok"),
                      str(FIXTURES / "routing-ok.txt")])
@@ -64,7 +85,7 @@ def main():
 
     for f in failures:
         print(f)
-    print(f"{len(EXPECT) + 2} checks, {len(failures)} failed")
+    print(f"{len(EXPECT) + 3} checks, {len(failures)} failed")
 
     fence = subprocess.run([sys.executable, str(Path(__file__).parent / "test_fence.py")])
     record = subprocess.run([sys.executable, str(Path(__file__).parent / "test_run.py")])

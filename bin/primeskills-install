@@ -234,12 +234,25 @@ def ours():
     return sorted(p.parent for p in SKILLS.glob("*/SKILL.md"))
 
 
+def under_root(path):
+    """Inside our repository, by path components rather than by substring.
+
+    `str(ROOT) in realpath` matched any sibling whose name merely starts with
+    ours -- a `primeskills-foreign` next door read as ours, and the caller of
+    this function is allowed to `shutil.rmtree` what it owns.
+    """
+    try:
+        return Path(os.path.realpath(path)).is_relative_to(ROOT)
+    except (OSError, ValueError):
+        return False
+
+
 def is_ours(path):
     """A link we created, so uninstall never removes someone else's skill."""
     if path.is_symlink():
-        return str(ROOT) in os.path.realpath(path)
+        return under_root(path)
     inner = path / "SKILL.md"
-    return inner.is_symlink() and str(ROOT) in os.path.realpath(inner)
+    return inner.is_symlink() and under_root(inner)
 
 
 def target_name(agent, skill_dir):

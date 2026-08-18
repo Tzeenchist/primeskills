@@ -121,6 +121,23 @@ def main():
         if manifest.is_file() and json.loads(manifest.read_text(encoding="utf-8")):
             failures.append("манифест не опустел после uninstall")
 
+    # ownership is decided by path components, not by substring: a neighbour
+    # directory whose name merely begins with ours is not ours, and the caller
+    # of this check is allowed to shutil.rmtree what it owns
+    import importlib.machinery
+    import importlib.util
+    loader = importlib.machinery.SourceFileLoader("_pi_test", str(TOOL))
+    spec = importlib.util.spec_from_loader("_pi_test", loader)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    neighbour = str(mod.ROOT) + "-foreign"
+    checks += 1
+    if mod.under_root(neighbour):
+        failures.append(f"{neighbour} опознан как наш каталог")
+    checks += 1
+    if not mod.under_root(str(mod.ROOT / "skills")):
+        failures.append("собственный каталог не опознан как наш")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

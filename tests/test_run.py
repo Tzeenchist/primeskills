@@ -106,6 +106,43 @@ def main():
         if code != 0 or not (repo / ".primeskills" / "run" / "feat-thing.jsonl").is_file():
             failures.append(f"branch with a slash: exit {code}\n{out}")
 
+    # evidence must expire when an untracked file's CONTENT changes, not only
+    # when one appears: the digest used to carry names from `git status` and a
+    # rewritten new module left an old PASS looking current
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
+        (repo / "new.py").write_text("first\n", encoding="utf-8")
+        run(repo, "note", "verify", "green")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 0:
+            failures.append(f"свежая запись прочиталась как протухшая:\n{out}")
+        (repo / "new.py").write_text("second\n", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 2 or "STALE" not in out:
+            failures.append(f"правка untracked-файла не протухила запись: {code}\n{out}")
+
+    # the G9 breaker counts a problem, not a phrasing of it
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        run(repo, "fail", "login returns 500")
+        checks += 1
+        code, out = run(repo, "fail", "The login  RETURNS 500!")
+        if "2 of 3" not in out:
+            failures.append(f"переформулировка обнулила счётчик G9:\n{out}")
+        checks += 1
+        code, out = run(repo, "fail", "css margin is wrong")
+        if "1 of 3" not in out:
+            failures.append(f"другая проблема попала в чужой счётчик:\n{out}")
+
     # outside a repository it must refuse, not write somewhere surprising
     with tempfile.TemporaryDirectory() as bare:
         checks += 1

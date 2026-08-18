@@ -38,6 +38,13 @@ COMMANDS = [
     ("not json at all", "ask"),                                   # fail closed
     ('{"tool_input":{"command":"rm -rf node_modules"}}', None),   # whitelisted
     ('{"tool_input":{"command":"rm -Rf dist coverage"}}', None),
+    # the whitelist is for artifacts under the working directory, and the name
+    # at the end is not enough: these three named someone else's directory
+    ('{"tool_input":{"command":"rm -rf ~/.cache"}}', "ask"),
+    ('{"tool_input":{"command":"rm -rf /srv/other/build"}}', "ask"),
+    ('{"tool_input":{"command":"rm -rf ../../node_modules"}}', "ask"),
+    ('{"tool_input":{"command":"rm -rf frontend/node_modules"}}', None),
+    ('{"tool_input":{"command":"rm -rf ./build"}}', None),
     ('{"tool_input":{"command":"ls -la"}}', None),
     ('{"tool_input":{"file_path":"a.py"}}', None),                # not a shell call
 ]
@@ -55,6 +62,7 @@ def decision(out):
 
 def main():
     failures = []
+    cases = []
     for payload, expected in COMMANDS:
         got = decision(run(CMD, payload))
         if got != expected:
@@ -68,7 +76,13 @@ def main():
                  ('{"tool_input":{"file_path":"/etc/passwd"}}', "deny"),
                  ('{"tool_input":{"file_path":"src/../../escape.py"}}', "deny"),
                  ("garbage", "deny"),
-                 ('{"tool_input":{"command":"ls"}}', None)]
+                 # NotebookEdit names its target notebook_path; reading only
+                 # file_path let every notebook write straight past the boundary
+                 ('{"tool_input":{"notebook_path":"/etc/x.ipynb"}}', "deny"),
+                 ('{"tool_input":{"notebook_path":"src/a.ipynb"}}', None),
+                 # a write whose shape we do not recognise is still a write
+                 ('{"tool_input":{}}', "deny"),
+                 ('{"tool_input":{"command":"ls"}}', "deny")]
 
         # no boundary file: everything allowed
         if decision(run(BND, '{"tool_input":{"file_path":"/etc/passwd"}}', cwd=repo)) is not None:
@@ -82,7 +96,7 @@ def main():
 
     for f in failures:
         print(f)
-    total = len(COMMANDS) + 6
+    total = len(COMMANDS) + len(cases) + 1
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 
