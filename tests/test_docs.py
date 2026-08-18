@@ -93,7 +93,29 @@ def main():
             failures.append(f"{doc.name}: {name} назван {hit.group(1).strip()}, "
                             f"линтер держит {want}")
 
-    # 4. A skill's declared role must match what it is allowed to do: `write`
+    # 4. VERSION and the newest CHANGELOG entry are one statement in two files.
+    checks += 1
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    newest = re.search(r"^## (\S+)", changelog, re.M)
+    if not newest:
+        failures.append("CHANGELOG.md без записей версий")
+    elif newest.group(1) != version:
+        failures.append(f"VERSION {version}, а верхняя запись CHANGELOG "
+                        f"{newest.group(1)}")
+
+    # 5. The queue promises its own sections by name. It lost one of them and
+    #    kept describing four, which is the same defect as any other document
+    #    claiming behaviour that is not there.
+    todos = (ROOT / "TODOS.md").read_text(encoding="utf-8")
+    intro = todos.split("## ", 1)[0]
+    for name in re.findall(r"\*\*([А-ЯЁ][^*]{4,60})\*\* —", intro):
+        checks += 1
+        if f"\n## {name}" not in todos:
+            failures.append(f"TODOS.md: во вступлении обещан раздел «{name}», "
+                            f"а заголовка такого нет")
+
+    # 6. A skill's declared role must match what it is allowed to do: `write`
     #    on a skill whose tools cannot write is a label, not a fact.
     for skill in sorted((ROOT / "skills").glob("*/SKILL.md")):
         meta, _, _ = load("primeskills-lint").split_frontmatter(

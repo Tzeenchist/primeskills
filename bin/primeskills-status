@@ -126,6 +126,10 @@ def main():
     print(f"  skills             {len(skills)} (of which flows: {len(flows)})")
     print(f"  always in context  {always} words "
           f"({len(skills)} descriptions {descs} + core pointer {pointer})")
+    version = (ROOT / "VERSION")
+    if version.is_file():
+        print(f"  version           {version.read_text(encoding='utf-8').strip()} "
+              f"(CHANGELOG.md)")
     pin = Path.home() / ".primeskills" / "pin.json"
     if pin.is_file():
         import json
