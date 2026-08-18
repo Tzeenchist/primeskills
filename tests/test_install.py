@@ -7,6 +7,7 @@ another tool would have gone through `shutil.rmtree`.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -187,6 +188,12 @@ def main():
           clone = Path(tmp) / "clone"
           made = subprocess.run(["git", "clone", "--quiet", "--no-hardlinks",
                                  str(ROOT), str(clone)], capture_output=True)
+          if made.returncode == 0:
+              # the clone carries the committed state; the test is about the
+              # working tree, so the working files go over it
+              for part in ("bin", "core", "skills", "docs", "tests"):
+                  if (ROOT / part).is_dir():
+                      shutil.copytree(ROOT / part, clone / part, dirs_exist_ok=True)
           if made.returncode != 0:
               print("пин: не применимо — клон не создан")
           else:
@@ -201,7 +208,15 @@ def main():
               checks += 1
               if not (h / ".primeskills" / "pin.json").is_file():
                   failures.append("пин не записан")
-              subprocess.run([sys.executable, str(tool), "claude", "--unpin"],
+              # uncommitted work inside the pinned tree must stop the removal
+              (h / ".primeskills" / "pinned" / "DIRTY.txt").write_text("моё\n",
+                                                                      encoding="utf-8")
+              checks += 1
+              out = subprocess.run([sys.executable, str(tool), "claude", "--unpin"],
+                                   capture_output=True, text=True, env=env)
+              if "uncommitted work" not in (out.stdout + out.stderr):
+                  failures.append("снятие пина не заметило незакоммиченную работу")
+              subprocess.run([sys.executable, str(tool), "claude", "--unpin", "--force"],
                              capture_output=True, text=True, env=env)
               checks += 1
               if "/.primeskills/pinned/" in os.path.realpath(link):

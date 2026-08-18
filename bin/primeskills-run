@@ -97,8 +97,12 @@ def untracked_content():
 
 
 def state_digest():
-    """Commit plus everything not in it. Two runs share a digest only when the
-    tree they ran against is byte-identical."""
+    """Commit plus what is not in it. Two runs share a digest when the tracked
+    diff and the untracked files match — which is close to byte-identical and
+    is not the same claim. Ignored files are outside it by design, untracked
+    files past BIG_FILE are represented by size and mtime, symlinks are
+    skipped, and a binary tracked file reaches us as git's "files differ" line.
+    README says the same in prose; neither should promise more than this."""
     commit = git("rev-parse", "HEAD").strip() or "no-commit"
     pending = git("diff", "HEAD") + git("status", "--porcelain") + untracked_content()
     return commit, hashlib.sha1(pending.encode("utf-8")).hexdigest()[:12]

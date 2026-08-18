@@ -465,35 +465,74 @@ def pin_state():
         return None
 
 
-def pin(ref, agents):
-    """Point the agents at a fixed commit, and let that commit install itself."""
+def pinned_is_dirty():
+    """Uncommitted work inside the pinned worktree. `worktree remove --force`
+    would throw it away without a word, and it is still someone's work."""
+    if not PINNED.is_dir():
+        return False
+    out = git("-C", str(PINNED), "status", "--porcelain")
+    return bool(out.stdout.strip())
+
+
+def pin(ref, agents, force=False):
+    """Point the agents at a fixed commit, and let that commit install itself.
+
+    Ordered so that a failure leaves the previous state: the worktree is built
+    first, the installation runs from it, and only a successful installation
+    writes the pin. The first version wrote the pin before installing, so a
+    failed install left the agents following a tree the record said they were
+    not following.
+    """
     sha = git("-C", str(ROOT), "rev-parse", ref).stdout.strip()
     if not sha:
         sys.exit(f"primeskills-install: {ref!r} is not a commit in {ROOT}")
+    if pinned_is_dirty() and not force:
+        sys.exit(f"primeskills-install: {PINNED} has uncommitted work. Commit it, "
+                 f"move it, or repeat with --force to discard it.")
+    previous = PIN_FILE.read_text(encoding="utf-8") if PIN_FILE.is_file() else None
     if PINNED.exists():
         git("-C", str(ROOT), "worktree", "remove", "--force", str(PINNED))
     PINNED.parent.mkdir(parents=True, exist_ok=True)
     made = git("-C", str(ROOT), "worktree", "add", "--detach", str(PINNED), sha)
     if made.returncode != 0:
         sys.exit(f"primeskills-install: worktree failed — {made.stderr.strip()}")
+    out = subprocess.run([sys.executable, str(PINNED / "bin" / "primeskills-install"),
+                          *agents, "--apply"], text=True)
+    if out.returncode != 0:
+        git("-C", str(ROOT), "worktree", "remove", "--force", str(PINNED))
+        if previous is not None:
+            write_atomic(PIN_FILE, previous, check=json.loads)
+        sys.exit("primeskills-install: установка из закреплённого дерева не удалась, "
+                 "пин не записан, прежнее состояние возвращено")
     write_atomic(PIN_FILE, json.dumps({"ref": ref, "commit": sha}, indent=2) + "\n",
                  check=json.loads)
     print(f"pinned: {ref} = {sha[:8]} at {PINNED}")
-    out = subprocess.run([sys.executable, str(PINNED / "bin" / "primeskills-install"),
-                          *agents, "--apply"], text=True)
-    return out.returncode
+    return 0
 
 
-def unpin(agents):
+def unpin(agents, force=False):
+    """Return the agents to the working copy, and only then let go of the pin.
+
+    Ordered the other way round at first: the record was deleted, the reinstall
+    attempted, and the worktree removed whatever happened — a failed reinstall
+    left dangling links and took any uncommitted work in the pinned tree with
+    it.
+    """
     if not PIN_FILE.is_file():
         print("not pinned")
         return 0
-    PIN_FILE.unlink()
+    if pinned_is_dirty() and not force:
+        sys.exit(f"primeskills-install: {PINNED} has uncommitted work. Commit it, "
+                 f"move it, or repeat with --force to discard it.")
     code = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                            *agents, "--apply"], text=True).returncode
+    if code != 0:
+        sys.exit("primeskills-install: возврат на рабочую копию не удался, "
+                 "пин оставлен как был")
+    PIN_FILE.unlink()
     git("-C", str(ROOT), "worktree", "remove", "--force", str(PINNED))
     print(f"unpinned: agents follow the working copy at {ROOT}")
-    return code
+    return 0
 
 
 def main():
@@ -505,12 +544,14 @@ def main():
                     help="install from a worktree fixed at this commit")
     ap.add_argument("--unpin", action="store_true",
                     help="go back to installing from the working copy")
+    ap.add_argument("--force", action="store_true",
+                    help="with --pin/--unpin: discard uncommitted work in the pinned tree")
     args = ap.parse_args()
 
     if args.pin:
-        return pin(args.pin, args.agents)
+        return pin(args.pin, args.agents, args.force)
     if args.unpin:
-        return unpin(args.agents)
+        return unpin(args.agents, args.force)
     state = pin_state()
     if state and Path(__file__).resolve().parent.parent != PINNED:
         print(f"note: agents are pinned to {state['commit'][:8]}; this command "
