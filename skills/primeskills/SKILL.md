@@ -32,9 +32,12 @@ with the set installed. Also on request: `/primeskills`.
 4. Print it: `primeskills-help` → **verify:** the output ends with the line
    counting skills and sequences
 5. The guide prints in English. If that is not the reader's language, translate
-   the whole of it as you hand it over → **verify:** headings and prose are
-   translated; command names, paths, flags and skill names are not; nothing was
-   improved, shortened or reordered on the way
+   the whole of it as you hand it over. A skill's description is prose and is
+   translated too — it is kept English in the file because routing reads it,
+   not because the reader should. What stays untouched is only what would stop
+   working if changed: skill names, command names, paths, flags → **verify:**
+   no English sentence is left in the output, and `/build`, `.primeskills/`,
+   `--set-lang` are still themselves
 6. Give it over → **verify:** you added no summary, no ranking, no advice
 
 ## Stop conditions
