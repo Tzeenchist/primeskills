@@ -50,6 +50,22 @@ def bootstrap_words():
     return mod.bootstrap_text().split()
 
 
+def call_budget():
+    """C3 as the linter defines it.
+
+    This number was typed here as a literal and stayed 3 000 while the linter
+    moved to 3 600 -- the second copy of a number in this repository and the
+    second time it drifted. Read it, never retype it.
+    """
+    spec = importlib.util.spec_from_loader(
+        "primeskills_lint",
+        importlib.machinery.SourceFileLoader(
+            "primeskills_lint", str(ROOT / "bin" / "primeskills-lint")))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.CALL_BUDGET
+
+
 def expand(name, call_map, seen=None):
     """A flow that calls a flow pays for its chain too. Depth-first, no repeats."""
     seen = seen if seen is not None else []
@@ -120,7 +136,7 @@ def main():
     budgets = {p.parent.name: budget_of(p) for p in skills
                if p.parent.name in singles}
     worst_name = max(budgets, key=budgets.get)
-    print(f"  headroom           {3000 - base - budgets[worst_name]} words before "
+    print(f"  headroom           {call_budget() - base - budgets[worst_name]} words before "
           f"C3 refuses (budget of '{worst_name}' is {budgets[worst_name]})")
     print("  a flow             base + every body it can call:")
     everything = {p.parent.name: calls_of(p) for p in skills}
