@@ -28,9 +28,10 @@ An approved plan, when you want the loop closed without stopping between steps.
 3. On FAIL, call `debug` — it records the attempt — then read the count with
    `primeskills-run show` and return to 2 → **verify:** the count rose by one,
    not two, and is below three
-4. When it exits 3, stop: restore the G14 snapshot, report what each
-   attempt ruled out, ask → **verify:** the tree is back and the user has the
-   ledger, not a summary of it
+4. When it exits 3, stop: restore the G14 snapshot if the work took one, and
+   where none was required say plainly what state the tree is in instead of
+   inventing a restore. Report what each attempt ruled out, ask → **verify:**
+   the user knows where the tree stands and has the ledger, not a summary
 5. On PASS, repeat from 1 until acceptance criteria are met → **verify:** each
    criterion is marked individually
 

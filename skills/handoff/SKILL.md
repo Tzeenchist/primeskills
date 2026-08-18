@@ -12,8 +12,11 @@ Approaching a usage limit, ending a session with work unfinished, or passing
 the task to another agent. Also on request: "save state", "checkpoint".
 
 ## Invariants
-- The checkpoint lives in the repository, not in a home directory. It has to
-  survive a different machine, a different agent, and a cleared context.
+- The checkpoint lives beside the work, in the repository's `.primeskills/`,
+  not in a home directory: it has to survive a cleared context and a different
+  agent on this machine. It does not travel — it is not committed (PS-022) —
+  so a hand-off to another machine needs the text itself, not a promise that
+  the file will be there.
 - Remaining work is assembled from the repository and the record, never copied
   from the previous checkpoint. Copying is how finished work stays open (G16).
 - What was tried and failed is the most valuable section. It is the part the

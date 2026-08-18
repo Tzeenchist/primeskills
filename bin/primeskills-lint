@@ -24,7 +24,7 @@ CORE_BUDGET = 2600          # always-loaded files; a ceiling, not a target
 # installer writes, and the body. This is the number that matters -- C1 and F4
 # are guards underneath it. Raising core spends skill headroom and vice versa,
 # and the arithmetic is meant to be visible when either moves.
-CALL_BUDGET = 3800
+CALL_BUDGET = 4000
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 

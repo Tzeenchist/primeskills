@@ -16,6 +16,10 @@ refs:
 answer assumed knowledge the reader does not have.
 
 ## Invariants
+- Explaining a term introduces the term's meaning — that is the job, and it is
+  not a new claim about the work. What stays out is anything about *this*
+  codebase, this diff or this decision that the answer being explained did not
+  say.
 - Simplify the language, never the claim. An explanation that became false is
   worse than the jargon it replaced.
 - Where something genuinely cannot be made simple without breaking, say that,

@@ -14,8 +14,10 @@ Work that is verified and reviewed, when the user wants it out rather than
 handed over.
 
 ## Invariants
-- Three gates, three decisions, all the user's: open, merge, deploy. This flow
-  carries them out in order; it does not grant them.
+- Every rung it crosses is the user's: commit, push and pull request inside
+  `land`, then merge, then migrate and deploy. Five decisions at least, not the
+  three this flow is named after; it carries them out in order and grants
+  none of them.
 - Each stage reads the previous one's evidence. Nothing here is assumed green.
 
 ## Procedure

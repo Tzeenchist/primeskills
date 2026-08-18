@@ -16,6 +16,14 @@ request description, anything published. Not for chat, not for commit messages,
 not for code comments.
 
 ## Invariants
+- This strips tells, never authorship. Where a text carries a declaration of
+  who wrote it — an application, coursework, a review, anything a reader will
+  judge as a person's own — say so and stop: making machine-written text read
+  as human is exactly what such a declaration exists to prevent. Editing your
+  own writing, a README, release notes or a report is the case this is for.
+- The frequencies in `ref/tells.md` are the author's rules of thumb, not
+  measured human norms. Use them to notice a pattern, never to certify that a
+  text passes as human.
 - This is a filter, not a rewrite. Remove the tic and leave the argument, the
   voice and the rhythm exactly as they were. A pass that also improves the
   writing has destroyed the evidence of what was wrong with it.

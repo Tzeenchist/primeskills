@@ -1,7 +1,7 @@
 ---
 name: build
 description: Use when implementing a feature or fixing a bug, before writing implementation code
-budget: 650
+budget: 800
 role: write
 ---
 
@@ -64,7 +64,10 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 - A step needs an abstraction "for later": that is the moment to cut, not to
   generalise (PRINCIPLES 2).
 - Three failed attempts at the same step, counted on the shared counter (G9):
-  hand to `debug`, do not improvise.
+  stop building. Handing to `debug` is allowed and improvising is not — `debug`
+  starts by reproducing and stating a hypothesis, which is the opposite of a
+  fourth attempt. If `debug` also runs out, that is the breaker (G9) and the
+  answer is the user, not a fifth idea.
 
 ## Output
 The diff, the new tests, the recorded red run, the commits made, the attempt
