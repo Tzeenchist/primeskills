@@ -28,6 +28,7 @@ EXPECT = {
     "f8-duplicate-invariant": "F8",
     "f9-bad-role": "F9",
     "f11-ref-too-big": "F11",
+    "f14-nested-frontmatter": "F14",
     "f11-ref-missing": "F11",
 }
 

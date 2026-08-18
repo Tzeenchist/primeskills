@@ -8,7 +8,8 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from psmeta import split_frontmatter  # noqa: E402  (path set above; see psmeta)
 
 SECTIONS = ["Trigger", "Invariants", "Procedure", "Stop conditions", "Output", "References"]
 ROLES = {"read-only", "reports", "write"}
@@ -25,18 +26,6 @@ CORE_BUDGET = 1900          # always-loaded files; a ceiling, not a target
 # and the arithmetic is meant to be visible when either moves.
 CALL_BUDGET = 3000
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
-
-
-def split_frontmatter(text):
-    if not text.startswith("---\n"):
-        return None, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return None, text
-    try:
-        return yaml.safe_load(text[4:end]), text[end + 5:]
-    except yaml.YAMLError:
-        return None, text[end + 5:]
 
 
 def sections_of(body):
@@ -130,11 +119,16 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
         problems.append((path, rule, msg))
 
     text = path.read_text(encoding="utf-8")
-    meta, body = split_frontmatter(text)
+    meta, body, meta_problems = split_frontmatter(text)
 
     if not isinstance(meta, dict):
-        bad("F1", "no valid YAML frontmatter")
+        bad("F1", "no frontmatter")
         return
+    # F14: the frontmatter reader models a subset of YAML on purpose
+    # (psmeta.py). A shape outside it is refused here rather than read wrongly
+    # in silence -- and the refusal is what keeps the subset true over time.
+    for problem in meta_problems:
+        bad("F14", problem)
     for key in ("name", "description", "role"):
         if not meta.get(key):
             bad("F1", f"frontmatter missing '{key}'")
@@ -262,7 +256,7 @@ def check_call_cost(root, files, core_dir, problems):
                for n in CORE_ALWAYS if (core_dir / n).is_file())
     descs, worst, worst_name = 0, 0, None
     for path in files:
-        meta, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+        meta, _, _ = split_frontmatter(path.read_text(encoding="utf-8"))
         if not isinstance(meta, dict):
             continue
         descs += len(str(meta.get("description", "")).split())

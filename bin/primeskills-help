@@ -23,6 +23,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from psmeta import split_frontmatter  # noqa: E402  (path set above; see psmeta)
+
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 PREF = Path.home() / ".primeskills" / "lang"
@@ -52,21 +55,17 @@ TITLES = {
 
 
 def read_meta(path):
-    text = path.read_text(encoding="utf-8")
-    def field(name):
-        m = re.search(rf"^{name}:\s*(.+)$", text, re.M)
-        return m.group(1).strip() if m else ""
-    def listfield(name):
-        m = re.search(rf"^{name}:\s*\[(.*?)\]", text, re.M)
-        return [x.strip() for x in m.group(1).split(",") if x.strip()] if m else []
-    body = text.split("---", 2)[2]
+    """One reader for the whole set (psmeta): a second one drifted from the
+    first the day both existed."""
+    meta, body, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+    meta = meta if isinstance(meta, dict) else {}
     return {
         "name": path.parent.name,
-        "description": field("description"),
-        "role": field("role"),
-        "flow": field("tier") == "flow",
-        "calls": listfield("calls"),
-        "optional": listfield("calls_optional"),
+        "description": str(meta.get("description", "")),
+        "role": str(meta.get("role", "")),
+        "flow": meta.get("tier") == "flow",
+        "calls": list(meta.get("calls") or []),
+        "optional": list(meta.get("calls_optional") or []),
         "words": len(body.split()),
         "trigger": " ".join(
             re.search(r"## Trigger\n(.*?)\n##", body, re.S).group(1).split()

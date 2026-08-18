@@ -47,7 +47,7 @@ agent-skills, prompt-eng-interactive-tutorial, loopx. Там же
 ```
 python3 bin/primeskills-doctor            # подключено ли всё у каждого агента
 python3 bin/primeskills-status            # состав и статус, из репозитория
-python3 bin/primeskills-lint              # формат: F1-F11, C1-C2
+python3 bin/primeskills-lint              # формат: F1-F14, C1-C3
 python3 bin/primeskills-run show          # запись прогона текущей ветки
 python3 bin/primeskills-adherence --all   # соблюдались ли инварианты вызванных скиллов
 python3 bin/primeskills-help             # справка по набору, EN или RU
@@ -55,6 +55,12 @@ python3 bin/primeskills-route skills tests/routing.txt
 python3 bin/primeskills-install --apply   # разложить по агентам
 python3 tests/run.py                      # весь прогон
 ```
+
+Сторонних зависимостей нет: только стандартная библиотека Python 3. PyYAML
+убран 2026-08-18 — он был единственной и необъявленной, и у нового пользователя
+линтер падал с `ImportError` раньше первой проверки. Frontmatter читает
+`bin/psmeta.py`, а правило F14 не даёт формату уехать за пределы того, что этот
+разборщик действительно умеет.
 
 ## Две судьбы `.primeskills/`
 

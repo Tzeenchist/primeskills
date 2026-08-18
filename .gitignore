@@ -4,3 +4,4 @@ bench/remote-rooms.git/
 bench/task-orders/app.db
 bench/task-orders/__pycache__/
 bench/task-invoice/__pycache__/
+__pycache__/
