@@ -184,7 +184,7 @@ def main():
         checks += 1
         run(repo, "grant", "push", "до PR")
         code, out = run(repo, "show")
-        if "## Authority" not in out or "до PR" not in out:
+        if "Заявленные полномочия" not in out or "до PR" not in out:
             failures.append(f"открытые ступени не видны в записи:\n{out}")
 
         # чувствительная ступень обязана называть цель, действует один раз и
