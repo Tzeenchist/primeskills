@@ -47,6 +47,28 @@ DESTRUCTIVE = re.compile(r"\b(dropdb|DROP\s+(TABLE|DATABASE)|rm\s+-rf|git\s+clea
                          r"|TRUNCATE|manage\.py\s+(migrate|flush))\b", re.I)
 TARGET_SHOWN = re.compile(r"\b(echo|printf)\b[^;]*\$|^\s*[A-Z_]{3,}=|--settings\b|--database\b|DATABASE_URL")
 GIT_HYGIENE = re.compile(r"\bgit\s+(add\s+(-A|--all|\.)\b|push\s+[^|;]*--force(?!-with-lease)|push\s+[^|;]*-f\b|rebase\b|commit\s+[^|;]*--amend\b|reset\s+--hard\b|filter-repo\b)")
+# Command text out of a session log lands in whatever reads this report — a
+# terminal, a CI log, a pasted message. The log is not ours to leak, so the
+# obvious shapes of a secret are blanked before printing. This is redaction,
+# not sanitising: it lowers the odds, it does not make the output safe to
+# publish blind.
+SECRETS = [
+    (re.compile(r'(?i)\b(authorization|api[_-]?key|token|secret|password|passwd)'
+                r'(\s*[:=]\s*|\s+)(\S+)'), r"\1\2<вымарано>"),
+    (re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9-]{16,}|xox[abprs]-[A-Za-z0-9-]{10,})"),
+     "<вымарано>"),
+    (re.compile(r"\b[A-Fa-f0-9]{40,}\b"), "<вымарано>"),
+    (re.compile(r"\b[A-Za-z0-9+/]{40,}={0,2}\b"), "<вымарано>"),
+]
+
+
+def safe(text):
+    out = str(text)
+    for pattern, replacement in SECRETS:
+        out = pattern.sub(replacement, out)
+    return out
+
+
 MUTATING_SHELL = re.compile(r"\b(sed\s+-i|tee\b|>>?\s*[^|&\s]|mv\b|cp\b|rm\b|git\s+(commit|add|apply))")
 
 
@@ -315,7 +337,7 @@ def check_suite_ran(span):
             return "ok", f"#{c['n']}: записан в run-запись"
     for c in span["calls"]:
         if ran_tests(c):
-            return "ok", f"#{c['n']}: {c['cmd'].splitlines()[0][:60]}"
+            return "ok", f"#{c['n']}: {safe(c['cmd'].splitlines()[0][:60])}"
     return "violated", "прогона тестов в пролёте нет"
 
 
@@ -524,14 +546,14 @@ def report(path, skills_dir, quiet=False):
                 tally["far"] = tally.get("far", 0) + 1
             if not quiet:
                 mark = {"ok": "ok  ", "violated": "НАРУШЕН", None: "н/п "}[verdict]
-                print(f"      [{mark}] {name} — {detail}")
+                print(f"      [{mark}] {name} — {safe(detail)}")
 
     g17 = check_target_resolved(calls)
     for verdict, n, cmd in g17:
         guard[verdict] += 1
         if not quiet:
             mark = "ok  " if verdict == "ok" else "НАРУШЕН"
-            print(f"  [{mark}] цель разрешена до разрушения (G17) — #{n}: {cmd}")
+            print(f"  [{mark}] цель разрешена до разрушения (G17) — #{n}: {safe(cmd)}")
 
     return {"skills": [s["skill"] for s in found], "core_at": core_at,
             "tally": tally, "guard": guard, "by_rule": by_rule}

@@ -274,6 +274,13 @@ def cmd_grant(path, argv):
     a skill said "commit atomically" with no way to tell whether anyone had
     agreed. Writing it down does not create authority -- it makes the claim to
     it checkable, and survives the session that heard it.
+
+    It is a journal, not an authorization gate, and the difference matters:
+    anything that can run this command can write a grant, including the agent
+    the grant is meant to restrain, and two `may` checks racing each other can
+    spend one single-use permission twice. Reviewed and stated plainly on
+    2026-08-18 rather than left for a reader to discover. The gate that holds
+    is the host's own confirmation at the moment of the operation.
     """
     if not argv or argv[0] not in RUNGS:
         sys.exit(f"usage: primeskills-run grant <{'|'.join(RUNGS)}> "
@@ -379,7 +386,7 @@ def cmd_show(path):
     print(f"# Run record — {path.stem}\n")
     print(f"Tree now: {commit[:8]}+{digest}\n")
     open_rungs = mandates(entries)
-    print("## Authority\n")
+    print("## Заявленные полномочия (журнал, не гейт)\n")
     if open_rungs:
         for rung in RUNGS:
             if rung in open_rungs:

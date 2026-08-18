@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Prove each linter rule fires on a fixture that violates it, and only then."""
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -50,25 +52,34 @@ def call_budget():
     return mod.CALL_BUDGET
 
 
-def arm_c3_fixture():
+def arm_c3_fixture(tmp):
     """The C3 case must break the ceiling, whatever the ceiling is today.
 
     Three times in one day a raised ceiling turned this fixture green and the
     rule stopped being tested, silently. A fixture with a number typed into it
-    tests the number, not the rule.
+    tests the number, not the rule — so the number is written at run time.
+
+    Into a copy, never into the tracked fixture: a test suite that edits the
+    working tree before running is the harness tampering G8 forbids, and it was
+    this file doing it.
     """
-    path = FIXTURES / "c3-over" / "skills" / "heavy" / "SKILL.md"
+    src = FIXTURES / "c3-over"
+    dest = Path(tmp) / "c3-over"
+    shutil.copytree(src, dest)
+    path = dest / "skills" / "heavy" / "SKILL.md"
     text = path.read_text(encoding="utf-8")
-    fixed = re.sub(r"^budget: \d+$", f"budget: {call_budget()}", text, count=1, flags=re.M)
-    if fixed != text:
-        path.write_text(fixed, encoding="utf-8")
+    path.write_text(re.sub(r"^budget: \d+$", f"budget: {call_budget()}", text,
+                           count=1, flags=re.M), encoding="utf-8")
+    return dest
 
 
 def main():
-    arm_c3_fixture()
     failures = []
+    scratch = tempfile.mkdtemp(prefix="primeskills-tests-")
+    c3_dir = arm_c3_fixture(scratch)
     for case, rule in sorted(EXPECT.items()):
-        path = FIXTURES / case / "skills" if case in NESTED else FIXTURES / case
+        base = c3_dir if case == "c3-over" else FIXTURES / case
+        path = base / "skills" if case in NESTED else base
         code, out = run([sys.executable, str(LINT), str(path)])
         if rule is None:
             if code != 0:
@@ -82,8 +93,6 @@ def main():
     # a linted tree is data, never code. Linting a foreign clone used to load
     # and execute its bin/primeskills-install, which turned a static format
     # check into arbitrary code execution with the user's rights.
-    import shutil
-    import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         foreign = Path(tmp) / "clone"
         shutil.copytree(FIXTURES / "ok", foreign / "skills")
@@ -124,6 +133,7 @@ def main():
     # routing over the real skill set, not just fixtures
     live = subprocess.run([sys.executable, str(ROUTE), str(ROOT / "skills"),
                            str(ROOT / "tests" / "routing.txt")])
+    shutil.rmtree(scratch, ignore_errors=True)
     return 1 if (failures or fence.returncode or record.returncode
                  or adherence.returncode or guide.returncode
                  or install.returncode or docs.returncode

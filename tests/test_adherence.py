@@ -204,6 +204,17 @@ def main():
     if "прошли через несколько агентов" not in p.stdout or "из них 1" not in p.stdout:
         failures.append(f"переход задачи между агентами не опознан:\n{p.stdout}")
 
+    # command text out of someone's log must not carry a token into this report
+    leaky = Path(tmp) / "leaky.jsonl"
+    leaky.write_text(_json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {"command":
+         "curl -H 'Authorization: Bearer ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345' https://api"}}]}},
+        ensure_ascii=False) + "\n", encoding="utf-8")
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), str(leaky)], capture_output=True, text=True)
+    if "ghp_ABCDEFG" in p.stdout:
+        failures.append("токен из журнала попал в отчёт")
+
     # --all must read every session, not one per project. The defect it guards
     # against read 3 files out of 44 and reported the result as "--all".
     home = Path(tmp) / "home"

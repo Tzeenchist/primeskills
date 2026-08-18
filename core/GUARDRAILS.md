@@ -55,7 +55,14 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   onto its base is ordinary work and rewriting a shared history is not yours to
   authorise at all. A permission gate the host never showed you is not
   permission granted.
-- **A rung is open only while the record says so.** Ask, then write it down:
+- **The record is a journal of discipline, not a gate.** Nothing stops a
+  process — including you — from writing a grant nobody gave, and two checks
+  running at once can spend the same one-use permission twice. What it does is
+  make the claim to authority visible, checkable and expiring, so "I thought I
+  was allowed" stops being unfalsifiable. The gate that actually holds is the
+  host asking at the moment of the operation; where the host does not ask, you
+  ask.
+- **Write the rung down before using it.** Ask, then record:
   `primeskills-run grant <rung> "<what the user allowed>"`, and check it with
   `primeskills-run may <rung>` before the step, not after. No entry means ask
   again — a yes heard three sessions ago in a conversation nobody kept is not

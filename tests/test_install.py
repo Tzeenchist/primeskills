@@ -172,16 +172,28 @@ def main():
     # It needs ROOT to be a git repository; where it is not — an extracted copy
     # of the index, for one — the case is not applicable, and n/a is not a
     # failure (R4).
+    # Against a clone, never against this repository: pinning writes worktree
+    # metadata into .git, and a test that leaves traces in the tree it tests is
+    # the harness tampering G8 forbids.
     in_repo = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-dir"],
                              capture_output=True).returncode == 0
     if not in_repo:
         print("пин: не применимо — ROOT не git-репозиторий")
     with tempfile.TemporaryDirectory() as tmp:
       if in_repo:
-          h = Path(tmp)
+          h = Path(tmp) / "home"
+          h.mkdir()
           (h / ".claude").mkdir()
-          try:
-              run(tmp, "claude", "--pin", "HEAD")
+          clone = Path(tmp) / "clone"
+          made = subprocess.run(["git", "clone", "--quiet", "--no-hardlinks",
+                                 str(ROOT), str(clone)], capture_output=True)
+          if made.returncode != 0:
+              print("пин: не применимо — клон не создан")
+          else:
+              tool = clone / "bin" / "primeskills-install"
+              env = dict(os.environ, HOME=str(h))
+              subprocess.run([sys.executable, str(tool), "claude", "--pin", "HEAD"],
+                             capture_output=True, text=True, env=env)
               link = h / ".claude" / "skills" / "build" / "SKILL.md"
               checks += 1
               if not (link.is_symlink() and "/.primeskills/pinned/" in os.path.realpath(link)):
@@ -189,13 +201,11 @@ def main():
               checks += 1
               if not (h / ".primeskills" / "pin.json").is_file():
                   failures.append("пин не записан")
-              run(tmp, "claude", "--unpin")
+              subprocess.run([sys.executable, str(tool), "claude", "--unpin"],
+                             capture_output=True, text=True, env=env)
               checks += 1
               if "/.primeskills/pinned/" in os.path.realpath(link):
                   failures.append("снятие пина не вернуло ссылки на рабочую копию")
-          finally:
-              subprocess.run(["git", "-C", str(ROOT), "worktree", "prune"],
-                             capture_output=True)
 
     # the update path must also take back only its own links: uninstall was
     # fixed first and reinstall kept deleting whole directories
