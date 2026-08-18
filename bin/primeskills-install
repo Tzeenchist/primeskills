@@ -11,6 +11,7 @@ to the directory. Kimi needs no links at all -- just the path in its config.
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -176,7 +177,9 @@ SHARED_TOOLS = ("primeskills-run", "primeskills-help")
 
 
 def hook_command(script):
-    return f"python3 {ROOT / 'skills' / 'fence' / 'bin' / script}"
+    """Quoted: the host runs this through a shell, and a space or a shell
+    metacharacter in the installation path would break it or worse."""
+    return "python3 " + shlex.quote(str(ROOT / "skills" / "fence" / "bin" / script))
 
 
 def is_our_hook(entry):
@@ -412,8 +415,11 @@ def apply_link(dest, src):
             return False
         if dest.is_symlink() or dest.is_file():
             dest.unlink()
-        else:
-            shutil.rmtree(dest)
+        elif remove_ours(dest):
+            # Uninstall stopped doing this on 2026-08-18 and the update path
+            # kept doing it: a directory of ours holding a file of theirs went
+            # through rmtree on the next install. Take back only our links.
+            return False
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.symlink_to(src, target_is_directory=True)
     return True

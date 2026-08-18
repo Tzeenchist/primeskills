@@ -404,8 +404,14 @@ def cmd_show(path):
             print(f"- **granted** ({e['ts']}) — {e['rung']}: {e['scope']}")
         elif e["kind"] == "revoke":
             print(f"- **revoked** ({e['ts']}) — {e['rung']}")
+        elif e["kind"] == "spent":
+            print(f"- **spent** ({e['ts']}) — {e.get('rung', '?')}")
+        elif e["kind"] == "clear":
+            print(f"- **cleared** ({e['ts']}) — {e.get('problem', '?')}")
         else:
-            print(f"- **cleared** ({e['ts']}) — {e['problem']}")
+            # An unknown kind is a record written by a newer version; printing
+            # it beats crashing the reader that came to read the record.
+            print(f"- **{e['kind']}** ({e['ts']})")
     return 0
 
 

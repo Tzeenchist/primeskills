@@ -197,6 +197,20 @@ def main():
               subprocess.run(["git", "-C", str(ROOT), "worktree", "prune"],
                              capture_output=True)
 
+    # the update path must also take back only its own links: uninstall was
+    # fixed first and reinstall kept deleting whole directories
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+        (h / ".claude").mkdir()
+        run(tmp, "claude", "--apply")
+        theirs = h / ".claude" / "skills" / "verify" / "notes.md"
+        if theirs.parent.is_dir():
+            theirs.write_text("моё\n", encoding="utf-8")
+            run(tmp, "claude", "--apply")
+            checks += 1
+            if not theirs.is_file():
+                failures.append("повторная установка снесла чужой файл")
+
     # ownership is decided by path components, not by substring: a neighbour
     # directory whose name merely begins with ours is not ours, and the caller
     # of this check is allowed to shutil.rmtree what it owns
