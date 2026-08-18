@@ -17,7 +17,8 @@ a red phase, and counting that as a pass would flatter the number, so it is
 
     primeskills-adherence <session.jsonl>...
     primeskills-adherence --project /path/to/repo     # every session of that repo
-    primeskills-adherence --all                       # every session of every project
+    primeskills-adherence --all                       # every session, all four agents
+    primeskills-adherence --all --kimi --codex        # narrow to named agents
     primeskills-adherence --newest                    # with either: newest session only
     primeskills-adherence --summary <files...>        # rates only
 """
@@ -48,8 +49,32 @@ GIT_HYGIENE = re.compile(r"\bgit\s+(add\s+(-A|--all|\.)\b|push\s+[^|;]*--force(?
 MUTATING_SHELL = re.compile(r"\b(sed\s+-i|tee\b|>>?\s*[^|&\s]|mv\b|cp\b|rm\b|git\s+(commit|add|apply))")
 
 
-def load_calls(path):
-    """Every tool call in order. Only tool_use events matter here."""
+# The set runs on four agents and one task moves between them: parallel work,
+# a hand-off mid-session when tokens run out, a child task started elsewhere.
+# Reading only Claude Code's transcripts would not merely gather data slowly --
+# it would mis-read the work, because a task handed to another agent looks
+# abandoned in the log it left behind.
+SKILL_FILE = re.compile(r"(?:^|/)skills/([a-z0-9-]+)/SKILL\.md")
+
+
+def call(calls, tool, skill=None, path="", cmd="", raw=None, inferred=False):
+    calls.append({"n": len(calls) + 1, "tool": tool, "skill": skill,
+                  "path": str(path or ""), "cmd": str(cmd or ""),
+                  "inferred": inferred and bool(skill),
+                  "raw": raw if raw is not None else str(cmd or path or "")})
+
+
+def named_skill(path, cmd):
+    """Outside Claude Code a skill has no invocation event: the host hands the
+    agent a directory and the agent reads SKILL.md. Reading that file is the
+    only trace, so it counts as the invocation -- weaker evidence than an
+    explicit event, and it is the evidence those hosts leave."""
+    hit = SKILL_FILE.search(path) or SKILL_FILE.search(cmd)
+    return hit.group(1) if hit else None
+
+
+def load_claude(path):
+    """Claude Code: one JSON object per line, tool_use inside message content."""
     calls = []
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -63,15 +88,140 @@ def load_calls(path):
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "tool_use":
                     data = item.get("input") or {}
-                    calls.append({
-                        "n": len(calls) + 1,
-                        "tool": item.get("name", "?"),
-                        "skill": data.get("skill"),
-                        "path": str(data.get("file_path") or data.get("notebook_path") or ""),
-                        "cmd": str(data.get("command") or ""),
-                        "raw": json.dumps(data, ensure_ascii=False),
-                    })
+                    call(calls, item.get("name", "?"), data.get("skill"),
+                         data.get("file_path") or data.get("notebook_path") or "",
+                         data.get("command") or "",
+                         json.dumps(data, ensure_ascii=False))
     return calls
+
+
+def load_codex(path):
+    """Codex: rollout log. Shell work arrives as a `custom_tool_call` named
+    `exec`, whose input is a snippet calling tools.exec_command({"cmd": ...});
+    edits arrive as `apply_patch`."""
+    calls = []
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            payload = event.get("payload") or {}
+            if event.get("type") != "response_item" or payload.get("type") != "custom_tool_call":
+                continue
+            raw = str(payload.get("input") or "")
+            if payload.get("name") == "apply_patch":
+                target = re.search(r'"(?:path|file_path)"\s*:\s*"([^"]+)"', raw)
+                call(calls, "Edit", None, target.group(1) if target else "", "", raw[:400])
+                continue
+            # The input is a JavaScript snippet, so the key is bare (`cmd:"..."`)
+            # and one snippet may hold several commands under Promise.all. Each
+            # command is one action here, or a session of eight batched calls
+            # reads as eight actions instead of one.
+            found = re.findall(r'\bcmd\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+            for piece in found or [""]:
+                try:
+                    cmd = json.loads('"' + piece + '"') if piece else ""
+                except ValueError:
+                    cmd = piece
+                call(calls, "Bash", named_skill("", cmd), "", cmd, raw[:400], inferred=True)
+    return calls
+
+
+def load_kimi(path):
+    """Kimi: wire log of one agent. `tool.call` events already carry the same
+    tool vocabulary Claude uses (Bash, Edit, Read, Write, Grep, Glob)."""
+    calls = []
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            inner = event.get("event") or {}
+            if inner.get("type") != "tool.call":
+                continue
+            args = inner.get("args") or {}
+            target = args.get("file_path") or args.get("filePath") or args.get("path") or ""
+            cmd = args.get("command") or args.get("cmd") or ""
+            name = inner.get("name", "?")
+            found = None if name in WRITING_TOOLS else named_skill(str(target), str(cmd))
+            call(calls, name, found, target, cmd,
+                 json.dumps(args, ensure_ascii=False)[:400], inferred=True)
+    return calls
+
+
+TOOL_ALIASES = {"bash": "Bash", "edit": "Edit", "write": "Write", "read": "Read",
+                "grep": "Grep", "glob": "Glob", "patch": "Edit",
+                "todowrite": "TodoWrite", "task": "Task"}
+
+
+def load_opencode(db, session_id):
+    """OpenCode keeps sessions in SQLite; each tool call is a `part` row whose
+    JSON carries the tool name and its input."""
+    import sqlite3
+    calls = []
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    rows = con.execute("select data from part where session_id = ? order by time_created, id",
+                       (session_id,))
+    for (data,) in rows:
+        try:
+            part = json.loads(data)
+        except ValueError:
+            continue
+        if part.get("type") != "tool":
+            continue
+        state = part.get("state") or {}
+        args = state.get("input") or {}
+        name = TOOL_ALIASES.get(str(part.get("tool", "")).lower(), part.get("tool", "?"))
+        target = args.get("filePath") or args.get("file_path") or args.get("path") or ""
+        cmd = args.get("command") or ""
+        found = None if name in WRITING_TOOLS else named_skill(str(target), str(cmd))
+        call(calls, name, found, target, cmd,
+             json.dumps(args, ensure_ascii=False)[:400], inferred=True)
+    con.close()
+    return calls
+
+
+# Reading five different SKILL.md files in one session is studying the set, not
+# using it. Below that, a read is the only trace an invocation leaves outside
+# Claude Code.
+STUDY_THRESHOLD = 5
+
+
+def drop_non_invocations(calls):
+    """Separate using the set from working on it.
+
+    Outside Claude Code an invocation is inferred from a read of SKILL.md, and
+    two kinds of session read those files without invoking anything: the ones
+    that edit them, and the external reviews that read all of them in a row.
+    Left in, they turned 27 real invocations into 265 and would have made the
+    adoption number say the opposite of the truth — the first version of this
+    reader did exactly that. Explicit invocations (Claude Code's Skill tool)
+    are never dropped: they are stated, not inferred.
+    """
+    editing = any(c["tool"] in WRITING_TOOLS and SKILL_FILE.search(c["path"] + c["cmd"])
+                  for c in calls)
+    distinct = {c["skill"] for c in calls if c.get("inferred") and c["skill"]}
+    if not editing and len(distinct) < STUDY_THRESHOLD:
+        return calls
+    for c in calls:
+        if c.get("inferred"):
+            c["skill"] = None
+    return calls
+
+
+def load_calls(path):
+    """Every tool call in order, whichever agent wrote the log."""
+    text = str(path)
+    if "/.codex/sessions/" in text or "rollout-" in Path(text).name:
+        return drop_non_invocations(load_codex(path))
+    if Path(text).name == "wire.jsonl" or "/.kimi-code/sessions/" in text:
+        return drop_non_invocations(load_kimi(path))
+    if "::" in text:
+        db, session_id = text.split("::", 1)
+        return drop_non_invocations(load_opencode(db, session_id))
+    return load_claude(path)
 
 
 # How many tool calls after an invocation still read comfortably as that
@@ -88,7 +238,11 @@ SPAN_CAP = 40
 
 def spans(calls):
     """A skill owns what follows its invocation, up to the next one or the cap."""
-    marks = [c for c in calls if c["tool"] == "Skill" and c["skill"]]
+    # Claude Code has an explicit Skill tool; the other three hosts leave only
+    # the read of SKILL.md, which the loaders turn into the same field. Keying
+    # on the field rather than on the tool name is what makes one task visible
+    # across the agents it passed through.
+    marks = [c for c in calls if c["skill"]]
     out = []
     for i, mark in enumerate(marks):
         end = marks[i + 1]["n"] if i + 1 < len(marks) else len(calls) + 1
@@ -385,6 +539,76 @@ def sessions_of(project_dir, newest_only):
     return files[-1:] if (newest_only and files) else files
 
 
+def claude_sessions(newest_only, project=None):
+    root = HOME / ".claude" / "projects"
+    dirs = [root / str(project.resolve()).replace("/", "-")] if project else \
+        (sorted(root.iterdir()) if root.is_dir() else [])
+    out = []
+    for d in dirs:
+        if d.is_dir():
+            out += sessions_of(d, newest_only)
+    return out
+
+
+def codex_sessions(newest_only, project=None):
+    root = HOME / ".codex" / "sessions"
+    files = sorted(root.rglob("rollout-*.jsonl"), key=lambda p: p.stat().st_mtime) \
+        if root.is_dir() else []
+    if project:
+        files = [f for f in files if session_cwd(f) == str(project.resolve())]
+    return files[-1:] if (newest_only and files) else files
+
+
+def session_cwd(path):
+    """Codex records the working directory in its first line."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            first = json.loads(fh.readline())
+        return (first.get("payload") or {}).get("cwd")
+    except (OSError, ValueError):
+        return None
+
+
+def kimi_sessions(newest_only, project=None):
+    root = HOME / ".kimi-code" / "sessions"
+    files = sorted(root.glob("*/session_*/agents/*/wire.jsonl"),
+                   key=lambda p: p.stat().st_mtime) if root.is_dir() else []
+    if project:
+        keep = []
+        for f in files:
+            state = f.parents[2] / "state.json"
+            try:
+                if json.loads(state.read_text(encoding="utf-8")).get("cwd") == str(project.resolve()):
+                    keep.append(f)
+            except (OSError, ValueError):
+                continue
+        files = keep
+    return files[-1:] if (newest_only and files) else files
+
+
+def opencode_sessions(newest_only, project=None):
+    """One database, many sessions: each is addressed as `<db>::<session id>`."""
+    db = HOME / ".local" / "share" / "opencode" / "opencode.db"
+    if not db.is_file():
+        return []
+    import sqlite3
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        rows = list(con.execute("select id, directory from session order by id"))
+    except sqlite3.Error:
+        return []
+    finally:
+        con.close()
+    ids = [sid for sid, directory in rows
+           if not project or directory == str(project.resolve())]
+    labels = [Path(f"{db}::{sid}") for sid in ids]
+    return labels[-1:] if (newest_only and labels) else labels
+
+
+AGENTS = {"claude": claude_sessions, "codex": codex_sessions,
+          "kimi": kimi_sessions, "opencode": opencode_sessions}
+
+
 def main(argv):
     skills_dir = Path(__file__).resolve().parent.parent / "skills"
     quiet = "--summary" in argv
@@ -392,19 +616,20 @@ def main(argv):
     argv = [a for a in argv if a not in ("--summary", "--newest")]
     paths = []
 
+    wanted = [a[2:] for a in argv if a.startswith("--") and a[2:] in AGENTS] or list(AGENTS)
+    argv = [a for a in argv if a[2:] not in AGENTS]
+
     if "--all" in argv:
-        root = HOME / ".claude" / "projects"
-        for d in sorted(root.iterdir()) if root.is_dir() else []:
-            paths += sessions_of(d, newest_only)
+        for agent in wanted:
+            paths += AGENTS[agent](newest_only)
     elif "--project" in argv:
-        slug = str(Path(argv[argv.index("--project") + 1]).resolve()).replace("/", "-")
-        d = HOME / ".claude" / "projects" / slug
-        found = sessions_of(d, newest_only) if d.is_dir() else []
-        if not found:
-            sys.exit(f"нет сессий для {d}")
-        paths += found
+        project = Path(argv[argv.index("--project") + 1])
+        for agent in wanted:
+            paths += AGENTS[agent](newest_only, project)
+        if not paths:
+            sys.exit(f"нет сессий для {project.resolve()} ни у одного агента")
     else:
-        paths = [Path(a) for a in argv if a.endswith(".jsonl")]
+        paths = [Path(a) for a in argv if a.endswith(".jsonl") or "::" in a]
 
     if not paths:
         print(__doc__)

@@ -122,6 +122,63 @@ def main():
     if p.returncode != 0:
         failures.append("нежурнальный файл уронил инструмент")
 
+    # the same task moves between four agents, so the reader must speak all
+    # four log formats — and must not mistake reading the set for using it
+    import json as _json
+    import sqlite3
+    fixtures = Path(tmp) / "agents"
+    fixtures.mkdir()
+
+    codex = fixtures / "rollout-2026-08-18T00-00-00-test.jsonl"
+    codex.write_text("\n".join(_json.dumps(e, ensure_ascii=False) for e in [
+        {"type": "session_meta", "payload": {"cwd": "/srv/demo"}},
+        {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec",
+         "input": 'await Promise.all([tools.exec_command({cmd:"cat /home/x/.codex/skills/build/SKILL.md"}),'
+                  ' tools.exec_command({cmd:"pytest -q"})])'}},
+    ]) + "\n", encoding="utf-8")
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), str(codex)], capture_output=True, text=True)
+    if "вызовов инструментов: 2" not in p.stdout or "вызовов скиллов: 1 (build)" not in p.stdout:
+        failures.append(f"журнал Codex прочитан неверно:\n{p.stdout}")
+
+    kimi = fixtures / "wire.jsonl"
+    kimi.write_text("\n".join(_json.dumps(e, ensure_ascii=False) for e in [
+        {"type": "context.append_loop_event", "event": {"type": "tool.call", "name": "Read",
+         "args": {"file_path": "/home/x/.kimi-code/skills/verify/SKILL.md"}}},
+        {"type": "context.append_loop_event", "event": {"type": "tool.call", "name": "Bash",
+         "args": {"command": "pytest -q"}}},
+    ]) + "\n", encoding="utf-8")
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), str(kimi)], capture_output=True, text=True)
+    if "вызовов скиллов: 1 (verify)" not in p.stdout:
+        failures.append(f"журнал Kimi прочитан неверно:\n{p.stdout}")
+
+    db = fixtures / "opencode.db"
+    con = sqlite3.connect(db)
+    con.execute("create table part (id text, session_id text, time_created int, data text)")
+    for n, part in enumerate([
+        {"type": "tool", "tool": "read", "state": {"input": {"filePath": "/home/x/.config/opencode/skills/land/SKILL.md"}}},
+        {"type": "tool", "tool": "bash", "state": {"input": {"command": "git status"}}},
+    ]):
+        con.execute("insert into part values (?,?,?,?)", (str(n), "ses_1", n, _json.dumps(part)))
+    con.commit(); con.close()
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), f"{db}::ses_1"], capture_output=True, text=True)
+    if "вызовов скиллов: 1 (land)" not in p.stdout:
+        failures.append(f"база OpenCode прочитана неверно:\n{p.stdout}")
+
+    # reading the whole set is studying it, not calling it
+    study = fixtures / "study-wire.jsonl"
+    study.write_text("\n".join(_json.dumps(
+        {"type": "context.append_loop_event", "event": {"type": "tool.call", "name": "Read",
+         "args": {"file_path": f"/home/x/.kimi-code/skills/{name}/SKILL.md"}}},
+        ensure_ascii=False) for name in ("build", "verify", "land", "plan", "vet", "probe")) + "\n",
+        encoding="utf-8")
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), str(study)], capture_output=True, text=True)
+    if "вызовов скиллов: 0" not in p.stdout:
+        failures.append(f"чтение всего набора засчитано как вызовы:\n{p.stdout}")
+
     # --all must read every session, not one per project. The defect it guards
     # against read 3 files out of 44 and reported the result as "--all".
     home = Path(tmp) / "home"
