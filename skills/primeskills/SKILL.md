@@ -2,7 +2,8 @@
 name: primeskills
 description: Use to print the guide to this set of skills
 budget: 450
-role: write
+role: reports
+allowed-tools: [Read, Grep, Glob, Bash]
 ---
 
 # Primeskills

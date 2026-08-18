@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Documents must not describe a set that no longer exists.
+
+Three external reviews in a row found the same class of defect: prose written by
+hand claiming behaviour the code had since changed. README still promised that
+the checkpoint is committed after `PS-022` made it local; the guide named a file
+extension the tool does not write; the benchmark divided by a word count from
+two ceilings ago.
+
+Numbers were already generated (`primeskills-status`), and that is why they
+stopped drifting. Prose cannot be generated without turning into a worse
+document, so it is checked instead: each claim below is paired with the code
+that settles it. A claim nobody can check does not belong in this file — add
+the check, or leave the claim out of the documents.
+"""
+import importlib.machinery
+import importlib.util
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+# TODOS keeps the record of what was wrong and quotes it on purpose; review/
+# holds other people's words. Neither describes the set as it is now.
+HISTORY = {"TODOS.md", "PLAN.md"}
+DOCS = sorted(d for d in list(ROOT.glob("*.md")) + list((ROOT / "docs").glob("*.md"))
+              if d.name not in HISTORY)
+
+
+def load(name):
+    loader = importlib.machinery.SourceFileLoader("_" + name.replace("-", "_"),
+                                                  str(ROOT / "bin" / name))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def record_suffix():
+    """What `primeskills-run` actually writes, read from the program."""
+    text = (ROOT / "bin" / "primeskills-run").read_text(encoding="utf-8")
+    hit = re.search(r'branch\.replace\([^)]*\)\s*\+\s*"(\.[a-z]+)"', text)
+    if hit:
+        return hit.group(1)
+    hit = re.search(r'"(\.jsonl|\.json|\.md)"', text)
+    return hit.group(1) if hit else None
+
+
+# (what the documents must agree on, how the code settles it)
+def main():
+    failures = []
+    checks = 0
+    lint = load("primeskills-lint")
+
+    # 1. The extension of the run record, wherever a document spells it out.
+    suffix = record_suffix()
+    checks += 1
+    if suffix is None:
+        failures.append("не удалось прочитать расширение записи прогона из кода")
+    else:
+        wrong = re.compile(r"\.primeskills/run/<[^>]+>(\.[a-z]+)")
+        for doc in DOCS + [ROOT / "bin" / "primeskills-help"]:
+            for found in wrong.findall(doc.read_text(encoding="utf-8")):
+                checks += 1
+                if found != suffix:
+                    failures.append(f"{doc.name}: запись прогона названа {found}, "
+                                    f"код пишет {suffix}")
+
+    # 2. The fate of the checkpoint. It is local (PS-022), and a document that
+    #    still calls it committed sends the next reader to push private notes.
+    committed = re.compile(r"handoff[^\n]{0,120}(коммит|commit|push|пуш)", re.I)
+    local_ok = re.compile(r"(не коммит|never commit|does not travel|локальн|local)", re.I)
+    for doc in DOCS:
+        text = doc.read_text(encoding="utf-8")
+        # by paragraph, not by line: the claim that sent this document wrong
+        # was split across two lines and a line-wise check walked past it
+        for para in re.split(r"\n\s*\n", text):
+            flat = " ".join(para.split())
+            if committed.search(flat) and not local_ok.search(flat):
+                checks += 1
+                failures.append(f"{doc.name}: «{flat[:80]}» — чекпоинт локальный")
+
+    # 3. Ceilings quoted in prose must be the ceilings the linter enforces.
+    for doc, pattern, want, name in (
+        (ROOT / "README.md", r"— (\d[\d\s ]*) слов\*\* \(правило C3\)", lint.CALL_BUDGET, "C3"),
+        (ROOT / "docs" / "SKILL-FORMAT.md", r"≤ (\d[\d\s ]*) слов \(`CORE_BUDGET`", lint.CORE_BUDGET, "C1"),
+    ):
+        checks += 1
+        hit = re.search(pattern, doc.read_text(encoding="utf-8"))
+        if not hit:
+            failures.append(f"{doc.name}: не нашёл заявленный потолок {name}")
+        elif int(re.sub(r"\D", "", hit.group(1))) != want:
+            failures.append(f"{doc.name}: {name} назван {hit.group(1).strip()}, "
+                            f"линтер держит {want}")
+
+    # 4. A skill's declared role must match what it is allowed to do: `write`
+    #    on a skill whose tools cannot write is a label, not a fact.
+    for skill in sorted((ROOT / "skills").glob("*/SKILL.md")):
+        meta, _, _ = load("primeskills-lint").split_frontmatter(
+            skill.read_text(encoding="utf-8"))
+        if not isinstance(meta, dict):
+            continue
+        tools = meta.get("allowed-tools")
+        if meta.get("role") == "write" and tools and not ({"Edit", "Write", "NotebookEdit"} & set(tools)):
+            checks += 1
+            failures.append(f"{skill.parent.name}: role write, но писать нечем")
+
+    for f in failures:
+        print(f)
+    print(f"{checks} checks, {len(failures)} failed")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

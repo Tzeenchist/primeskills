@@ -9,9 +9,10 @@ role: write
 
 ## Trigger
 `verify` reports PASS, `vet` returns no blocking findings, and `probe` returned
-PASS. Not before all three. `NOT RUN` counts only when the change touches no
-running interface; when it does, an interface nobody could bring up is an
-unknown, and landing on an unknown is the thing this order exists to prevent.
+PASS — or `NOT RUN` on a change that touches no running interface. Not before
+all three. Where the change does touch one, `NOT RUN` blocks: an interface
+nobody could bring up is an unknown, and landing on an unknown is what this
+order exists to prevent.
 
 ## Invariants
 - The commit message describes what the diff does. If you cannot write the

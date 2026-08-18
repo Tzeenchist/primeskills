@@ -119,13 +119,15 @@ def main():
     adherence = subprocess.run([sys.executable, str(Path(__file__).parent / "test_adherence.py")])
     guide = subprocess.run([sys.executable, str(Path(__file__).parent / "test_help.py")])
     install = subprocess.run([sys.executable, str(Path(__file__).parent / "test_install.py")])
+    docs = subprocess.run([sys.executable, str(Path(__file__).parent / "test_docs.py")])
 
     # routing over the real skill set, not just fixtures
     live = subprocess.run([sys.executable, str(ROUTE), str(ROOT / "skills"),
                            str(ROOT / "tests" / "routing.txt")])
     return 1 if (failures or fence.returncode or record.returncode
                  or adherence.returncode or guide.returncode
-                 or install.returncode or live.returncode) else 0
+                 or install.returncode or docs.returncode
+                 or live.returncode) else 0
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 ---
 name: probe
-description: Use to click through a running app and report the bugs it actually has, without fixing them
+description: Use to exercise a running app over HTTP, CLI and logs, and report the bugs it actually has
 budget: 600
 role: exercises
 environment: disposable — a store that may be left dirty and can be reset
@@ -27,6 +27,11 @@ runs; the properties of the diff are `vet`.
   explicit confirmation, and never with writes (G17).
 - A defect report that cannot be reproduced from its own text is not a report.
 - What you did not test is part of the result. Say it.
+- Reach is HTTP, the command line, and what the system writes to its logs and
+  stores. There is no browser here, so a state that needs one — a hover, a
+  drag, a rendering bug — is `NOT RUN` with the reason. Describing a screen you
+  did not reach is the failure this skill exists to prevent, and an interface
+  nobody could bring up is an unknown, never a pass.
 
 ## Procedure
 1. Confirm what you are pointed at: URL, branch, commit, database, and how it

@@ -78,7 +78,9 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   never moved it and the breaker existed only in sessions that reached `debug`.
   It increments on
   every failed attempt at the same failure, wherever the attempt happened.
-  At three: restore the G14 snapshot, report what each attempt ruled out, ask.
+  At three: stop. Restore the G14 snapshot if the step took one; where none was
+  required, say plainly what state the work is in instead of inventing a
+  restore. Then report what each attempt ruled out, and ask.
   Every retry tests a fundamentally new hypothesis, not cosmetics. A cycle closes
   only when the new test passes *and* the full suite passes.
 - **G13 Hypothesis ledger.** Before each new attempt, write one line:

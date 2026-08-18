@@ -171,7 +171,7 @@ def render(skills, reader_lang):
         w(f"- **`/{s['name']}`**: {chain_of(s)}")
     w("")
     w("## What gets written to disk\n")
-    w("- `.primeskills/run/<branch>.md` — what was checked, what the review said,")
+    w("- `.primeskills/run/<branch>.jsonl` — what was checked, what the review said,")
     w("  how many attempts failed. It has to outlive a restart.")
     w("- `.primeskills/handoff/<branch>.md` — the state of the work for the next")
     w("  agent, or for you tomorrow: decisions, what is left, what was tried in")
