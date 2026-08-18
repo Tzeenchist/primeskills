@@ -42,7 +42,10 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 7. **Red.** Write the test that fails for the right reason → **verify:** run it,
    record the failure message verbatim — that record is the red half of the
    proof and `verify` will read it rather than re-deriving it
-8. **Green.** Write the least code that passes → **verify:** `verify` reports PASS
+8. **Green.** Write the least code that passes. If the step fails, record it —
+   `primeskills-run fail "<problem>"` — before trying again, so the breaker
+   counts here too and not only inside `cycle` → **verify:** `verify` reports
+   PASS, or the attempt is on the counter
 9. **Refactor.** Clean only what you just wrote → **verify:** tests still PASS,
    and the diff contains no unrelated change
 10. Every 2–3 steps, commit atomically **where the commit rung is open**:

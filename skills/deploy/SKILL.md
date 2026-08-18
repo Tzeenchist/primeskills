@@ -38,18 +38,18 @@ Never on your own initiative, and never as the tail end of merging.
    → **verify:** the backup exists and you can name how to restore from it (G14)
 4. Check what ships: the commit going out and how it differs from what runs now
    → **verify:** you can list migrations, config changes, and new dependencies
-5. `primeskills-run may deploy` — **before** anything writes to the target. A
-   migration is part of the deploy and is usually the irreversible part, so the
-   rung is checked here, not after it → **verify:** the rung is open and its
-   scope names this environment
-6. Run migrations before or with the release as the project requires
-   → **verify:** the migration ran against the target you resolved in step 1,
-   not against the one your shell happened to point at
-7. Release → **verify:** the process reports success and the running version is
-   the commit you intended, read from the environment rather than assumed
-8. Check health on the real thing: the main path a user takes, plus error rate
+5. `primeskills-run may migrate --target <the target from step 1>`, then run
+   migrations as the project requires. Migrations are their own rung because
+   they are usually the half you cannot undo → **verify:** the rung is open for
+   this target, and the migration ran against the target you resolved, not
+   against the one your shell happened to point at
+6. `primeskills-run may deploy --target <the same target>`, then release
+   → **verify:** the rung is open for this target, the process reports success,
+   and the running version is the commit you intended, read from the
+   environment rather than assumed
+7. Check health on the real thing: the main path a user takes, plus error rate
    and logs → **verify:** you exercised it, and you say what you exercised
-9. Report → **verify:** the user knows what went out, where, and how to undo it
+8. Report → **verify:** the user knows what went out, where, and how to undo it
 
 ## Stop conditions
 - No rollback and no forward-only decision in the record: stop. A deploy you

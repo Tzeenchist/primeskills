@@ -187,6 +187,31 @@ def main():
         if "## Authority" not in out or "до PR" not in out:
             failures.append(f"открытые ступени не видны в записи:\n{out}")
 
+        # чувствительная ступень обязана называть цель, действует один раз и
+        # не открывает дверь соседнему окружению
+        checks += 1
+        code, out = run(repo, "grant", "deploy", "выкатить")
+        if code == 0:
+            failures.append("deploy выдан без --target")
+        run(repo, "grant", "deploy", "--target", "staging", "выкатить релиз")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "production")
+        if code != 1:
+            failures.append(f"мандат на staging пропустил production:\n{out}")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "staging")
+        if code != 0:
+            failures.append(f"мандат на свою цель не сработал:\n{out}")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "staging")
+        if code != 1:
+            failures.append("одноразовый мандат сработал дважды")
+        checks += 1
+        run(repo, "grant", "commit", "--for", "0", "истёкший")
+        code, out = run(repo, "may", "commit")
+        if code != 1:
+            failures.append(f"истёкший мандат всё ещё действует:\n{out}")
+
     # outside a repository it must refuse, not write somewhere surprising
     with tempfile.TemporaryDirectory() as bare:
         checks += 1

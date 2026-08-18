@@ -1,7 +1,7 @@
 ---
 name: heavy
 description: Use before claiming tests pass or work is complete, and before any commit or PR
-budget: 2000
+budget: 3800
 role: write
 ---
 

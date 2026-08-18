@@ -46,7 +46,8 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 - **Authority is a ladder, not a switch.** Reading and editing files in the
   work you were asked to do needs no permission. Each rung below is a separate
   yes, and one does not imply the next: commit, push, open a pull request,
-  merge, deploy, roll back, delete anything. Rewriting history, force-pushing
+  merge, migrate, deploy, roll back, delete anything. Migrations are their own
+  rung because they are often the irreversible half of a reversible deploy. Rewriting history, force-pushing
   and resetting are outside the ladder entirely — the test is whether anyone
   else could already have the commits, so rebasing your own unpushed branch
   onto its base is ordinary work and rewriting a shared history is not yours to
@@ -56,9 +57,12 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   `primeskills-run grant <rung> "<what the user allowed>"`, and check it with
   `primeskills-run may <rung>` before the step, not after. No entry means ask
   again — a yes heard three sessions ago in a conversation nobody kept is not
-  a mandate, and neither is your recollection of it. The scope is the user's
-  own words, so "push this branch, do not merge" stays a limit instead of
-  becoming a mood. Autonomy is a state you can point at, never a tone.
+  a mandate, and neither is your recollection of it. A mandate names its target
+  (`--target`) on the rungs that reach outside the branch, expires on its own,
+  and is spent by one use where the step is irreversible: permission for
+  staging is not permission for production, and permission for one deploy is
+  not permission for the next. Autonomy is a state you can point at, never a
+  tone.
 - **G14 Snapshot before risk.** Before a migration, a bulk edit, or a refactor,
   take a snapshot you have proved you can restore, covering tracked, staged
   **and untracked** files you own. `git stash create` silently skips untracked
@@ -66,8 +70,11 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   own. Data gets a dump. Never sweep in changes that are not yours.
 
 ## Loops
-- **G9 Circuit breaker.** One counter per problem, owned by whoever runs the
-  loop — `cycle` when it runs, otherwise the skill in hand. It increments on
+- **G9 Circuit breaker.** One counter per problem, and one writer: the command
+  `primeskills-run fail`. Whichever skill is in hand calls it — the counter used
+  to belong to whichever skill was "running the loop", so `build` on its own
+  never moved it and the breaker existed only in sessions that reached `debug`.
+  It increments on
   every failed attempt at the same failure, wherever the attempt happened.
   At three: restore the G14 snapshot, report what each attempt ruled out, ask.
   Every retry tests a fundamentally new hypothesis, not cosmetics. A cycle closes

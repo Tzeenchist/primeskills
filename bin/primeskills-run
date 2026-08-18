@@ -19,7 +19,9 @@ consequence: it is read automatically at session start, so committing it lets
 anyone who can push to a branch write the next agent's opening context.
 
     primeskills-run grant push "ветка feature/x, до PR"   # a rung the user opened
+    primeskills-run grant deploy --target staging "релиз 0.4"  # named, one use
     primeskills-run may push                          # exits 1 when never granted
+    primeskills-run may deploy --target staging       # target must match
     primeskills-run revoke push
     primeskills-run note verify "pytest -q: 1119 passed, exit 0"
     primeskills-run fail "export renders 4 pages"     # exits 3 on the third
@@ -40,7 +42,12 @@ BIG_FILE = 4 * 1024 * 1024  # past this, an untracked file is hashed by size+mti
 # The rungs of the authority ladder, in order. Each is a separate yes and one
 # never implies the next; `may` refuses anything not on this list rather than
 # guessing what a new word means.
-RUNGS = ("commit", "push", "pr", "merge", "deploy", "rollback", "delete")
+RUNGS = ("commit", "push", "pr", "merge", "migrate", "deploy", "rollback", "delete")
+# Rungs where a mandate must name what it covers and is spent when used. A
+# migration is often irreversible where the deploy around it is not, so it
+# carries its own yes rather than riding on deploy's.
+SENSITIVE = ("migrate", "deploy", "rollback", "delete")
+LIFETIME = {"sensitive": 60, "ordinary": 480}  # minutes
 IGNORE = "# Written by skills, read by skills, and never committed.\n" \
          "# run/ names commands, targets and problems. handoff/ carries blockers,\n" \
          "# dead ends and internal context — and a committed handoff is read by\n" \
@@ -107,6 +114,11 @@ def record_path():
     ignore = root.parent / ".gitignore"
     if not ignore.is_file():
         ignore.write_text(IGNORE, encoding="utf-8")
+        # Writing into someone else's repository without a word is not the same
+        # as writing inside our own boundary. Say it once, do not ask: a prompt
+        # on every new repository costs more than the file it guards.
+        print(f"primeskills-run: создан {ignore} — записи прогона и чекпоинты "
+              f"остаются локальными", file=sys.stderr)
     return root / (slug(branch) + ".jsonl")
 
 
@@ -227,15 +239,31 @@ def cmd_clear(path, argv):
     return 0
 
 
-def mandates(entries):
-    """rung -> the entry that opened it, minus anything revoked since."""
+def age_minutes(entry):
+    then = datetime.fromisoformat(entry["ts"])
+    return (datetime.now(timezone.utc) - then).total_seconds() / 60
+
+
+def mandates(entries, at=None):
+    """rung -> the entry that opened it: not revoked, not spent, not expired.
+
+    A permission with no end is a switch wearing a ladder's clothes. The first
+    version stored one and answered `granted` a month later, which sat badly
+    next to deploy's own invariant that prior permission for one deploy is not
+    permission for the next.
+    """
     out = {}
     for e in entries:
-        if e.get("kind") == "grant":
-            out[e["rung"]] = e
-        elif e.get("kind") == "revoke":
-            out.pop(e.get("rung"), None)
-    return out
+        kind, rung = e.get("kind"), e.get("rung")
+        if kind == "grant":
+            out[rung] = e
+        elif kind in ("revoke", "spent"):
+            out.pop(rung, None)
+    live = {}
+    for rung, e in out.items():
+        if age_minutes(e) <= e.get("lifetime", LIFETIME["ordinary"]):
+            live[rung] = e
+    return live
 
 
 def cmd_grant(path, argv):
@@ -248,13 +276,38 @@ def cmd_grant(path, argv):
     it checkable, and survives the session that heard it.
     """
     if not argv or argv[0] not in RUNGS:
-        sys.exit(f"usage: primeskills-run grant <{'|'.join(RUNGS)}> [scope]")
-    rung, scope = argv[0], " ".join(argv[1:]).strip()
+        sys.exit(f"usage: primeskills-run grant <{'|'.join(RUNGS)}> "
+                 f"[--target <what>] [--for <minutes>] <scope>")
+    rung, rest = argv[0], argv[1:]
+    target, minutes = None, None
+    words = []
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--target" and i + 1 < len(rest):
+            target, i = rest[i + 1], i + 2
+        elif rest[i] == "--for" and i + 1 < len(rest):
+            minutes, i = rest[i + 1], i + 2
+        else:
+            words.append(rest[i]); i += 1
+    scope = " ".join(words).strip()
     if not scope:
         sys.exit("grant needs a scope: what the permission covers, in the "
                  "user's own words. An unbounded yes is not a yes.")
-    e = append(path, {"kind": "grant", "rung": rung, "scope": scope})
-    print(f"{rung}: granted — {scope} (recorded against {e['commit'][:8]})")
+    if rung in SENSITIVE and not target:
+        sys.exit(f"{rung} needs --target: the environment, host or database this "
+                 f"covers. 'deploy staging' must not open the door to production.")
+    try:
+        lifetime = int(minutes) if minutes else LIFETIME[
+            "sensitive" if rung in SENSITIVE else "ordinary"]
+    except ValueError:
+        sys.exit("--for takes minutes as a number")
+    e = append(path, {"kind": "grant", "rung": rung, "scope": scope,
+                      "target": target, "lifetime": lifetime,
+                      "once": rung in SENSITIVE})
+    once = ", one use" if rung in SENSITIVE else ""
+    at = f" for {target}" if target else ""
+    print(f"{rung}: granted{at} — {scope} ({lifetime} min{once}, "
+          f"recorded against {e['commit'][:8]})")
     return 0
 
 
@@ -273,14 +326,27 @@ def cmd_revoke(path, argv):
 def cmd_may(path, argv):
     """Exit 0 when the rung is open, 1 when it is not. Meant for a skill step."""
     if not argv or argv[0] not in RUNGS:
-        sys.exit(f"usage: primeskills-run may <{'|'.join(RUNGS)}>")
+        sys.exit(f"usage: primeskills-run may <{'|'.join(RUNGS)}> [--target <what>]")
     rung = argv[0]
+    target = argv[argv.index("--target") + 1] if "--target" in argv[1:] else None
     hit = mandates(read(path)).get(rung)
     if not hit:
-        print(f"{rung}: not granted on this branch. Ask, then "
+        print(f"{rung}: not granted, or the grant has run out. Ask, then "
               f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
         return 1
-    print(f"{rung}: granted — {hit['scope']}")
+    if hit.get("target") and hit["target"] != target:
+        print(f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "
+              f"A permission for one target is not a permission for another.")
+        return 1
+    if rung in SENSITIVE and not target:
+        print(f"{rung}: name the target — `may {rung} --target <what>`.")
+        return 1
+    age = int(age_minutes(hit))
+    spent = ""
+    if hit.get("once"):
+        append(path, {"kind": "spent", "rung": rung})
+        spent = ", spent by this check"
+    print(f"{rung}: granted — {hit['scope']} (выдан {age} мин назад{spent})")
     return 0
 
 

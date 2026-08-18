@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Prove each linter rule fires on a fixture that violates it, and only then."""
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -40,7 +41,31 @@ def run(cmd):
     return p.returncode, p.stdout + p.stderr
 
 
+def call_budget():
+    import importlib.machinery, importlib.util
+    loader = importlib.machinery.SourceFileLoader("_lint", str(LINT))
+    spec = importlib.util.spec_from_loader("_lint", loader)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.CALL_BUDGET
+
+
+def arm_c3_fixture():
+    """The C3 case must break the ceiling, whatever the ceiling is today.
+
+    Three times in one day a raised ceiling turned this fixture green and the
+    rule stopped being tested, silently. A fixture with a number typed into it
+    tests the number, not the rule.
+    """
+    path = FIXTURES / "c3-over" / "skills" / "heavy" / "SKILL.md"
+    text = path.read_text(encoding="utf-8")
+    fixed = re.sub(r"^budget: \d+$", f"budget: {call_budget()}", text, count=1, flags=re.M)
+    if fixed != text:
+        path.write_text(fixed, encoding="utf-8")
+
+
 def main():
+    arm_c3_fixture()
     failures = []
     for case, rule in sorted(EXPECT.items()):
         path = FIXTURES / case / "skills" if case in NESTED else FIXTURES / case

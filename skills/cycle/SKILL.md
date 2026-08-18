@@ -14,7 +14,8 @@ An approved plan, when you want the loop closed without stopping between steps.
 
 ## Invariants
 - The attempt counter (G9) lives in `primeskills-run`, not in your head, and
-  has exactly one writer: `debug`, which increments where the attempt failed.
+  has exactly one writer: the command `primeskills-run fail`, called by whichever
+  skill hit the failure.
   This flow reads it. Two writers counted one failure twice and tripped the
   breaker at a hypothesis and a half.
 - No step starts before the previous one has a PASS.

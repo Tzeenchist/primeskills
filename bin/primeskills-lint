@@ -19,12 +19,12 @@ DEFAULT_BUDGET = 800
 REF_BUDGET = 700             # one reference file
 REF_TOTAL_BUDGET = 1200      # all references of one skill
 PARAPHRASE = 0.34            # share of a core rule's words an invariant may echo
-CORE_BUDGET = 2300          # always-loaded files; a ceiling, not a target
+CORE_BUDGET = 2400          # always-loaded files; a ceiling, not a target
 # What one skill call actually costs: core, every description, the pointer the
 # installer writes, and the body. This is the number that matters -- C1 and F4
 # are guards underneath it. Raising core spends skill headroom and vice versa,
 # and the arithmetic is meant to be visible when either moves.
-CALL_BUDGET = 3600
+CALL_BUDGET = 3800
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 
