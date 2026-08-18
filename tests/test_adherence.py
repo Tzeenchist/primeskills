@@ -121,6 +121,32 @@ def main():
     if p.returncode != 0:
         failures.append("нежурнальный файл уронил инструмент")
 
+    # --all must read every session, not one per project. The defect it guards
+    # against read 3 files out of 44 and reported the result as "--all".
+    home = Path(tmp) / "home"
+    project = home / ".claude" / "projects" / "-srv-two-sessions"
+    project.mkdir(parents=True)
+    call = ('{"type": "assistant", "message": {"content": [{"type": "tool_use", '
+            '"name": "Bash", "input": {"command": "ls"}}]}}\n')
+    for n in ("older.jsonl", "newer.jsonl"):
+        (project / n).write_text(call, encoding="utf-8")
+    import os
+    older, newer = project / "older.jsonl", project / "newer.jsonl"
+    os.utime(older, (1, 1))
+
+    env = dict(os.environ, HOME=str(home))
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), "--all"],
+                       capture_output=True, text=True, env=env)
+    if "сессий: 2" not in p.stdout:
+        failures.append(f"--all прочитал не все сессии:\n{p.stdout}")
+
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), "--all", "--newest"],
+                       capture_output=True, text=True, env=env)
+    if "сессий: 1" not in p.stdout:
+        failures.append(f"--newest должен оставить одну сессию:\n{p.stdout}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

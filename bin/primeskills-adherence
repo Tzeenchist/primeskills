@@ -16,8 +16,9 @@ a red phase, and counting that as a pass would flatter the number, so it is
 `n/a` and leaves the denominator.
 
     primeskills-adherence <session.jsonl>...
-    primeskills-adherence --project /path/to/repo     # its newest session
-    primeskills-adherence --all                       # every project, newest each
+    primeskills-adherence --project /path/to/repo     # every session of that repo
+    primeskills-adherence --all                       # every session of every project
+    primeskills-adherence --newest                    # with either: newest session only
     primeskills-adherence --summary <files...>        # rates only
 """
 import json
@@ -331,30 +332,36 @@ def report(path, skills_dir, quiet=False):
     return {"skills": [s["skill"] for s in found], "core_at": core_at, "tally": tally}
 
 
-def newest_session(project_dir):
+def sessions_of(project_dir, newest_only):
+    """Every session of a project, oldest first.
+
+    `--all` used to mean "every project, newest session each" -- which read 3
+    files out of 44 on the machine it was written on. A statistic gathered
+    through that window is quietly low, and the flag that produces it is named
+    --all. Breadth is the default now; --newest asks for the old behaviour.
+    """
     files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
-    return files[-1] if files else None
+    return files[-1:] if (newest_only and files) else files
 
 
 def main(argv):
     skills_dir = Path(__file__).resolve().parent.parent / "skills"
     quiet = "--summary" in argv
-    argv = [a for a in argv if a != "--summary"]
+    newest_only = "--newest" in argv
+    argv = [a for a in argv if a not in ("--summary", "--newest")]
     paths = []
 
     if "--all" in argv:
         root = HOME / ".claude" / "projects"
         for d in sorted(root.iterdir()) if root.is_dir() else []:
-            s = newest_session(d)
-            if s:
-                paths.append(s)
+            paths += sessions_of(d, newest_only)
     elif "--project" in argv:
         slug = str(Path(argv[argv.index("--project") + 1]).resolve()).replace("/", "-")
         d = HOME / ".claude" / "projects" / slug
-        s = newest_session(d) if d.is_dir() else None
-        if not s:
+        found = sessions_of(d, newest_only) if d.is_dir() else []
+        if not found:
             sys.exit(f"нет сессий для {d}")
-        paths.append(s)
+        paths += found
     else:
         paths = [Path(a) for a in argv if a.endswith(".jsonl")]
 
