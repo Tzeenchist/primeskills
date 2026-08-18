@@ -184,18 +184,22 @@ SOFTWARE.
 
 https://github.com/multica-ai/andrej-karpathy-skills, cloned at `2c60614`.
 
-**Unresolved, and the one to settle before publishing.** The repository states
-"MIT" in its README and ships no `LICENSE` file, and the GitHub API reports no
-licence for it. It is also not Andrej Karpathy's own repository: it is a third
-party's compilation of his published guidelines, which our own `ATTRIBUTIONS.md`
-misnamed until 2026-08-18. So there is no notice to preserve and no holder to
-name with confidence, while `core/PRINCIPLES.md` P2 and P3 are close to that
-text.
+    MIT, stated in the repository README. Copyright: multica-ai, the owner of
+    that repository, for the compilation. The underlying guidelines are Andrej
+    Karpathy's public statements.
 
-Two ways out, and both are work rather than paperwork: rewrite P2 and P3 from
-our own practice the way the four claude.ai rules were rewritten, or ask the
-repository owner for a licence file naming a holder. Until one of them is done,
-this is the open item that blocks publication, not a formality.
+The repository ships no `LICENSE` file and GitHub reports no licence for it, so
+this notice records the grant as the README makes it rather than reproducing a
+file that does not exist. A licence stated plainly in a README is a grant by the
+repository owner; it is weaker as evidence than a licence file, and that is why
+the exact wording is written out here.
+
+What we actually took, measured on 2026-08-18 by the eight-word shingle method
+used for `loopx`: `core/PRINCIPLES.md` **P2** shares 55% of its windows with the
+source and is a genuine copy of expression. **P3** shares none — the heading and
+the idea are common, the text is ours, and our own `ATTRIBUTIONS.md` overstated
+this until it was measured. Ideas are not the issue and never were; the wording
+in P2 is, and MIT asks only that this notice travel with it, which it now does.
 
 ## loopx
 
