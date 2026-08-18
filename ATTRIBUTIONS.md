@@ -14,10 +14,19 @@ too.
 |---|---|---|---|
 | [superpowers](https://github.com/obra/superpowers) | MIT | Jesse Vincent, 2025 | skeletons: the iron law of root cause, the red-green-refactor cycle, the plan file structure, the right to argue with a review comment, the rationalisation tables condensed into `core/RATIONALIZATIONS.md` |
 | [agent-skills](https://github.com/addyosmani/agent-skills) | MIT | Addy Osmani, 2025 | checklists and axes: `skills/ui` is built on `frontend-ui-engineering`; the five review axes in `vet`; the security checklist in `vet/ref/security.md`; the rollback plan in `deploy`; the layer breakdown in `measure` |
-| [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | MIT, заявлен строкой в README; файла лицензии в репозитории нет | владелец репозитория multica-ai; собрание составлено из публичных высказываний Андрея Карпаты, и по словам владельца нашего проекта сам Карпаты против сборника не возражал | P2 Simplicity first — измерено 2026-08-18: 55% наших восьмисловных окон совпадают с источником дословно. P3 Surgical changes — общая мысль, совпадений **ноль**: текст наш. §1 и §4 сжаты |
+| [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | MIT, заявлен строкой в README; файла лицензии в репозитории нет | владелец репозитория multica-ai; собрание составлено из публичных высказываний Андрея Карпаты | P2 Simplicity first — измерено 2026-08-18: 55% наших восьмисловных окон совпадают с источником дословно. P3 Surgical changes — общая мысль, совпадений **ноль**: текст наш. §1 и §4 сжаты |
 | [gstack](https://github.com/gstack-ai/gstack) | MIT | Garry Tan, 2026 | the destructive-command pattern list ported into `skills/fence/bin/check-commands.py`; the `PreToolUse` hook mechanics; the lens questions behind `ceo`, `eng`, `beauty`; the voice rules and the jargon list in `baby/ref/jargon.md`; the checkpoint file structure behind `handoff`. Telemetry was removed from everything ported |
 | [stop-slop](https://github.com/hardikpandya/stop-slop) | MIT | Hardik Pandya | the pattern list behind `skills/prose`: binary contrasts, triples, punchy paragraph endings, throat-clearing openers |
 | [loopx](https://github.com/loopx-ai/loopx) | Apache-2.0 | LoopX contributors | the idea of classifying a failure by layer, and repairing at the lowest durable one, in `skills/debug`. Concept only: an eight-word shingle comparison between their `self-repair` document and our `debug` plus `GUARDRAILS` finds no overlap, so no expression of theirs is reproduced here |
+
+**Про `andrej-karpathy-skills` отдельно.** Владелец проекта сообщил, что сам
+Карпаты против сборника не возражал. Это записано как есть — сообщение, а не
+проверенный факт, и оно не является ни лицензией, ни подтверждением цепочки
+прав: возражения нет у автора идей, а текст, с которым совпадает наш P2,
+принадлежит составителю сборника. Права здесь даёт строка «MIT» в README
+репозитория multica-ai, и только она; всё остальное — контекст. На это указал
+разбор Codex 2026-08-18, и он прав, что раньше эта фраза стояла в колонке
+правообладателя, где читалась как основание.
 
 ## Sources without a licence file
 
