@@ -25,6 +25,7 @@ a red phase, and counting that as a pass would flatter the number, so it is
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 HOME = Path.home()
@@ -481,7 +482,13 @@ def report(path, skills_dir, quiet=False):
     found = spans(calls)
     core_at = next((c["n"] for c in calls
                     if any(f in c["raw"] for f in CORE_FILES)), None)
+    # Two questions, two tallies. Mixing them produced one number that answered
+    # neither: 138 of 151 checks were the session-wide G17, so "adherence 56%"
+    # was really a measurement of destructive-target hygiene wearing the name of
+    # skill adherence.
     tally = {"ok": 0, "violated": 0, "na": 0, "far": 0}
+    guard = {"ok": 0, "violated": 0, "na": 0}
+    by_rule = {}
 
     if not quiet:
         print(f"\n{path}")
@@ -511,6 +518,8 @@ def report(path, skills_dir, quiet=False):
         for name, fn in checks:
             verdict, detail = fn(span)
             tally["na" if verdict is None else verdict] += 1
+            slot = by_rule.setdefault(name, {"ok": 0, "violated": 0, "na": 0})
+            slot["na" if verdict is None else verdict] += 1
             if verdict is not None and span.get("long"):
                 tally["far"] = tally.get("far", 0) + 1
             if not quiet:
@@ -519,12 +528,13 @@ def report(path, skills_dir, quiet=False):
 
     g17 = check_target_resolved(calls)
     for verdict, n, cmd in g17:
-        tally[verdict] += 1
+        guard[verdict] += 1
         if not quiet:
             mark = "ok  " if verdict == "ok" else "НАРУШЕН"
             print(f"  [{mark}] цель разрешена до разрушения (G17) — #{n}: {cmd}")
 
-    return {"skills": [s["skill"] for s in found], "core_at": core_at, "tally": tally}
+    return {"skills": [s["skill"] for s in found], "core_at": core_at,
+            "tally": tally, "guard": guard, "by_rule": by_rule}
 
 
 def sessions_of(project_dir, newest_only):
@@ -605,6 +615,94 @@ def opencode_sessions(newest_only, project=None):
     return labels[-1:] if (newest_only and labels) else labels
 
 
+# One task crosses agents: it is picked up elsewhere when tokens run out, and
+# child tasks are started alongside. Sessions are grouped into a task by the
+# directory they worked in plus a gap in time — because PS-009 counts tasks,
+# not sessions, and applying it to sessions would answer a different question
+# with the right-looking number.
+TASK_GAP = 6 * 3600  # seconds between sessions that still read as one task
+
+
+def as_seconds(value):
+    """Timestamps arrive as seconds, milliseconds, or ISO text depending on the
+    host — and one host uses more than one of those."""
+    if isinstance(value, (int, float)):
+        return value / 1000 if value > 10 ** 11 else float(value)
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def session_facts(path):
+    """(agent, working directory, first timestamp, last timestamp)."""
+    text = str(path)
+    if "::" in text:
+        db, sid = text.split("::", 1)
+        import sqlite3
+        row = times = None
+        try:
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            try:
+                row = con.execute("select directory from session where id = ?",
+                                  (sid,)).fetchone()
+            except sqlite3.Error:
+                row = None          # a database without the session table still has parts
+            times = con.execute("select min(time_created), max(time_created) from part "
+                                "where session_id = ?", (sid,)).fetchone()
+            con.close()
+        except sqlite3.Error:
+            pass
+        return ("opencode", row[0] if row else None,
+                as_seconds(times[0] if times else 0), as_seconds(times[1] if times else 0))
+    if Path(text).name == "wire.jsonl":
+        state = Path(text).parents[2] / "state.json"
+        try:
+            data = json.loads(state.read_text(encoding="utf-8"))
+            return ("kimi", data.get("cwd"),
+                    as_seconds(data.get("createdAt")), as_seconds(data.get("updatedAt")))
+        except (OSError, ValueError):
+            return ("kimi", None, 0, 0)
+    stamp = Path(text).stat().st_mtime if Path(text).exists() else 0
+    if "/.codex/sessions/" in text or Path(text).name.startswith("rollout-"):
+        return ("codex", session_cwd(path), stamp, stamp)
+    cwd = None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    cwd = (json.loads(line) or {}).get("cwd")
+                except ValueError:
+                    continue
+                if cwd:
+                    break
+    except OSError:
+        pass
+    return ("claude", cwd, stamp, stamp)
+
+
+def tasks_of(paths):
+    """Group sessions into tasks: same directory, no gap longer than TASK_GAP."""
+    facts = [(p,) + session_facts(p) for p in paths]
+    by_dir = {}
+    for item in facts:
+        by_dir.setdefault(item[2] or "(каталог неизвестен)", []).append(item)
+    out = []
+    for directory, items in sorted(by_dir.items()):
+        items.sort(key=lambda i: i[3])
+        group = []
+        for item in items:
+            if group and item[3] - group[-1][4] > TASK_GAP:
+                out.append((directory, group))
+                group = []
+            group.append(item)
+        if group:
+            out.append((directory, group))
+    return out
+
+
 AGENTS = {"claude": claude_sessions, "codex": codex_sessions,
           "kimi": kimi_sessions, "opencode": opencode_sessions}
 
@@ -636,25 +734,63 @@ def main(argv):
         return 0
 
     total = {"ok": 0, "violated": 0, "na": 0, "far": 0}
+    guard = {"ok": 0, "violated": 0, "na": 0}
+    rules = {}
     invoked, sessions_with_core = [], 0
+    seen = {}
     for p in paths:
-        r = report(p, skills_dir, quiet)
+        r = seen[str(p)] = report(p, skills_dir, quiet)
         invoked += r["skills"]
         sessions_with_core += bool(r["core_at"])
         for k, v in r["tally"].items():
             total[k] += v
+        for k, v in r["guard"].items():
+            guard[k] += v
+        for name, counts in r["by_rule"].items():
+            slot = rules.setdefault(name, {"ok": 0, "violated": 0, "na": 0})
+            for k, v in counts.items():
+                slot[k] += v
 
-    applicable = total["ok"] + total["violated"]
-    rate = f"{100 * total['ok'] // applicable}%" if applicable else "—"
+    def share(counts):
+        applicable = counts["ok"] + counts["violated"]
+        return applicable, (f"{100 * counts['ok'] // applicable}%" if applicable else "—")
+
+    # `session_facts` and `report` are both re-read per session otherwise, and
+    # a sweep of 661 sessions pays for it twice.
+    grouped = tasks_of(paths)
+    crossing = [t for t in grouped if len({i[1] for i in t[1]}) > 1]
+    with_skills = sum(1 for _d, items in grouped
+                      if any(seen.get(str(i[0]), {}).get("skills") for i in items))
+
     print(f"\nсессий: {len(paths)}   с чтением core/: {sessions_with_core}")
+    print(f"задач: {len(grouped)} (сессии одного каталога в пределах "
+          f"{TASK_GAP // 3600} ч), из них {len(crossing)} прошли через несколько "
+          f"агентов; набор участвовал в {with_skills}")
     print(f"вызовов скиллов: {len(invoked)}"
           + (f" ({', '.join(sorted(set(invoked)))})" if invoked else ""))
-    print(f"инвариантов проверено: {applicable} применимых, {total['na']} неприменимых")
+
+    applicable, rate = share(total)
+    print(f"\n## Соблюдение вызванных скиллов")
+    print(f"проверок: {applicable} применимых, {total['na']} неприменимых")
     print(f"соблюдено: {total['ok']}, нарушено: {total['violated']}, доля {rate}")
+    if rules:
+        print("по инвариантам — что именно ломается:")
+        for name, counts in sorted(rules.items(),
+                                   key=lambda kv: -kv[1]["violated"]):
+            print(f"  {counts['violated']:>3} нарушено, {counts['ok']:>3} соблюдено"
+                  f"{', ' + str(counts['na']) + ' н/п' if counts['na'] else ''}"
+                  f" — {name}")
     if total.get("far"):
         print(f"из них {total['far']} на пролётах длиннее {SPAN_CAP} действий — "
               f"там скиллу приписано и то, что могло быть посторонней работой; "
               f"эти смотреть глазами, прежде чем считать")
+
+    g_applicable, g_rate = share(guard)
+    print(f"\n## Ограничитель G17 (по всей сессии, вне зависимости от скиллов)")
+    print(f"проверок: {g_applicable}")
+    print(f"соблюдено: {guard['ok']}, нарушено: {guard['violated']}, доля {g_rate}")
+    print("это база поведения, а не мера набора: она набрана и там, где набор "
+          "не участвовал")
     return 0
 
 

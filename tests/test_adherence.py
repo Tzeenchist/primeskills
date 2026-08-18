@@ -6,6 +6,7 @@ One fixture is a real session reduced to its tool calls -- the SHOP-009 run of
 verdict was established by reading the transcript manually before this tool
 existed, so it is the regression that matters most.
 """
+import os
 import subprocess
 import sys
 import tempfile
@@ -179,6 +180,30 @@ def main():
     if "вызовов скиллов: 0" not in p.stdout:
         failures.append(f"чтение всего набора засчитано как вызовы:\n{p.stdout}")
 
+    # sessions of one directory, close in time, are one task — even when they
+    # were written by different agents. PS-009 counts tasks, not sessions.
+    home2 = Path(tmp) / "home2"
+    proj = home2 / ".claude" / "projects" / "-srv-demo"
+    proj.mkdir(parents=True)
+    call = ('{"type": "assistant", "cwd": "/srv/demo", "message": {"content": '
+            '[{"type": "tool_use", "name": "Bash", "input": {"command": "ls"}}]}}\n')
+    for n in ("one.jsonl", "two.jsonl"):
+        (proj / n).write_text(call, encoding="utf-8")
+    codex_dir = home2 / ".codex" / "sessions" / "2026" / "08" / "18"
+    codex_dir.mkdir(parents=True)
+    (codex_dir / "rollout-2026-08-18T00-00-00-x.jsonl").write_text(
+        _json.dumps({"type": "session_meta", "payload": {"cwd": "/srv/demo"}}) + "\n",
+        encoding="utf-8")
+    env2 = dict(os.environ, HOME=str(home2))
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), "--all", "--summary"],
+                       capture_output=True, text=True, env=env2)
+    if "сессий: 3" not in p.stdout or "задач: 1" not in p.stdout:
+        failures.append(f"сессии одного каталога не сошлись в задачу:\n{p.stdout}")
+    checks += 1
+    if "прошли через несколько агентов" not in p.stdout or "из них 1" not in p.stdout:
+        failures.append(f"переход задачи между агентами не опознан:\n{p.stdout}")
+
     # --all must read every session, not one per project. The defect it guards
     # against read 3 files out of 44 and reported the result as "--all".
     home = Path(tmp) / "home"
@@ -188,7 +213,6 @@ def main():
             '"name": "Bash", "input": {"command": "ls"}}]}}\n')
     for n in ("older.jsonl", "newer.jsonl"):
         (project / n).write_text(call, encoding="utf-8")
-    import os
     older, newer = project / "older.jsonl", project / "newer.jsonl"
     os.utime(older, (1, 1))
 
