@@ -60,7 +60,7 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   is ordinary work, rewriting a shared history is not yours to authorise at
   all. A permission gate the host never showed you is not permission granted.
 - **The record is a journal of discipline, not a gate.** Nothing stops a
-  process from writing a grant nobody gave, and two checks at once can spend
+  process — including you — from writing a grant nobody gave, and two at once can spend
   the same one-use permission twice. It makes the claim to authority visible,
   checkable and expiring, so "I thought I was allowed" stops being
   unfalsifiable. The gate that actually holds is the host asking at the moment
