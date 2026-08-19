@@ -204,6 +204,81 @@ def without_inert_heredocs(command):
     return "\n".join(kept), dropped
 
 
+def top_level_parts(command):
+    """The separate commands in a line, split only where the shell splits.
+
+    `;`, `|`, `&&` and a newline separate commands at the top level and are
+    ordinary text anywhere else. A regex that did not know the difference cut
+    `awk -F"|"`, `git log --format="%h | %s"` and `find ... -exec rm {} ';'` in
+    half; the halves had unbalanced quotes, so the guard could not read them and
+    asked. In a mode where the user has switched asking off, that question is
+    the one answer the guard is not allowed to give -- so ordinary work stopped
+    on a quote character.
+    """
+    parts, buf = [], []
+    quote = None                 # inside '...' or "..."
+    depth = 0                    # open $( ... ), counted
+    backtick = False             # inside ` ... `, which does not nest
+    i, n = 0, len(command)
+    while i < n:
+        ch = command[i]
+        if quote:
+            buf.append(ch)
+            if ch == "\\" and quote == '"' and i + 1 < n:
+                buf.append(command[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            buf.append(ch)
+            buf.append(command[i + 1])
+            i += 2
+            continue
+        if ch in "'\"":
+            quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if command.startswith("$(", i):
+            depth += 1
+            buf.append("$(")
+            i += 2
+            continue
+        if ch == ")" and depth:
+            depth -= 1
+            buf.append(ch)
+            i += 1
+            continue
+        if ch == "`":
+            backtick = not backtick
+            buf.append(ch)
+            i += 1
+            continue
+        if depth == 0 and not backtick:
+            if ch in ";\n":
+                parts.append("".join(buf))
+                buf = []
+                i += 1
+                continue
+            if ch == "|":
+                parts.append("".join(buf))
+                buf = []
+                i += 2 if command.startswith("||", i) else 1
+                continue
+            if command.startswith("&&", i):
+                parts.append("".join(buf))
+                buf = []
+                i += 2
+                continue
+        buf.append(ch)
+        i += 1
+    parts.append("".join(buf))
+    return parts
+
+
 def segments(command):
     """Words of each command in the line, and a rebuilt string to match on.
 
@@ -212,7 +287,7 @@ def segments(command):
     cannot read a command must not pass it.
     """
     out, unreadable = [], False
-    for part in re.split(r"[;\n]|&&|\|\||\|", command):
+    for part in top_level_parts(command):
         if not part.strip():
             continue
         try:
@@ -349,6 +424,17 @@ def decide(raw):
             break
 
     if verdict is None:
+        # A segment that could not be tokenised has no words to judge, so the
+        # whole line is read as text. The catastrophic list is checked here too:
+        # without it an unreadable line carried its rung away, and in a silent
+        # mode a missing rung means a silent allow.
+        hit = next(((rung, why) for pat, rung, why in CATASTROPHIC
+                    if pat.search(command)), None)
+        if hit:
+            rung, why = hit
+            verdict = (why, rung, None)
+
+    if verdict is None:
         for pattern, reason in RULES:
             if not pattern.startswith("rm") and re.search(pattern, command):
                 verdict = (reason, None, None)
@@ -356,6 +442,20 @@ def decide(raw):
 
     if verdict is None:
         if unreadable:
+            if mode in SILENT_MODES:
+                # Asking is off, so the doubt is settled instead of handed
+                # over: the text is held to the `rm` rules the tokens would
+                # have answered, and what survives passes with a journal line
+                # saying it went unread.
+                if any(re.search(pat, command) for pat, _ in RULES
+                       if pat.startswith("rm")):
+                    return deny("part of this line could not be parsed and it "
+                                "names a recursive delete, so it is refused "
+                                "rather than asked. Rewrite it so the quoting "
+                                "balances, or say what it should remove.")
+                run_tool(["note", "guard",
+                          f"allowed unread (unbalanced quotes): {command[:120]}"], cwd)
+                return ALLOW
             return ask("part of this line could not be parsed (unbalanced "
                        "quotes), so it was not checked.")
         return ALLOW

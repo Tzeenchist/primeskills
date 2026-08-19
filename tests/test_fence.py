@@ -95,6 +95,37 @@ MODES = [
 ]
 
 
+# A separator inside quotes is text, not a separator. Cutting there left
+# fragments with unbalanced quotes, and the guard answered `ask` to `awk -F"|"`
+# and to every `sed -n "$(... | ...)"` -- in a mode with confirmations off, the
+# one answer that stops the work.
+QUOTED = [
+    ('grep -n "foo" f.py | head', None),
+    ("""sed -n "$(grep -n 'X = ' f.py | cut -d: -f1),+12p" f.py""", None),
+    ('echo "a | b"', None),
+    ('git log --format="%h | %s" | head -5', None),
+    ('awk -F"|" \'{print $1}\' file.txt', None),
+    ('python3 -c "print(1 | 2)"', None),
+    ('find . -name "*.py" -exec grep -l "x" {} \\;', None),
+    ('psql -c "SELECT 1 WHERE name = \'a|b\'"', None),
+    # and a separator outside quotes still separates
+    ('ls -la; ' + "rm -" + "rf /srv/data", "ask"),
+    ('echo hi | ' + "dropd" + "b ledger", "ask"),
+]
+
+
+# An unparseable line in a silent mode is decided, not handed back as a
+# question: judged by its text, refused where the text names a recursive
+# delete, and journalled where it does not.
+UNREADABLE = [
+    ("default", 'echo "unbalanced', "ask"),
+    ("bypassPermissions", 'echo "unbalanced', None),
+    ("bypassPermissions", "rm -" + "rf \"unbalanced", "deny"),
+    # a catastrophic command inside a line nobody could tokenise keeps its rung
+    ("bypassPermissions", "psql -c \"DR" + "OP DATA" + "BASE prod", "deny"),
+]
+
+
 # PS-044: a heredoc body is a command when something executes it and a document
 # when it is on its way to a file. Judging both the same way made the guard
 # refuse the writing of its own tests. The introducing line is still a command.
@@ -133,7 +164,13 @@ def main():
             failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
                             f"expected {expected}")
 
-    for mode, command, expected in MODES:
+    for command, expected in QUOTED:
+        payload = json.dumps({"tool_input": {"command": command}})
+        got = decision(run(CMD, payload))
+        if got != expected:
+            failures.append(f"quoted: {command!r} -> {got}, expected {expected}")
+
+    for mode, command, expected in MODES + UNREADABLE:
         payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
                               "cwd": "/nonexistent",
                               "tool_input": {"command": command}})
@@ -177,8 +214,8 @@ def main():
 
     for f in failures:
         print(f)
-    total = (len(COMMANDS) + len(HEREDOCS) + len(MODES) + len(IN_TREE)
-             + len(cases) + 1)
+    total = (len(COMMANDS) + len(HEREDOCS) + len(MODES) + len(QUOTED)
+             + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1)
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 
