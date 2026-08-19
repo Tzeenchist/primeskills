@@ -17,6 +17,8 @@ you to integrate. `land` prepared it; this puts it in.
 - Green means read, not assumed. A stale CI run describes an older commit.
 - The base branch is the one the project uses, not the one you would pick.
 - Never force, never rewrite, never merge your own unreviewed work.
+- Deleting the merged branch is its own rung, always: a merge mandate never
+  implies it, however routinely the project deletes branches.
 
 ## Procedure
 1. Confirm the decision is the user's and name what you are merging: branch,
@@ -41,9 +43,10 @@ you to integrate. `land` prepared it; this puts it in.
 7. Confirm the result → **verify:** the base branch contains the change and its
    tests are green on the base, not only on the branch
 8. Offer to delete the merged branch if the project does that, and delete it
-   only on a yes: `primeskills-run may delete --target <the branch>` right
-   before deleting, and that call spends the one use. `--peek` is for checking
-   earlier without spending → **verify:** you asked, and nothing unmerged was deleted
+   only on a yes and an open rung: `primeskills-run may delete --target <the
+   branch>` right before deleting, and that call spends the one use. `--peek`
+   is for checking earlier without spending → **verify:** you asked, the rung
+   was open, and nothing unmerged was deleted
 
 ## Stop conditions
 - CI is red, missing, or ran on a different commit: stop and report.

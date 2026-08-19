@@ -8,9 +8,10 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 - **G2 Planning gate, by radius.** One file, no contract change: no gate.
   New module, migration, or public API: the user approves the plan and the
   acceptance criteria before any code.
-- **G3 Reading budget.** Reading is budgeted per task, not banned. Prefer
-  `rg`, signatures, and `offset/limit`. Read a file whole when it is short or
-  when that is plainly cheaper than five searches.
+- **G3 Reading budget.** Reading is budgeted per task, not banned: twenty
+  reads a task. Past that, stop and name the question the next read must
+  answer. Prefer `rg`, signatures, and `offset/limit`. Read a file whole when
+  it is short or plainly cheaper than five searches.
 
 ## Evidence
 - **G4 Exit-code proof.** Nothing passes until a command says so: exit code 0
@@ -31,8 +32,10 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 
 ## Harness and data
 - **G8 Harness immutability and hygiene.** Never edit tests, fixtures, or
-  thresholds to make a build green — fix the code. Tests run isolated, with
-  fixed seeds and mocked external calls, never against live data. Kill spawned
+  thresholds to make a build green — fix the code. Tests run reproducible and
+  isolated: a rerun lands on the same result, and nothing reaches live data or
+  a shared service — fixed seeds and mocked calls are one way, a property run
+  that logs its seed or a sandboxed integration another. Kill spawned
   processes and remove temp artifacts before reporting.
 - **G17 Resolve the target before destroying it.** Before tests, migrations, or
   bulk operations, resolve and print the *actual* target — database, schema,
@@ -53,17 +56,15 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   Migrations are their own rung because they are often the irreversible half of
   a reversible deploy. Rewriting history, force-pushing
   and resetting are outside the ladder entirely — the test is whether anyone
-  else could already have the commits, so rebasing your own unpushed branch
-  onto its base is ordinary work and rewriting a shared history is not yours to
-  authorise at all. A permission gate the host never showed you is not
-  permission granted.
+  else could have the commits: rebasing your own unpushed branch onto its base
+  is ordinary work, rewriting a shared history is not yours to authorise at
+  all. A permission gate the host never showed you is not permission granted.
 - **The record is a journal of discipline, not a gate.** Nothing stops a
-  process — including you — from writing a grant nobody gave, and two checks
-  running at once can spend the same one-use permission twice. What it does is
-  make the claim to authority visible, checkable and expiring, so "I thought I
-  was allowed" stops being unfalsifiable. The gate that actually holds is the
-  host asking at the moment of the operation; where the host does not ask, you
-  ask.
+  process from writing a grant nobody gave, and two checks at once can spend
+  the same one-use permission twice. It makes the claim to authority visible,
+  checkable and expiring, so "I thought I was allowed" stops being
+  unfalsifiable. The gate that actually holds is the host asking at the moment
+  of the operation; where the host does not ask, you ask.
 - **Write the rung down before using it.** Ask, then record:
   `primeskills-run grant <rung> "<what the user allowed>"`, and check it with
   `primeskills-run may <rung>` before the step, not after. No entry means ask
@@ -90,11 +91,9 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 
 ## Loops
 - **G9 Circuit breaker.** One counter per problem, and one writer: the command
-  `primeskills-run fail`. Whichever skill is in hand calls it — the counter used
-  to belong to whichever skill was "running the loop", so `build` on its own
-  never moved it and the breaker existed only in sessions that reached `debug`.
-  It increments on
-  every failed attempt at the same failure, wherever the attempt happened.
+  `primeskills-run fail`. Whichever skill is in hand calls it, and it
+  increments on every failed attempt at the same failure, wherever the attempt
+  happened.
   At three: stop. Restore the G14 snapshot if the step took one; where none was
   required, say plainly what state the work is in instead of inventing a
   restore. Then report what each attempt ruled out, and ask. Only the user's yes
