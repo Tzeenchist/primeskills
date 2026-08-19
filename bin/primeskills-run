@@ -28,6 +28,12 @@ anyone who can push to a branch write the next agent's opening context.
     primeskills-run clear "export renders 4 pages"
     primeskills-run check verify                      # exits 2 when stale
     primeskills-run show
+
+Evidence of a run (notes, G9 counters) is per branch. Permissions (grant,
+revoke, spent) live in one record per repository, `run/repo.jsonl`: `land` and
+`merge` cross branches by design, and a mandate written on master was
+invisible from the branch the merge ran on (PS-047). For one transition period
+both records are read and only the repo-wide one is written.
 """
 import hashlib
 import json
@@ -177,16 +183,53 @@ def slug(text):
     return f"{(plain or 'unnamed')[:60]}-{mark}"
 
 
-def read(path):
+def read(path, strict=False):
+    """Entries of one record.
+
+    A line that does not parse is corruption, not absence. Where the record is
+    read as a lock — `may`, `check`, `show` — skipping it silently widens the
+    gate: a truncated `spent` line resurrects a one-use mandate, and the
+    `fence` hook declines a command when the journal does not answer. Strict
+    readers refuse and name the line.
+    """
     if not path.is_file():
         return []
     out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         try:
             out.append(json.loads(line))
         except ValueError:
-            continue
+            if strict:
+                sys.exit(f"primeskills-run: {path}: строка {n} не читается — "
+                         f"запись испорчена, отказ.")
     return out
+
+
+def ledger_path(record):
+    """The one permissions record per repository: grants, revokes, spends.
+
+    They used to live in the per-branch record, and `land`/`merge` cross
+    branches by design — a mandate written on master was invisible from the
+    branch, and one written on the branch was invisible from the base
+    (PS-047). Evidence and G9 counters stay per branch; authority is granted
+    to the work, not to the branch.
+    """
+    ledger = record.with_name("repo.jsonl")
+    if ledger.exists() or ledger.is_symlink():
+        no_symlink(ledger, record.parents[2])
+    return ledger
+
+
+def permission_entries(record):
+    """Grant history from every record that can hold it, oldest first.
+
+    Transition period (PS-047): this version reads BOTH the repo-wide ledger
+    and the per-branch record older versions wrote grants into, and writes
+    only to the ledger — an update mid-work must not silently close open
+    rungs. Чтение записи по ветке снимается в 0.5.x.
+    """
+    entries = read(record, strict=True) + read(ledger_path(record), strict=True)
+    return sorted(entries, key=lambda e: e.get("ts", ""))
 
 
 def append(path, entry):
@@ -311,13 +354,12 @@ def age_minutes(entry):
     return (datetime.now(timezone.utc) - then).total_seconds() / 60
 
 
-def mandates(entries, at=None):
-    """rung -> the entry that opened it: not revoked, not spent, not expired.
+def open_grants(entries):
+    """rung -> the entry that opened it: not revoked, not spent.
 
-    A permission with no end is a switch wearing a ladder's clothes. The first
-    version stored one and answered `granted` a month later, which sat badly
-    next to deploy's own invariant that prior permission for one deploy is not
-    permission for the next.
+    Expiry is answered by the caller on purpose: an expired mandate must say
+    it expired, not read as never granted — «not granted» sends the user
+    looking for a grant they already gave.
     """
     out = {}
     for e in entries:
@@ -326,11 +368,19 @@ def mandates(entries, at=None):
             out[rung] = e
         elif kind in ("revoke", "spent"):
             out.pop(rung, None)
-    live = {}
-    for rung, e in out.items():
-        if age_minutes(e) <= e.get("lifetime", LIFETIME["ordinary"]):
-            live[rung] = e
-    return live
+    return out
+
+
+def mandates(entries, at=None):
+    """rung -> the entry that opened it: not revoked, not spent, not expired.
+
+    A permission with no end is a switch wearing a ladder's clothes. The first
+    version stored one and answered `granted` a month later, which sat badly
+    next to deploy's own invariant that prior permission for one deploy is not
+    permission for the next.
+    """
+    return {rung: e for rung, e in open_grants(entries).items()
+            if age_minutes(e) <= e.get("lifetime", LIFETIME["ordinary"])}
 
 
 def cmd_grant(path, argv):
@@ -375,10 +425,10 @@ def cmd_grant(path, argv):
             "sensitive" if rung in SENSITIVE else "ordinary"]
     except ValueError:
         sys.exit("--for takes minutes as a number")
-    e = append(path, {"kind": "grant", "rung": rung, "scope": scope,
-                      "target": target, "lifetime": lifetime,
-                      "branch": current_branch(),
-                      "once": rung in SENSITIVE})
+    e = append(ledger_path(path), {"kind": "grant", "rung": rung, "scope": scope,
+                                   "target": target, "lifetime": lifetime,
+                                   "branch": current_branch(),
+                                   "once": rung in SENSITIVE})
     once = ", one use" if rung in SENSITIVE else ""
     at = f" for {target}" if target else ""
     print(f"{rung}: granted{at} — {scope} ({lifetime} min{once}, "
@@ -390,10 +440,10 @@ def cmd_revoke(path, argv):
     if not argv or argv[0] not in RUNGS:
         sys.exit(f"usage: primeskills-run revoke <{'|'.join(RUNGS)}>")
     rung = argv[0]
-    if rung not in mandates(read(path)):
+    if rung not in mandates(permission_entries(path)):
         print(f"{rung}: not granted")
         return 0
-    append(path, {"kind": "revoke", "rung": rung})
+    append(ledger_path(path), {"kind": "revoke", "rung": rung})
     print(f"{rung}: revoked")
     return 0
 
@@ -407,14 +457,16 @@ def rung_state(path, rung, target, spend=True, peek=False):
     the breaker. One path also means one place where a single-use mandate is
     spent, instead of two that can disagree about whether it was.
     """
-    hit = mandates(read(path)).get(rung)
+    hit = open_grants(permission_entries(path)).get(rung)
     if not hit:
-        return 1, (f"{rung}: not granted, or the grant has run out. Ask, then "
+        return 1, (f"{rung}: not granted. Ask, then "
                    f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
-    if hit.get("branch") and hit["branch"] != current_branch():
-        return 1, (f"{rung}: granted on branch {hit['branch']!r}, asked on "
-                   f"{current_branch()!r}. A permission for one branch is not a "
-                   f"permission for another.")
+    lifetime = hit.get("lifetime", LIFETIME["ordinary"])
+    age = age_minutes(hit)
+    if age > lifetime:
+        return 1, (f"{rung}: истёк {int(age)} мин назад (мандат был выдан на "
+                   f"{lifetime} мин). Ask, then `primeskills-run grant {rung} "
+                   f"\"<what the user allowed>\"`.")
     # A peek with no target of its own asks a different question: "is anything
     # open here, and for what?" It gets the mandate's target back and compares
     # on its own terms -- the `fence` hook knows the command, not the wording
@@ -424,14 +476,13 @@ def rung_state(path, rung, target, spend=True, peek=False):
                    f"A permission for one target is not a permission for another.")
     if rung in SENSITIVE and not target and not peek:
         return 1, f"{rung}: name the target — `may {rung} --target <what>`."
-    age = int(age_minutes(hit))
     spent = ""
     if hit.get("once") and spend:
-        append(path, {"kind": "spent", "rung": rung})
+        append(ledger_path(path), {"kind": "spent", "rung": rung})
         spent = ", spent by this check"
     named = f" target={hit['target']}" if peek and hit.get("target") else ""
     return 0, (f"{rung}: granted{named} — {hit['scope']} "
-               f"(выдан {age} мин назад{spent})")
+               f"(выдан {int(age)} мин назад{spent})")
 
 
 def cmd_may(path, argv):
@@ -457,7 +508,8 @@ def cmd_check(path, argv):
     if not argv:
         sys.exit("usage: primeskills-run check <stage>")
     stage = argv[0]
-    hits = [e for e in read(path) if e.get("kind") == "note" and e.get("stage") == stage]
+    hits = [e for e in read(path, strict=True)
+            if e.get("kind") == "note" and e.get("stage") == stage]
     if not hits:
         print(f"{stage}: nothing recorded")
         return 1
@@ -473,7 +525,7 @@ def cmd_check(path, argv):
 
 
 def cmd_show(path):
-    entries = read(path)
+    entries = permission_entries(path)
     if not entries:
         print("nothing recorded yet")
         return 0

@@ -44,7 +44,9 @@ order exists to prevent.
 6. Commit in conventional form: type, scope, one-line summary, then why
    → **verify:** the summary reads as what changed, not as what you did today
 7. `primeskills-run may push`, then push. Push is its own rung and a commit
-   mandate never implies it → **verify:** the rung is open, then the branch is
+   mandate never implies it. On a one-use rung (migrate, deploy, rollback,
+   delete, clear) the check is `may <rung> --peek`: a plain `may` spends the
+   mandate it only confirms → **verify:** the rung is open, then the branch is
    on the remote
 8. `primeskills-run may pr`, then open a PR if the remote is hosted; if it is a
    bare or local remote, there is nothing to open — say so and put the

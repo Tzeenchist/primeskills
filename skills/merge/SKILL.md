@@ -41,7 +41,9 @@ you to integrate. `land` prepared it; this puts it in.
 7. Confirm the result → **verify:** the base branch contains the change and its
    tests are green on the base, not only on the branch
 8. Offer to delete the merged branch if the project does that, and delete it
-   only on a yes → **verify:** you asked, and nothing unmerged was deleted
+   only on a yes, checked with `primeskills-run may delete --target <the
+   branch> --peek` — a plain `may` spends the one-use mandate
+   → **verify:** you asked, and nothing unmerged was deleted
 
 ## Stop conditions
 - CI is red, missing, or ran on a different commit: stop and report.
