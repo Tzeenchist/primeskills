@@ -91,11 +91,42 @@ def main():
         if code != 0 or "1 of 3" not in out:
             failures.append(f"second problem shares a counter: {out.strip()!r}")
 
+        # A breaker its own subject can lift is a reminder, not a breaker, so
+        # `clear` sits on the ladder: refused without a grant, spent by use.
         checks += 1
-        run(repo, "clear", "flaky export")
+        code, out = run(repo, "clear", "flaky export")
+        if code == 0 or "not granted" not in out:
+            failures.append(f"clear без гранта прошёл: exit {code}, {out.strip()!r}")
+        checks += 1
+        code, out = run(repo, "fail", "flaky export")
+        if code != 3:
+            failures.append(f"отказанный clear всё же обнулил счётчик: {out.strip()!r}")
+
+        checks += 1
+        run(repo, "grant", "clear", "--target", "flaky export",
+            "владелец разрешил сбросить счётчик по этой проблеме")
+        code, out = run(repo, "clear", "flaky export")
+        if code != 0 or "cleared" not in out:
+            failures.append(f"clear с грантом не сработал: exit {code}, {out.strip()!r}")
+        checks += 1
         code, out = run(repo, "fail", "flaky export")
         if "1 of 3" not in out:
             failures.append(f"clear: counter not reset, said {out.strip()!r}")
+
+        # the grant is single-use: the same yes must not clear a second time
+        checks += 1
+        run(repo, "fail", "flaky export")
+        run(repo, "fail", "flaky export")
+        code, out = run(repo, "clear", "flaky export")
+        if code == 0:
+            failures.append(f"одноразовый грант потратился дважды: {out.strip()!r}")
+
+        # and a yes for one problem is not a yes for another
+        checks += 1
+        run(repo, "grant", "clear", "--target", "flaky export", "снова разрешил")
+        code, out = run(repo, "clear", "slow query")
+        if code == 0 or "not a permission for another" not in out:
+            failures.append(f"грант на одну проблему снял чужой счётчик: {out.strip()!r}")
 
         checks += 1
         text = record.read_text(encoding="utf-8")

@@ -42,11 +42,15 @@ BIG_FILE = 4 * 1024 * 1024  # past this, an untracked file is hashed by size+mti
 # The rungs of the authority ladder, in order. Each is a separate yes and one
 # never implies the next; `may` refuses anything not on this list rather than
 # guessing what a new word means.
-RUNGS = ("commit", "push", "pr", "merge", "migrate", "deploy", "rollback", "delete")
+RUNGS = ("commit", "push", "pr", "merge", "migrate", "deploy", "rollback",
+         "delete", "clear")
 # Rungs where a mandate must name what it covers and is spent when used. A
 # migration is often irreversible where the deploy around it is not, so it
-# carries its own yes rather than riding on deploy's.
-SENSITIVE = ("migrate", "deploy", "rollback", "delete")
+# carries its own yes rather than riding on deploy's. `clear` is here for a
+# different reason: it lifts the G9 breaker, and a breaker its own subject can
+# lift is a reminder, not a breaker. Its target is the problem being cleared,
+# so one yes clears one counter and not the next one.
+SENSITIVE = ("migrate", "deploy", "rollback", "delete", "clear")
 LIFETIME = {"sensitive": 60, "ordinary": 480}  # minutes
 IGNORE = "# Written by skills, read by skills, and never committed.\n" \
          "# run/ names commands, targets and problems. handoff/ carries blockers,\n" \
@@ -245,14 +249,28 @@ def cmd_fail(path, argv):
 
 
 def cmd_clear(path, argv):
+    """Reset one G9 counter -- on the user's yes, never on the agent's own.
+
+    The rung is `clear` and its target is the problem, so the permission that
+    lifts the breaker on one failure does not lift it on the next. The target
+    is matched exactly, not by the fuzzy rule the counters use: a counter may
+    be found by a rephrasing, but a permission must not.
+    """
     if not argv:
         sys.exit("usage: primeskills-run clear <problem>")
     problem = " ".join(argv)
-    if match_key(counters(read(path)), problem) not in counters(read(path)):
+    live = counters(read(path))
+    if match_key(live, problem) not in live:
         print(f"{problem}: no counter")
         return 0
+    code, message = rung_state(path, "clear", problem)
+    if code:
+        print(message)
+        if live:
+            print("counters right now: " + ", ".join(repr(k) for k in live))
+        return code
     append(path, {"kind": "clear", "problem": problem})
-    print(f"{problem}: cleared")
+    print(f"{problem}: cleared ({message.split('— ', 1)[-1]})")
     return 0
 
 
@@ -348,36 +366,45 @@ def cmd_revoke(path, argv):
     return 0
 
 
+def rung_state(path, rung, target):
+    """Is this rung open, for this target, right now? (code, message).
+
+    Shared by `may` and `clear` on purpose. When `clear` did its own reading of
+    the journal it did no reading at all: the command that lifts the G9 breaker
+    was the one command on no rung, so the agent the breaker stops could stop
+    the breaker. One path also means one place where a single-use mandate is
+    spent, instead of two that can disagree about whether it was.
+    """
+    hit = mandates(read(path)).get(rung)
+    if not hit:
+        return 1, (f"{rung}: not granted, or the grant has run out. Ask, then "
+                   f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
+    if hit.get("branch") and hit["branch"] != current_branch():
+        return 1, (f"{rung}: granted on branch {hit['branch']!r}, asked on "
+                   f"{current_branch()!r}. A permission for one branch is not a "
+                   f"permission for another.")
+    if hit.get("target") and hit["target"] != target:
+        return 1, (f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "
+                   f"A permission for one target is not a permission for another.")
+    if rung in SENSITIVE and not target:
+        return 1, f"{rung}: name the target — `may {rung} --target <what>`."
+    age = int(age_minutes(hit))
+    spent = ""
+    if hit.get("once"):
+        append(path, {"kind": "spent", "rung": rung})
+        spent = ", spent by this check"
+    return 0, f"{rung}: granted — {hit['scope']} (выдан {age} мин назад{spent})"
+
+
 def cmd_may(path, argv):
     """Exit 0 when the rung is open, 1 when it is not. Meant for a skill step."""
     if not argv or argv[0] not in RUNGS:
         sys.exit(f"usage: primeskills-run may <{'|'.join(RUNGS)}> [--target <what>]")
     rung = argv[0]
     target = argv[argv.index("--target") + 1] if "--target" in argv[1:] else None
-    hit = mandates(read(path)).get(rung)
-    if not hit:
-        print(f"{rung}: not granted, or the grant has run out. Ask, then "
-              f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
-        return 1
-    if hit.get("branch") and hit["branch"] != current_branch():
-        print(f"{rung}: granted on branch {hit['branch']!r}, asked on "
-              f"{current_branch()!r}. A permission for one branch is not a "
-              f"permission for another.")
-        return 1
-    if hit.get("target") and hit["target"] != target:
-        print(f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "
-              f"A permission for one target is not a permission for another.")
-        return 1
-    if rung in SENSITIVE and not target:
-        print(f"{rung}: name the target — `may {rung} --target <what>`.")
-        return 1
-    age = int(age_minutes(hit))
-    spent = ""
-    if hit.get("once"):
-        append(path, {"kind": "spent", "rung": rung})
-        spent = ", spent by this check"
-    print(f"{rung}: granted — {hit['scope']} (выдан {age} мин назад{spent})")
-    return 0
+    code, message = rung_state(path, rung, target)
+    print(message)
+    return code
 
 
 def cmd_check(path, argv):
