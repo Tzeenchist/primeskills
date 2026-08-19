@@ -226,7 +226,7 @@ def permission_entries(record):
     Transition period (PS-047): this version reads BOTH the repo-wide ledger
     and the per-branch record older versions wrote grants into, and writes
     only to the ledger — an update mid-work must not silently close open
-    rungs. Чтение записи по ветке снимается в 0.5.x.
+    rungs. Чтение записи по ветке снимается в 0.6.0.
     """
     entries = read(record, strict=True) + read(ledger_path(record), strict=True)
     return sorted(entries, key=lambda e: e.get("ts", ""))
