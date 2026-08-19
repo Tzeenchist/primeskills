@@ -204,11 +204,19 @@ def hook_command(script):
 
 
 def is_our_hook(entry):
-    """Ours if it runs a script from this repository — the same containment test
-    used for links, not a name we hope nobody else picked."""
+    """Ours if it runs a fence script from any tree of this set.
+
+    Testing against ROOT alone read the same installation two ways depending on
+    which copy was running: `--unpin` runs from the working copy, saw the
+    pinned tree's hooks as a stranger's, kept them and appended its own. The
+    result was four hooks in `settings.json`, two of them from a different
+    version of the guard, and the host ran both (PS-048). Both roots are ours,
+    and containment is still the test.
+    """
+    roots = [str(ROOT), str(PINNED)]
     for h in entry.get("hooks", []):
         cmd = str(h.get("command", ""))
-        if str(ROOT) in cmd and "/skills/fence/bin/" in cmd:
+        if "/skills/fence/bin/" in cmd and any(r in cmd for r in roots):
             return True
     return False
 
@@ -589,7 +597,11 @@ def unpin(agents, force=False):
     if code != 0:
         sys.exit("primeskills-install: возврат на рабочую копию не удался, "
                  "пин оставлен как был")
-    PIN_FILE.unlink()
+    # The inner `--live` install removes the record itself — it has to, the
+    # links it just wrote point at the working copy. Unlinking again raised
+    # FileNotFoundError *after* "unpinned" was printed, and the traceback took
+    # the worktree removal below with it (PS-048).
+    PIN_FILE.unlink(missing_ok=True)
     git("-C", str(ROOT), "worktree", "remove", "--force", str(PINNED))
     print(f"unpinned: agents follow the working copy at {ROOT}")
     return 0
