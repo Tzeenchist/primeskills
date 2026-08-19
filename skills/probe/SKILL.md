@@ -19,10 +19,11 @@ runs; the properties of the diff are `vet`.
 ## Invariants
 - You report. You do not fix. A found bug that you also fixed cannot be
   reproduced by the person reading your report.
-- Read-only means the codebase, not the application. Producing an empty list or
-  a failed payment means writing application data, so you need a disposable
-  environment with a stated way to reset it. Without one, say which states you
-  could not produce.
+- This skill writes. It leaves the code alone and works the application, and
+  producing an empty list or a failed payment means writing application data —
+  so it needs a disposable store with a stated way to reset it. Without one,
+  say which states you could not produce. Do not call yourself read-only here:
+  the code is safe, the data is not.
 - Test against development or a staging copy. Production is touched only with
   explicit confirmation, and never with writes (G17).
 - A defect report that cannot be reproduced from its own text is not a report.

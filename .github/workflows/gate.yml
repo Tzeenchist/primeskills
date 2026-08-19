@@ -1,0 +1,24 @@
+# The gate this repository already runs by hand, run by the host instead.
+#
+# Two rules keep it honest. It installs nothing -- the set has no dependencies,
+# and a workflow that quietly adds some would be the first place that stops
+# being true. And the one action it uses is pinned to a commit, not a moving
+# tag: `@v7` is a name someone else can repoint, which is the same supply-chain
+# hole the installer closed for the skills themselves.
+name: gate
+on:
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: tests
+        run: python3 tests/run.py
+      - name: lint
+        run: python3 bin/primeskills-lint
+      - name: what it weighs
+        run: python3 bin/primeskills-status
