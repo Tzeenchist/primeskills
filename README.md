@@ -26,7 +26,8 @@ does. A skill's full text loads only when that skill is needed.
 > I love gstack and have used it since it appeared, but by now it has grown so
 > fat and so expensive that soon Garry Tan himself will not be able to afford
 > it. Agentic development is thrift: of effort, of time, of money. That is the
-> philosophy I built PRIMESKILLS on.
+> philosophy I built PRIMESKILLS on. Today this set holds the best and most
+> dependable of what I use every day to build software products.
 >
 > — Ilya Priymak, author
 
