@@ -14,19 +14,34 @@ too.
 |---|---|---|---|
 | [superpowers](https://github.com/obra/superpowers) | MIT | Jesse Vincent, 2025 | skeletons: the iron law of root cause, the red-green-refactor cycle, the plan file structure, the right to argue with a review comment, the rationalisation tables condensed into `core/RATIONALIZATIONS.md` |
 | [agent-skills](https://github.com/addyosmani/agent-skills) | MIT | Addy Osmani, 2025 | checklists and axes: `skills/ui` is built on `frontend-ui-engineering`; the five review axes in `vet`; the security checklist in `vet/ref/security.md`; the rollback plan in `deploy`; the layer breakdown in `measure` |
-| [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | MIT, заявлен строкой в README; файла лицензии в репозитории нет | владелец репозитория multica-ai; собрание составлено из публичных высказываний Андрея Карпаты | P2 Simplicity first — измерено 2026-08-18: 55% наших восьмисловных окон совпадают с источником дословно. P3 Surgical changes — общая мысль, совпадений **ноль**: текст наш. §1 и §4 сжаты |
+| [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) | MIT, заявлен строкой в README; файла лицензии в репозитории нет | владелец репозитория multica-ai; собрание составлено из публичных высказываний Андрея Карпаты | ideas only, as of 2026-08-19: four sections of theirs (§1–§4) shaped P1, P2, P3 and P7, and the wording of all four was rewritten that day. `bin/primeskills-shingle` reports the longest run shared with them as four words, and that run is a heading |
 | [gstack](https://github.com/gstack-ai/gstack) | MIT | Garry Tan, 2026 | the destructive-command pattern list ported into `skills/fence/bin/check-commands.py`; the `PreToolUse` hook mechanics; the lens questions behind `ceo`, `eng`, `beauty`; the voice rules and the jargon list in `baby/ref/jargon.md`; the checkpoint file structure behind `handoff`. Telemetry was removed from everything ported |
 | [stop-slop](https://github.com/hardikpandya/stop-slop) | MIT | Hardik Pandya | the pattern list behind `skills/prose`: binary contrasts, triples, punchy paragraph endings, throat-clearing openers |
 | [loopx](https://github.com/loopx-ai/loopx) | Apache-2.0 | LoopX contributors | the idea of classifying a failure by layer, and repairing at the lowest durable one, in `skills/debug`. Concept only: an eight-word shingle comparison between their `self-repair` document and our `debug` plus `GUARDRAILS` finds no overlap, so no expression of theirs is reproduced here |
 
-**Про `andrej-karpathy-skills` отдельно.** Владелец проекта сообщил, что сам
-Карпаты против сборника не возражал. Это записано как есть — сообщение, а не
-проверенный факт, и оно не является ни лицензией, ни подтверждением цепочки
-прав: возражения нет у автора идей, а текст, с которым совпадает наш P2,
-принадлежит составителю сборника. Права здесь даёт строка «MIT» в README
-репозитория multica-ai, и только она; всё остальное — контекст. На это указал
-разбор Codex 2026-08-18, и он прав, что раньше эта фраза стояла в колонке
-правообладателя, где читалась как основание.
+**Про `andrej-karpathy-skills` отдельно.** Из шести доноров это единственный без
+файла лицензии: грант — строка «MIT» в README репозитория multica-ai, и
+2026-08-19 он там всё ещё стоит, а GitHub по-прежнему не показывает лицензии
+(`gh api` отдаёт `license: null`, `contents/LICENSE` — 404). Строка в README
+есть грант владельца репозитория, но как доказательство она слабее файла, и
+проверить цепочку прав на сборник публичных высказываний Карпаты нечем. Поэтому
+2026-08-19 набор перестал на неё опираться: P2 — единственное место, где текст
+был копией выражения (23 слова подряд, 55% восьмисловных окон), — переписан
+своими словами, вместе с более короткими совпадениями в P1, P3 и P7. Идеи
+остаются заимствованными и названы здесь; выражение — нет. Проверяется командой
+`bin/primeskills-shingle` (нужен `vendor/`).
+
+Сообщение владельца проекта о том, что сам Карпаты против сборника не возражал,
+остаётся записанным как контекст: это не лицензия и не подтверждение прав. На
+подмену контекста основанием указал разбор Codex 2026-08-18 — раньше эта фраза
+стояла в колонке правообладателя.
+
+**Три числа здесь раньше были неверны**, и все три исправлены измерением
+2026-08-19. P3 значился как «совпадений ноль, текст наш» — ноль был у
+восьмисловного окна, а заголовок с первой фразой совпадал дословно (7 слов).
+P1 и P7 в учёте не значились вовсе, хотя несли дословные куски в 9 и 10 слов.
+`docs/SKILL-SOURCES.md` называл G1 дословным портом §3 — у G1 нет с §3 ни одного
+общего четырёхсловного окна, текст наш целиком.
 
 ## Sources without a licence file
 

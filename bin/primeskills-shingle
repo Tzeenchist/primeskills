@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Measure how much of our wording is literally a donor's wording.
+
+`ATTRIBUTIONS.md` and `NOTICE` make numeric claims about borrowing, and those
+claims used to be settled by reading. Reading was wrong twice in opposite
+directions: `docs/SKILL-SOURCES.md` called G1 a verbatim port when it shares
+nothing, while P3 was recorded as ours because an eight-word window found no
+match -- the heading and the opening sentence were a copy, five and seven words
+long, and the window was wider than the theft.
+
+So the window is not a single number here. Overlap is reported at four sizes
+plus the longest common run, and a short run is what tells you the wording is
+ours: a match of two or three words is a heading, a match of twenty is a copy.
+
+Needs `vendor/`, which is a clone directory and is not distributed. Without it
+the tool says so and exits 0 -- an absent donor is not a failed check.
+"""
+import difflib
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+VENDOR = ROOT / "vendor"
+SIZES = (8, 6, 5, 4)
+
+# (label, our file, our section, donor file, donor section) -- every pair
+# ATTRIBUTIONS.md names for the one donor whose licence is a README line.
+PAIRS = [
+    ("P1 / Think Before Coding", "core/PRINCIPLES.md", ("## P1.", "## P2."),
+     "andrej-karpathy-skills/CLAUDE.md", ("## 1. Think Before Coding", "## 2. Simplicity")),
+    ("P2 / Simplicity First", "core/PRINCIPLES.md", ("## P2.", "## P3."),
+     "andrej-karpathy-skills/CLAUDE.md", ("## 2. Simplicity First", "## 3. Surgical")),
+    ("P3 / Surgical Changes", "core/PRINCIPLES.md", ("## P3.", "## P4."),
+     "andrej-karpathy-skills/CLAUDE.md", ("## 3. Surgical Changes", "## 4.")),
+    ("P7 / Goal-Driven Execution", "core/PRINCIPLES.md", ("## P7.", "## P8."),
+     "andrej-karpathy-skills/CLAUDE.md", ("## 4. Goal-Driven Execution", None)),
+    ("G1 / Surgical Changes", "core/GUARDRAILS.md", ("- **G1 Blast radius.**", "- **G2"),
+     "andrej-karpathy-skills/CLAUDE.md", ("## 3. Surgical Changes", "## 4.")),
+]
+
+
+def words(text):
+    return re.sub(r"[^a-z0-9\s]", " ", text.lower()).split()
+
+
+def section(path, bounds):
+    text = path.read_text(encoding="utf-8")
+    start, stop = bounds
+    i = text.index(start)
+    j = text.index(stop, i + len(start)) if stop else len(text)
+    return text[i:j]
+
+
+def windows(tokens, n):
+    return {tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1)}
+
+
+def compare(label, ours, theirs):
+    a, b = words(ours), words(theirs)
+    parts = []
+    for n in SIZES:
+        mine = windows(a, n)
+        if not mine:
+            parts.append(f"n={n}: --")
+            continue
+        parts.append(f"n={n}: {100 * len(mine & windows(b, n)) // len(mine):3d}%")
+    match = difflib.SequenceMatcher(None, a, b).find_longest_match(0, len(a), 0, len(b))
+    run = " ".join(a[match.a:match.a + match.size])
+    print(f"{label}")
+    print(f"    {'  '.join(parts)}   longest run: {match.size} words -- \"{run}\"")
+    return match.size
+
+
+def main():
+    if not VENDOR.exists():
+        print("vendor/ is absent, nothing to compare against (clone the donors to measure)")
+        return 0
+    print("Share of our windows found verbatim in the donor, by window size.\n")
+    worst = 0
+    for label, ours_file, ours_sec, theirs_file, theirs_sec in PAIRS:
+        donor = VENDOR / theirs_file
+        if not donor.exists():
+            print(f"{label}\n    donor clone missing: vendor/{theirs_file}")
+            continue
+        worst = max(worst, compare(label, section(ROOT / ours_file, ours_sec),
+                                   section(donor, theirs_sec)))
+    print(f"\nlongest common run across all pairs: {worst} words")
+    print("Headings are two to four words; a run past ten is copied expression.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

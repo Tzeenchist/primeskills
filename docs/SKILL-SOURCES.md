@@ -29,9 +29,9 @@
 |---|---|---|---|
 | `PRINCIPLES.md` | gstack `ETHOS.md` § User Sovereignty | 1 275 | **суверенитет пользователя** + 4 антипаттерна → ~70 слов |
 | | gstack `ETHOS.md` § Boil the Ocean | | принимаем **частично**: полнота путей — да, полнота возможностей — нет (см. GSTACK-ETHOS) |
-| | karpathy §2 Simplicity First | 110 | **дословно** → P2 |
-| | karpathy §3 Surgical Changes | 120 | **дословно** → G1 |
-| | karpathy §1 Think Before Coding | 90 | сжать до 3 строк |
+| | karpathy §2 Simplicity First | 110 | мысль → P2; текст был копией (23 слова подряд) и 2026-08-19 переписан |
+| | karpathy §3 Surgical Changes | 120 | мысль → P3, она же стоит за G1. Дословного у G1 нет ни одного четырёхсловного окна — прежняя запись «дословно» была неверна |
+| | karpathy §1 Think Before Coding | 90 | сжато до 3 строк; дословный кусок в 9 слов убран 2026-08-19 |
 | | superpowers `systematic-debugging` Iron Law | ~30 | одна формулировка → P5 |
 | `GUARDRAILS.md` | gstack `careful` (список паттернов) | ~150 | порт списка → G10 |
 | | superpowers `finishing-a-development-branch` | ~40 | права на историю git |
@@ -67,7 +67,7 @@
 | источник | слов | что берём | что отбрасываем |
 |---|---|---|---|
 | superpowers `verification-before-completion` | 580 | Iron Law, Gate Function (5 шагов), Common Failures (7→5 строк) | Red Flags и Rationalizations → `core`; When To Apply → в триггер |
-| karpathy §4 Goal-Driven | 130 | «действие → verify:» как форма шага | |
+| karpathy §4 Goal-Driven | 130 | «действие → verify:» как форма шага; дословный кусок в 10 слов убран из P7 2026-08-19 | |
 | addy `ci-cd-and-automation` | 1 560 | ничего; гейты качества — тема `land` | целиком |
 
 **Пишем сами:** шаг 0 — разрешить и напечатать фактическую цель прогона
@@ -475,7 +475,7 @@ router на 55 записей, написанный для агента, а не
 |---|---|---|---|
 | superpowers | ~4 000 слов | ~10 000 | берём **скелеты**: iron laws, циклы, форматы |
 | addyosmani | ~3 000 | ~40 000 | берём **чеклисты и оси**, чаще в `ref/` |
-| karpathy | 371 (всё) | 0 | берём **целиком**, это ядро `core/PRINCIPLES` |
+| karpathy | 371 (всё) | 0 | берём **мысли целиком**, это ядро `core/PRINCIPLES`; выражение — своё, мера в `bin/primeskills-shingle` |
 | gstack | ~3 000 | ~400 000 | **механику хуков**, вопросы линз и **философию** (`ETHOS.md`, Voice, 4 пути данных) — см. `GSTACK-ETHOS.md` |
 | loopx | ~200 слов | ~12 000 (скиллы) + весь control plane | берём **классификацию слоя отказа** и три паттерна циклов |
 | prompt-eng-tutorial | техники | — | применяем при написании, в поставку не идёт |

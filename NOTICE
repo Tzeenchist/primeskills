@@ -188,18 +188,25 @@ https://github.com/multica-ai/andrej-karpathy-skills, cloned at `2c60614`.
     that repository, for the compilation. The underlying guidelines are Andrej
     Karpathy's public statements.
 
-The repository ships no `LICENSE` file and GitHub reports no licence for it, so
-this notice records the grant as the README makes it rather than reproducing a
-file that does not exist. A licence stated plainly in a README is a grant by the
-repository owner; it is weaker as evidence than a licence file, and that is why
-the exact wording is written out here.
+The repository ships no `LICENSE` file and GitHub reports no licence for it
+(checked again on 2026-08-19: `license: null`, and `contents/LICENSE` is a 404),
+so this notice records the grant as the README makes it rather than reproducing
+a file that does not exist. A licence stated plainly in a README is a grant by
+the repository owner; it is weaker as evidence than a licence file, and that is
+why the exact wording is written out here.
 
-What we actually took, measured on 2026-08-18 by the eight-word shingle method
-used for `loopx`: `core/PRINCIPLES.md` **P2** shares 55% of its windows with the
-source and is a genuine copy of expression. **P3** shares none — the heading and
-the idea are common, the text is ours, and our own `ATTRIBUTIONS.md` overstated
-this until it was measured. Ideas are not the issue and never were; the wording
-in P2 is, and MIT asks only that this notice travel with it, which it now does.
+**Nothing of their expression is distributed any more.** On 2026-08-18 the
+eight-word method reported `core/PRINCIPLES.md` **P2** as 55% shared with the
+source — a genuine copy — and **P3** as clean. Measuring again on 2026-08-19 at
+four window sizes showed the second number to be an artefact of the window: P3
+shared its heading and opening sentence word for word, and P1 and P7, never
+measured at all, carried runs of nine and ten words. All four were rewritten
+that day. `bin/primeskills-shingle` now reports the longest run shared with this
+donor as four words, and that run is a section heading.
+
+The debt that remains is to the ideas, which are named in `ATTRIBUTIONS.md` and
+here. The grant above is recorded because it covered what we shipped before the
+rewrite, and because the notice costs nothing to keep.
 
 ## loopx
 

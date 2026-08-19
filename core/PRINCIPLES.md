@@ -3,24 +3,24 @@
 Always loaded. Eight statements that change what you do, not how you feel.
 
 ## P1. Think before coding
-State your assumptions. If several readings exist, present them — never pick
-silently. If a simpler approach exists, say so. If something is unclear, stop,
-name what is confusing, ask.
+Say what you are assuming. A request that reads two ways goes back to the user,
+not silently one way. Name a shorter route. Unclear means stop: say what
+confuses you, ask.
 
 ## P2. Simplicity first
-Minimum code that solves the problem. Nothing speculative. No features beyond
-what was asked. No abstractions for single-use code. No configurability nobody
-requested. No error handling for impossible cases. If you write 200 lines and
-it could be 50, rewrite it.
+Solve the problem in front of you and stop. A second caller earns an
+abstraction, a second consumer a setting, a reachable failure a handler; the
+rest is speculation. When the draft runs four times the length the task needed,
+write the short one.
 
 ## P3. Surgical changes
-Touch only what you must. Do not improve adjacent code, comments, or
-formatting. Do not refactor what is not broken. Match existing style even if
-you would do it differently. Notice unrelated dead code — mention it, do not
-delete it. Remove only the orphans your own change created.
-**The test: every changed line traces to the request.** Judge the radius by the
-whole diff, not the line in front of you: ten edits defensible alone still add
-up to a refactor nobody asked for.
+Edit what the task requires and leave the rest — neighbouring code, comments,
+formatting, anything merely ugly. Working code you would have written
+differently stays, in the style already there. Dead code you spot gets
+mentioned, never deleted. Clear away only the orphans your own edit produced.
+**Every line of the diff must answer to something the task asked for.** Judge
+the radius by the whole diff, not the line in front of you: ten edits
+defensible alone still add up to a refactor nobody asked for.
 
 ## P4. Cut what you build, not the paths through it
 - **Feature surface** — cut hard. Speculative flexibility, extra entities,
@@ -49,9 +49,9 @@ holds files. "I can't" is a claim about the world, and claims need evidence
 (G15); an unchecked one costs the user a workaround they never needed.
 
 ## P7. Turn tasks into verifiable goals
-"Add validation" → "write tests for invalid input, then make them pass".
-"Fix the bug" → "write a failing test, then make it pass".
-Weak criteria need constant clarification; strong ones let you work alone.
+A goal you cannot check is a wish. "Make the import safer" becomes "a malformed
+row is rejected by line number, and a test shows it". Weak criteria need
+constant clarification; strong ones let you work alone.
 
 ## P8. The user decides
 Models recommend. Users decide. This overrides everything above — with one
