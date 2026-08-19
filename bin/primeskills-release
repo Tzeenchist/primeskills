@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Publish a GitHub release for the current version, with its changelog entry.
+
+Written because nine tags were pushed and nine releases were not: the tags
+carried a one-line subject and the repository's own account of what changed sat
+in `CHANGELOG.md`, read by nobody. A release without notes is a version number
+with no answer to "should I take it".
+
+Refuses rather than guesses. `VERSION`, the top entry of `CHANGELOG.md` and the
+tag must agree, the tag must point at the commit being released, and the entry
+must have a body -- an empty release is the failure this program exists to
+prevent. Prints the plan and changes nothing until `--apply`.
+"""
+import argparse
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def git(*args):
+    return subprocess.run(("git", "-C", str(ROOT)) + args,
+                          capture_output=True, text=True)
+
+
+def entry(version):
+    """The changelog section for this version, without its heading."""
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    hit = re.search(rf"^## {re.escape(version)} — (\S+)$(.*?)(?=^## |\Z)",
+                    text, flags=re.M | re.S)
+    if not hit:
+        sys.exit(f"primeskills-release: в CHANGELOG.md нет записи про {version}")
+    date, body = hit.group(1), hit.group(2).strip()
+    if not body:
+        sys.exit(f"primeskills-release: запись про {version} пуста — "
+                 f"релиз без описания не публикуется")
+    return date, body
+
+
+def main(argv):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("version", nargs="?", help="по умолчанию — файл VERSION")
+    ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--repo", default=None, help="по умолчанию — origin")
+    args = ap.parse_args(argv)
+
+    version = args.version or (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    declared = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    if version != declared:
+        sys.exit(f"primeskills-release: просят {version}, а VERSION говорит "
+                 f"{declared}. Сперва согласуйте их.")
+    tag = f"v{version}"
+    date, body = entry(version)
+
+    if git("rev-parse", "-q", "--verify", f"refs/tags/{tag}").returncode != 0:
+        sys.exit(f"primeskills-release: тега {tag} нет. `git tag -a {tag}`.")
+    at = git("rev-list", "-n", "1", tag).stdout.strip()
+    head = git("rev-parse", "HEAD").stdout.strip()
+    if at != head:
+        print(f"внимание: {tag} стоит на {at[:8]}, а HEAD — {head[:8]}")
+    if git("status", "--porcelain").stdout.strip():
+        sys.exit("primeskills-release: дерево грязное — релиз описывает коммит, "
+                 "а не рабочую копию")
+
+    subject = git("tag", "-l", tag, "--format=%(contents:subject)").stdout.strip()
+    title = subject or f"primeskills {version}"
+    notes = f"{body}\n\n---\nВыпущено {date}. Полный журнал изменений — `CHANGELOG.md`."
+
+    repo = ["--repo", args.repo] if args.repo else []
+    exists = subprocess.run(["gh", "release", "view", tag, *repo],
+                            capture_output=True, text=True, cwd=ROOT).returncode == 0
+    if exists:
+        print(f"{tag}: релиз уже есть — обновляю описание" if args.apply
+              else f"{tag}: релиз уже есть, описание будет заменено")
+        cmd = ["gh", "release", "edit", tag, "--title", title, "--notes", notes]
+    else:
+        cmd = ["gh", "release", "create", tag, "--verify-tag",
+               "--title", title, "--notes", notes]
+
+    if not args.apply:
+        print(f"\n{title}\n{'-' * len(title)}\n{notes}\n")
+        print("ничего не опубликовано. Повторите с --apply.")
+        return 0
+    done = subprocess.run(cmd + repo, capture_output=True, text=True, cwd=ROOT)
+    if done.returncode != 0:
+        sys.exit(f"primeskills-release: {done.stderr.strip()}")
+    print(f"{tag}: {(done.stdout or '').strip() or 'опубликован'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -16,6 +16,7 @@ the check, or leave the claim out of the documents.
 import importlib.machinery
 import importlib.util
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -160,6 +161,26 @@ def main():
         missing_flows = sorted(f for f in flows if f"/{f}" not in text)
         if missing_flows:
             failures.append(f"{doc.name}: последовательности не названы: {missing_flows}")
+
+    # 3b'''. A tag without a changelog entry cannot be released with notes, and
+    #        nine of them were pushed that way before anyone noticed. Tags are
+    #        absent from a shallow CI checkout, so their absence is not a
+    #        failure — their disagreement with the changelog is.
+    release = load("primeskills-release")
+    tags = subprocess.run(["git", "-C", str(ROOT), "tag"],
+                          capture_output=True, text=True).stdout.split()
+    for tag in tags:
+        checks += 1
+        try:
+            release.entry(tag.lstrip("v"))
+        except SystemExit as exc:
+            failures.append(f"{tag}: {exc}")
+    checks += 1
+    try:
+        release.entry("0.0.0-нет-такой")
+        failures.append("primeskills-release принял версию, которой нет в CHANGELOG")
+    except SystemExit:
+        pass
 
     # 3c. The guide is generated from the set, except two hand-written parts —
     #     and those are exactly the parts that went stale. Each claim below is

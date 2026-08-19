@@ -200,6 +200,7 @@ primeskills-status            what is in the set and what it weighs
 primeskills-run show          the run record of the current branch
 primeskills-adherence --all   were the invariants of called skills followed
 primeskills-lint              skill format: rules F and C
+primeskills-release           publish the release notes for this version
 python3 tests/run.py          the whole suite
 ```
 

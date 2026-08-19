@@ -202,6 +202,7 @@ primeskills-status            состав набора и его вес, из �
 primeskills-run show          запись прогона текущей ветки
 primeskills-adherence --all   соблюдались ли инварианты вызванных навыков
 primeskills-lint              формат навыков: правила F и C
+primeskills-release           опубликовать описание релиза этой версии
 python3 tests/run.py          весь прогон
 ```
 
