@@ -33,8 +33,8 @@ does. A skill's full text loads only when that skill is needed.
 
 ```
 always in context        443 words for all 27 skills
-shared rules             2 696 words, once per session
-one skill call           3 393 … 3 824 words
+shared rules             2 697 words, once per session
+one skill call           3 404 … 3 825 words
 ```
 
 **The ceiling on one skill call is 4 000 words** (rule C3), and a check holds
@@ -123,6 +123,15 @@ strongest thing this set does to your machine, so decide about it deliberately:
 the hook lines name an absolute path, the pinned tree is read-only day to day,
 and `--uninstall --apply` removes them. Nothing else installs hooks; the other
 three agents have no such mechanism at all.
+
+**With confirmations switched off, the guard stops asking.** In a session run
+with `--dangerously-skip-permissions` — or any mode where you have said "do not
+ask me" — a prompt is not protection: it is approved unread, and the reflex it
+trains is the one that answers the question that mattered. So it decides
+instead. A short irreversible list is refused: database contents, force-push,
+cluster resources, a device overwrite, a delete outside the working directory.
+Everything else runs, with a line in the run journal. A refusal lifts the way
+permissions do — tell the agent what you allow, and it records your answer.
 
 ## Skills and chains
 

@@ -398,7 +398,7 @@ def cmd_revoke(path, argv):
     return 0
 
 
-def rung_state(path, rung, target):
+def rung_state(path, rung, target, spend=True, peek=False):
     """Is this rung open, for this target, right now? (code, message).
 
     Shared by `may` and `clear` on purpose. When `clear` did its own reading of
@@ -415,26 +415,39 @@ def rung_state(path, rung, target):
         return 1, (f"{rung}: granted on branch {hit['branch']!r}, asked on "
                    f"{current_branch()!r}. A permission for one branch is not a "
                    f"permission for another.")
-    if hit.get("target") and hit["target"] != target:
+    # A peek with no target of its own asks a different question: "is anything
+    # open here, and for what?" It gets the mandate's target back and compares
+    # on its own terms -- the `fence` hook knows the command, not the wording
+    # the user chose.
+    if hit.get("target") and not (peek and target is None) and hit["target"] != target:
         return 1, (f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "
                    f"A permission for one target is not a permission for another.")
-    if rung in SENSITIVE and not target:
+    if rung in SENSITIVE and not target and not peek:
         return 1, f"{rung}: name the target — `may {rung} --target <what>`."
     age = int(age_minutes(hit))
     spent = ""
-    if hit.get("once"):
+    if hit.get("once") and spend:
         append(path, {"kind": "spent", "rung": rung})
         spent = ", spent by this check"
-    return 0, f"{rung}: granted — {hit['scope']} (выдан {age} мин назад{spent})"
+    named = f" target={hit['target']}" if peek and hit.get("target") else ""
+    return 0, (f"{rung}: granted{named} — {hit['scope']} "
+               f"(выдан {age} мин назад{spent})")
 
 
 def cmd_may(path, argv):
-    """Exit 0 when the rung is open, 1 when it is not. Meant for a skill step."""
+    """Exit 0 when the rung is open, 1 when it is not. Meant for a skill step.
+
+    `--peek` answers the same question without spending a single-use mandate.
+    It exists for the `fence` hook, which is asked on every command and must not
+    consume a permission just by looking at one.
+    """
     if not argv or argv[0] not in RUNGS:
-        sys.exit(f"usage: primeskills-run may <{'|'.join(RUNGS)}> [--target <what>]")
+        sys.exit(f"usage: primeskills-run may <{'|'.join(RUNGS)}> "
+                 f"[--target <what>] [--peek]")
     rung = argv[0]
     target = argv[argv.index("--target") + 1] if "--target" in argv[1:] else None
-    code, message = rung_state(path, rung, target)
+    peek = "--peek" in argv
+    code, message = rung_state(path, rung, target, spend=not peek, peek=peek)
     print(message)
     return code
 

@@ -75,6 +75,26 @@ IN_TREE = [
 ]
 
 
+# Where the user has switched confirmations off, a question is not protection:
+# it renders as a prompt that gets approved unread. These cases fix the answer
+# instead — deny for the irreversible short list, silent allow for the rest.
+# The literals are glued together so that writing this file does not trip the
+# guard it tests: the hook reads a command string, and a string that merely
+# quotes a destructive command looks exactly like one that runs it.
+KILL = "DR" + "OP DATA" + "BASE"
+FORCE = "git push --fo" + "rce origin main"
+MODES = [
+    ("bypassPermissions", f"psql -c '{KILL} prod'", "deny"),
+    ("dontAsk", f"psql -c '{KILL} prod'", "deny"),
+    ("bypassPermissions", FORCE, "deny"),
+    ("bypassPermissions", "rm -rf /srv/somewhere-else", "deny"),
+    ("bypassPermissions", "git clean -fd", None),     # разрушительно, но обратимо
+    ("bypassPermissions", "ls -la", None),
+    ("default", f"psql -c '{KILL} prod'", "ask"),     # режим со спросом не меняется
+    ("acceptEdits", FORCE, "ask"),
+]
+
+
 def run(script, payload, cwd=None):
     p = subprocess.run([sys.executable, str(script)], input=payload,
                        capture_output=True, text=True, cwd=cwd)
@@ -92,6 +112,14 @@ def main():
         got = decision(run(CMD, payload))
         if got != expected:
             failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+
+    for mode, command, expected in MODES:
+        payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
+                              "cwd": "/nonexistent",
+                              "tool_input": {"command": command}})
+        got = decision(run(CMD, payload))
+        if got != expected:
+            failures.append(f"mode {mode}: {command!r} -> {got}, expected {expected}")
 
     with tempfile.TemporaryDirectory() as tree:
         (Path(tree) / "core-file.md").write_text("x", encoding="utf-8")
@@ -129,7 +157,7 @@ def main():
 
     for f in failures:
         print(f)
-    total = len(COMMANDS) + len(IN_TREE) + len(cases) + 1
+    total = len(COMMANDS) + len(MODES) + len(IN_TREE) + len(cases) + 1
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 

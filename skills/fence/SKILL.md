@@ -20,6 +20,14 @@ unattended session. Also on request: "be careful", "lock edits here".
   cannot forget, not a wall.
 - Pattern matching is necessary and never sufficient: destruction usually
   arrives through a harmless command with a misconfigured target (G17).
+- **Where confirmations are off, the guard decides instead of asking.** In
+  `bypassPermissions` and `dontAsk` a prompt is not protection: it is approved
+  unread, and it trains the reflex that answers the one that mattered. So a
+  short irreversible list — database contents, force-push, cluster resources,
+  a device overwrite, a delete outside the working directory — is refused, and
+  everything else passes with a line in the run journal. A refusal lifts the way
+  permissions do: ask, then record the answer with `primeskills-run grant`. The
+  list stays short; a long deny list is a disabled one.
 
 ## Procedure
 1. On Claude Code the hooks are armed by the installer, in `settings.json`,

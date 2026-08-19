@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: ask before a destructive shell command runs.
+"""PreToolUse guard: ask before a destructive shell command runs -- and where
+the user has switched confirmations off, stop asking and start deciding.
 
 Ported from gstack's check-careful.sh. Kept: fail-closed parsing, the
 obfuscation tripwire, the anchored build-artifact whitelist, and the reasons
@@ -14,6 +15,7 @@ is ignored and silently no-ops the guard.
 import json
 import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -46,6 +48,30 @@ OBFUSCATION = re.compile(
     r"|base64\s+(-d|--decode)[^|]*\|\s*(sh|bash)"
 )
 
+# Modes where the user has already said "do not ask me". A question here is not
+# protection: it renders as a prompt that gets approved without being read, and
+# the reflex it trains is the one that matters on the day the answer should have
+# been no. So in these modes the guard decides instead of asking -- deny for the
+# short list below, silent allow plus a journal line for everything else.
+SILENT_MODES = {"bypassPermissions", "dontAsk"}
+# The irreversible short list. Losing these is not "redo the step": it is data
+# gone, history rewritten for everyone, or a cluster resource deleted. Anything
+# recoverable from the working tree, a branch, or a rebuild stays out on
+# purpose -- a long deny list is a disabled deny list.
+# Compiled once, at import: a pattern that does not compile used to raise from
+# inside the decision and take the hook down with it -- and a hook that dies is
+# a hook that permits. Compiling here fails in tests instead of in the field.
+CATASTROPHIC = tuple((re.compile(pat), rung, why) for pat, rung, why in (
+    (r"(?i)drop\s+(table|database|schema)|\bdropdb\b|\btruncate\b|manage\.py\s+flush",
+     "delete", "destroys database contents"),
+    (r"git\s+push\s+.*(-f\b|--force)", "push",
+     "rewrites history others may already have"),
+    (r"kubectl\s+delete", "delete", "removes cluster resources"),
+    (r"docker\s+volume\s+rm", "delete", "destroys the data in that volume"),
+    (r"(?i)\bshred\b|\bmkfs\b|\bdd\s+[^|;&]*of=/dev/", "delete",
+     "overwrites a device beyond recovery"),
+))
+
 RULES = [
     (r"rm\s+(-[a-zA-Z]*[rR]|--recursive)", "recursive delete (rm -r) permanently removes files"),
     (r"(?i)drop\s+(table|database|schema)", "SQL DROP permanently deletes database objects"),
@@ -74,6 +100,50 @@ RULES = [
     (r"kubectl\s+delete", "kubectl delete removes cluster resources and may hit production"),
     (r"docker\s+(rm\s+-f|system\s+prune)", "Docker force-remove or prune deletes containers and images"),
 ]
+
+
+def deny(reason):
+    return json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": f"[fence] {reason}",
+        }
+    })
+
+
+def run_tool(args, cwd):
+    """Call `primeskills-run`, and never let it change the decision.
+
+    The guard answers on every command. If the journal is missing, outside a
+    repository, or slow, that is the journal's problem: the verdict above was
+    already reached without it.
+    """
+    try:
+        p = subprocess.run(["primeskills-run", *args], cwd=cwd or None,
+                           capture_output=True, text=True, timeout=5)
+        return p.returncode, (p.stdout + p.stderr).strip()
+    except (OSError, subprocess.SubprocessError):
+        return None, ""
+
+
+def first_target(tokens):
+    """The thing a catastrophic command names: a database, a resource, a path."""
+    for t in tokens[1:]:
+        if not t.startswith("-") and "=" not in t:
+            return t
+    return None
+
+
+def escapes(target, cwd):
+    """Does this path leave the directory the session is working in?"""
+    if target.startswith("~") or target == "/":
+        return True
+    try:
+        base = Path(cwd or ".").resolve()
+        return not str((base / target).resolve()).startswith(str(base))
+    except OSError:
+        return True
 
 
 def ask(reason):
@@ -198,33 +268,81 @@ def decide(raw):
         return ask("shell obfuscation (IFS word-splitting or base64 piped to a "
                    "shell). Read the command before approving.")
 
+    mode = payload.get("permission_mode")
+    cwd = payload.get("cwd") or ""
     parsed, unreadable = segments(command)
+
+    verdict = None                     # (reason, rung or None, target or None)
     for tokens, text in parsed:
         if tokens[0] == "rm":
             reason = rm_verdict(tokens)
             if reason:
-                return ask(reason)
+                targets = [t for t in tokens[1:] if not t.startswith("-")]
+                out = [t for t in targets if escapes(t, cwd)]
+                verdict = (reason, "delete" if out else None, out[0] if out else None)
+                break
         if tokens[0] == "git":
             reason = git_verdict(tokens)
             if reason:
-                return ask(reason)
+                verdict = (reason, None, None)
+                break
+        hit = next(((rung, why) for pat, rung, why in CATASTROPHIC
+                    if pat.search(text)), None)
+        if hit:
+            rung, why = hit
+            verdict = (why, rung, first_target(tokens))
+            break
+        rule = next((r for pat, r in RULES
+                     if not (pat.startswith("rm") and tokens[0] == "rm")
+                     and re.search(pat, text)), None)
+        if rule:
+            verdict = (rule, None, None)
+            break
+
+    if verdict is None:
         for pattern, reason in RULES:
-            if pattern.startswith("rm") and tokens[0] == "rm":
-                continue       # rm_verdict has already read this one properly
-            if re.search(pattern, text):
-                return ask(reason)
+            if not pattern.startswith("rm") and re.search(pattern, command):
+                verdict = (reason, None, None)
+                break
 
-    for pattern, reason in RULES:
-        if pattern.startswith("rm"):
-            continue
-        if re.search(pattern, command):
-            return ask(reason)
+    if verdict is None:
+        if unreadable:
+            return ask("part of this line could not be parsed (unbalanced "
+                       "quotes), so it was not checked.")
+        return ALLOW
 
-    if unreadable:
-        return ask("part of this line could not be parsed (unbalanced quotes), "
-                   "so it was not checked.")
+    reason, rung, target = verdict
+    if mode not in SILENT_MODES:
+        return ask(reason)
+
+    # The user turned confirmations off. Asking anyway trains the reflex; going
+    # quiet everywhere removes the guard exactly where the agent runs unwatched.
+    # So: the short irreversible list needs a permission that was actually
+    # granted, and everything else passes with a line in the journal.
+    if rung:
+        # Peek at the ladder without spending anything, and let the human's own
+        # words settle it: a mandate counts when what they named appears in the
+        # command. The guard's guess at "the target" is a first operand; theirs
+        # is a database or a path they meant.
+        code, said = run_tool(["may", rung, "--peek"], cwd)
+        named = re.search(r"target=(\S+)", said or "")
+        covered = code == 0 and (not named or named.group(1).lower() in command.lower())
+        if covered:
+            run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"], cwd)
+            return ALLOW
+        run_tool(["note", "guard", f"refused, no {rung}: {command[:120]}"], cwd)
+        return deny(
+            f"{reason}. Confirmations are off, so this is refused rather than "
+            f"asked: tell the user what it will do, and when they agree record "
+            f"it: `primeskills-run grant {rung} --target <the database, path "
+            f"or environment> \"<their words>\"`.")
+    run_tool(["note", "guard", f"allowed silently: {command[:120]}"], cwd)
     return ALLOW
 
 
 if __name__ == "__main__":
-    print(decide(sys.stdin.read()))
+    try:
+        print(decide(sys.stdin.read()))
+    except Exception as exc:  # noqa: BLE001 -- a crash must not become consent
+        print(ask(f"the guard itself failed ({type(exc).__name__}), so this "
+                  f"command was not checked."))
