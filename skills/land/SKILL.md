@@ -37,7 +37,8 @@ order exists to prevent.
    claim in the message appears in the diff, and every change in the diff is
    covered by the message
 4. Check the branch: not the default branch → **verify:** you are on a working
-   branch, or you create one before committing
+   branch; on the default branch you ask where the work should live before
+   creating one
 5. `primeskills-run may commit`. If it refuses, ask and record the answer
    before going on → **verify:** the rung is open and its scope covers this
    branch
