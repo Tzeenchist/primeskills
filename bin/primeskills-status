@@ -105,6 +105,27 @@ def body_words(p):
     return len(re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.S).split())
 
 
+def figures():
+    """The five numbers the READMEs quote, so they can be checked, not retyped.
+
+    They were retyped, and both READMEs drifted together: the pair was compared
+    with each other and with nothing else, so 2 545 words of core survived three
+    ceilings. Any document that states one of these must be settled against this
+    function -- see `tests/test_docs.py`.
+    """
+    skills = sorted(ROOT.glob("skills/*/SKILL.md"))
+    flows = [p for p in skills if "\ntier: flow" in p.read_text(encoding="utf-8")]
+    core = sum(words(ROOT / "core" / f) for f in ALWAYS)
+    descs = sum(len(d.split()) for d in (description(p) for p in skills))
+    always = descs + len(bootstrap_words())
+    base = always + core
+    bodies = {p.parent.name: body_words(p) for p in skills}
+    singles = {n: w for n, w in bodies.items() if n not in {f.parent.name for f in flows}}
+    return {"always": always, "skills": len(skills), "core": core,
+            "one_min": base + min(singles.values()),
+            "one_max": base + max(singles.values())}
+
+
 def main():
     skills = sorted(ROOT.glob("skills/*/SKILL.md"))
     flows = [p for p in skills if "\ntier: flow" in p.read_text(encoding="utf-8")]

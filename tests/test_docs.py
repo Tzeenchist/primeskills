@@ -108,6 +108,33 @@ def main():
         failures.append(f"README и README.ru разошлись в числах: "
                         f"{numbers(en)} против {numbers(ru)}")
 
+    # 3b'. Agreeing with each other is not the same as being true. Both READMEs
+    #      promised 2 545 words of core through three ceilings, because the pair
+    #      was checked against itself and against nothing else. The block at the
+    #      top of each states five numbers, in one order, in both languages —
+    #      settle them against the set (PS-039).
+    status = load("primeskills-status")
+    want = status.figures()
+    order = ("always", "skills", "core", "one_min", "one_max")
+    for doc in (ROOT / "README.md", ROOT / "README.ru.md"):
+        checks += 1
+        blocks = re.findall(r"^```.*?\n(.*?)^```", doc.read_text(encoding="utf-8"),
+                            flags=re.M | re.S)
+        # the first fence is the ASCII art; the numbers live in the one that
+        # states five of them, which is also the only place they are stated
+        counted = [[int(re.sub(r"\D", "", n)) for n in re.findall(r"\d[\d\s ]*", b)]
+                   for b in blocks]
+        found = [c for c in counted if len(c) == len(order)]
+        if len(found) != 1:
+            failures.append(f"{doc.name}: блок с пятью числами найден "
+                            f"{len(found)} раз — проверка не знает, что сверять")
+            continue
+        said = found[0]
+        if said != [want[k] for k in order]:
+            failures.append(
+                f"{doc.name}: числа {said} против набора "
+                f"{[want[k] for k in order]} ({', '.join(order)})")
+
     # 3c. The guide is generated from the set, except two hand-written parts —
     #     and those are exactly the parts that went stale. Each claim below is
     #     tied to something the code decides.
