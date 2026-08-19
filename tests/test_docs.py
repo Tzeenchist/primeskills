@@ -135,6 +135,32 @@ def main():
                 f"{doc.name}: числа {said} против набора "
                 f"{[want[k] for k in order]} ({', '.join(order)})")
 
+    # 3b''. The README names the skills by hand, and a hand-written list drops
+    #       one quietly: six were missing on 2026-08-19, `baby` and `prose`
+    #       among them — two the owner reaches for most. The prose stays human,
+    #       the coverage is checked, between the markers.
+    skills = {p.parent.name: p.read_text(encoding="utf-8")
+              for p in ROOT.glob("skills/*/SKILL.md")}
+    singles = {n for n, text in skills.items() if "\ntier: flow" not in text}
+    flows = set(skills) - singles
+    for doc in (ROOT / "README.md", ROOT / "README.ru.md"):
+        checks += 1
+        text = doc.read_text(encoding="utf-8")
+        block = re.search(r"<!-- skills:begin -->(.*?)<!-- skills:end -->",
+                          text, flags=re.S)
+        if not block:
+            failures.append(f"{doc.name}: разметки списка навыков нет")
+            continue
+        named = set(re.findall(r"^/([a-z][a-z-]*)", block.group(1), flags=re.M))
+        if named != singles:
+            failures.append(
+                f"{doc.name}: список навыков разошёлся с набором — "
+                f"нет {sorted(singles - named)}, лишние {sorted(named - singles)}")
+        checks += 1
+        missing_flows = sorted(f for f in flows if f"/{f}" not in text)
+        if missing_flows:
+            failures.append(f"{doc.name}: последовательности не названы: {missing_flows}")
+
     # 3c. The guide is generated from the set, except two hand-written parts —
     #     and those are exactly the parts that went stale. Each claim below is
     #     tied to something the code decides.

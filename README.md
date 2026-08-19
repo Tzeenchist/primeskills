@@ -147,11 +147,46 @@ the decision is yours.
 /teams      review a plan: product, engineering, interface
 ```
 
-The other twenty-two are called one at a time: `/brief` and `/study` to
-understand the task and someone else's code; `/build`, `/debug`, `/verify` to
-write and prove; `/vet`, `/probe`, `/measure`, `/ui` to check the diff, the
-running app, the speed, the interface states; `/land`, `/merge`, `/deploy` to
-hand over and ship; `/handoff` to save state for the next session.
+The rest are called one at a time. All of them, because the small ones earn
+their place too — `/baby` and `/prose` are among the most used here:
+
+<!-- skills:begin -->
+```
+# understand the task, the code, the words
+/brief        what is actually wanted, and what to cut
+/study        how unfamiliar code is put together
+/baby         a term, or the last answer, in plain language
+
+# decide what to build
+/plan         ordered tasks once the requirements are clear
+/ceo          is this the right work at all
+/eng          architecture, data flow, edge cases, test coverage
+/beauty       interface states, hierarchy, keyboard, contrast
+
+# write it and prove it
+/build        implement, failing test first
+/debug        find the cause, not the symptom
+/verify       proof before the words "it passes"
+
+# check what came out
+/vet          read the diff before it merges
+/probe        drive the running app, report the bugs it has
+/measure      where the time actually goes
+/ui           the states an interface owes the user
+
+# hand it over
+/revise       answer every review comment, rework the branch
+/land         commit, push, open the pull request
+/merge        merge once CI is green
+/deploy       ship, with the way back ready first
+/handoff      save state the next session can resume from
+
+# keep the session honest
+/fence        guards on destructive commands and stray edits
+/prose        strip machine tells without flattening the writing
+/primeskills  print the guide to this set
+```
+<!-- skills:end -->
 
 `primeskills-help` prints the full guide — in your language, any of them:
 `primeskills-help --set-lang <language>`, and the choice is remembered.

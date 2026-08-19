@@ -156,6 +156,54 @@ def ask(reason):
     })
 
 
+# Programs that execute what they are fed. A heredoc going into one of these is
+# a command; a heredoc going into `cat > file` or `tee` is a document that
+# happens to quote one. Reading them the same way made the guard refuse the
+# writing of its own tests -- twice in one hour, on 2026-08-19.
+INTERPRETERS = {"sh", "bash", "zsh", "dash", "ksh", "python", "python2",
+                "python3", "node", "deno", "ruby", "perl", "php", "psql",
+                "mysql", "sqlite3", "mongo", "redis-cli", "kubectl", "docker",
+                "ssh", "env", "xargs", "eval"}
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+
+
+def without_inert_heredocs(command):
+    """The command text to judge, with document bodies taken out of it.
+
+    A heredoc body is scanned when the thing consuming it runs what it reads,
+    and dropped when the body is on its way to a file. The introducing line is
+    always kept: `cat > f <<EOF` is still a command, and a redirect over
+    something precious is still a redirect.
+    """
+    if "<<" not in command:
+        return command, 0
+    lines = command.split("\n")
+    kept, dropped, i = [], 0, 0
+    while i < len(lines):
+        line = lines[i]
+        kept.append(line)
+        hit = HEREDOC.search(line)
+        i += 1
+        if not hit:
+            continue
+        marker = hit.group(2)
+        head = shlex.split(line.split("<<")[0], comments=False) if line.split("<<")[0].strip() else []
+        while head and (head[0] in ("sudo", "time", "nohup") or "=" in head[0]):
+            head = head[1:]
+        executes = bool(head) and Path(head[0]).name in INTERPRETERS
+        body = []
+        while i < len(lines) and lines[i].strip() != marker:
+            body.append(lines[i])
+            i += 1
+        if i < len(lines):
+            i += 1                      # the closing marker itself
+        if executes:
+            kept.extend(body)
+        else:
+            dropped += 1
+    return "\n".join(kept), dropped
+
+
 def segments(command):
     """Words of each command in the line, and a rebuilt string to match on.
 
@@ -270,6 +318,7 @@ def decide(raw):
 
     mode = payload.get("permission_mode")
     cwd = payload.get("cwd") or ""
+    command, _inert = without_inert_heredocs(command)
     parsed, unreadable = segments(command)
 
     verdict = None                     # (reason, rung or None, target or None)

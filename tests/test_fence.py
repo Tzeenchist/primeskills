@@ -95,6 +95,19 @@ MODES = [
 ]
 
 
+# PS-044: a heredoc body is a command when something executes it and a document
+# when it is on its way to a file. Judging both the same way made the guard
+# refuse the writing of its own tests. The introducing line is still a command.
+WIPE = "rm -" + "rf /srv/data"
+HEREDOCS = [
+    (f"cat > notes.md <<'EOF'\n{WIPE}\nEOF", None),
+    (f"tee notes.md <<'EOF'\n{WIPE}\nEOF", None),
+    (f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", "ask"),
+    (f"bash <<'SH'\n{WIPE}\nSH", "ask"),
+    (f"{WIPE} && cat > f <<'EOF'\nhi\nEOF", "ask"),
+]
+
+
 def run(script, payload, cwd=None):
     p = subprocess.run([sys.executable, str(script)], input=payload,
                        capture_output=True, text=True, cwd=cwd)
@@ -112,6 +125,13 @@ def main():
         got = decision(run(CMD, payload))
         if got != expected:
             failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+
+    for command, expected in HEREDOCS:
+        payload = json.dumps({"tool_input": {"command": command}})
+        got = decision(run(CMD, payload))
+        if got != expected:
+            failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
+                            f"expected {expected}")
 
     for mode, command, expected in MODES:
         payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
@@ -157,7 +177,8 @@ def main():
 
     for f in failures:
         print(f)
-    total = len(COMMANDS) + len(MODES) + len(IN_TREE) + len(cases) + 1
+    total = (len(COMMANDS) + len(HEREDOCS) + len(MODES) + len(IN_TREE)
+             + len(cases) + 1)
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 
