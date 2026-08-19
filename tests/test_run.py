@@ -5,9 +5,11 @@ Every check here runs the tool as a fresh process against a scratch repository,
 because that is the failure being fixed — state that only existed while one
 agent was still running.
 """
+import json
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -260,11 +262,15 @@ def main():
         checks += 1
         run(repo, "grant", "commit", "--for", "0", "истёкший")
         code, out = run(repo, "may", "commit")
-        if code != 1:
-            failures.append(f"истёкший мандат всё ещё действует:\n{out}")
+        # истёкший мандат называет причину, а не читается как «не выдан»:
+        # иначе пользователя отправляют искать разрешение, которое он уже давал
+        if code != 1 or "истёк" not in out:
+            failures.append(f"истёкший мандат не назвал причину: {code}\n{out}")
 
-    # two branch names that used to collapse into one journal must not share
-    # permissions: slug() alone mapped feature/a and feature-a to one file
+    # grants live in one record per repository (PS-047): written on one branch,
+    # visible from another — land and merge cross branches by design. Evidence
+    # journals stay per branch: slug() alone used to map feature/a and
+    # feature-a to one file
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
         repo.mkdir()
@@ -273,18 +279,80 @@ def main():
         subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
                         "commit", "-q", "--allow-empty", "-m", "seed"],
                        cwd=repo, check=True)
-        run(repo, "grant", "push", "первая ветка")
+        run(repo, "note", "verify", "первая ветка")
+        run(repo, "grant", "push", "выписан на feature/a")
         subprocess.run(["git", "checkout", "-q", "-b", "feature-a"], cwd=repo, check=True)
         checks += 1
         code, out = run(repo, "may", "push")
-        if code != 1:
-            failures.append(f"мандат перетёк между feature/a и feature-a:\n{out}")
-        # `may` ничего не пишет, поэтому второй журнал появляется от записи
-        run(repo, "grant", "commit", "вторая ветка")
+        if code != 0:
+            failures.append(f"грант не виден с соседней ветки того же репозитория:\n{out}")
+        run(repo, "note", "verify", "вторая ветка")
         checks += 1
-        names = sorted(p.name for p in (repo / ".primeskills" / "run").glob("*.jsonl"))
+        names = sorted(p.name for p in (repo / ".primeskills" / "run").glob("*.jsonl")
+                       if p.name != "repo.jsonl")
         if len(names) != 2:
-            failures.append(f"две ветки пишут в один журнал: {names}")
+            failures.append(f"две ветки делят журнал доказательств: {names}")
+
+        # переходный период: грант, дописанный старой версией в журнал ветки,
+        # читается — обновление посреди работы не гасит открытые ярусы
+        code, out = run(repo, "start")
+        branch_record = Path(out.strip())
+        legacy = {"kind": "grant", "rung": "merge", "scope": "записан старой версией",
+                  "target": None, "lifetime": 480, "branch": "feature/a", "once": False,
+                  "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                  "commit": "x", "state": "y"}
+        with branch_record.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(legacy, ensure_ascii=False) + "\n")
+        checks += 1
+        code, out = run(repo, "may", "merge")
+        if code != 0 or "старой версией" not in out:
+            failures.append(f"грант из записи ветки не читается в переходный период:\n{out}")
+
+    # --peek asks without spending: the pre-step check must not burn the
+    # one-use mandate it only confirms (PS-047), and a plain `may` still spends
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        run(repo, "grant", "deploy", "--target", "staging", "выкатить релиз")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "staging", "--peek")
+        if code != 0 or "spent" in out:
+            failures.append(f"--peek потратил мандат: {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "staging")
+        if code != 0 or "spent by this check" not in out:
+            failures.append(f"мандат не дожил до шага после --peek: {code}\n{out}")
+
+    # an unreadable line is a refusal naming the line, not a silent skip:
+    # a truncated `spent` would resurrect a one-use mandate, and the fence
+    # hook declines a command when the journal does not answer
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
+        run(repo, "grant", "deploy", "--target", "staging", "выкатить")
+        run(repo, "may", "deploy", "--target", "staging")  # строка 2 repo.jsonl — spent
+        ledger = repo / ".primeskills" / "run" / "repo.jsonl"
+        lines = ledger.read_text(encoding="utf-8").splitlines()
+        lines[1] = "{оборвано"
+        ledger.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "staging", "--peek")
+        if code == 0 or "строка 2" not in out:
+            failures.append(f"битая строка spent воскресила мандат: {code}\n{out}")
+        run(repo, "note", "verify", "green")
+        record = next((repo / ".primeskills" / "run").glob("work-*.jsonl"))
+        with record.open("a", encoding="utf-8") as fh:
+            fh.write("не json\n")
+        for args in (("check", "verify"), ("show",)):
+            checks += 1
+            code, out = run(repo, *args)
+            if code == 0 or "строка 2" not in out:
+                failures.append(f"{args[0]}: битая строка не дала отказ с номером: {code}\n{out}")
 
     # outside a repository it must refuse, not write somewhere surprising
     with tempfile.TemporaryDirectory() as bare:
