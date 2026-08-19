@@ -27,28 +27,32 @@ pushing, and before handing work to another agent.
 - The cycle closes only when the new test passes and the full suite passes.
 
 ## Procedure
-1. Resolve the target the run will act on — database, schema, directory — and
+1. Before executing someone else's change, call `vet`, then require a current
+   `primeskills-run check vet`; without it, use a sandbox or obtain the user's
+   trust → **verify:** review precedes execution, and the trust boundary is named
+2. Resolve the target the run will act on — database, schema, directory — and
    print it → **verify:** it is the isolated one, not the working store (G17)
-2. Name the command that would prove the claim → **verify:** it tests the claim,
+3. Name the command that would prove the claim → **verify:** it tests the claim,
    not a neighbour of it
-3. Run it whole and fresh → **verify:** exit code is 0
-4. Read the tool's own success signal → **verify:** 0 failed and the count you
+4. Run it whole and fresh → **verify:** exit code is 0
+5. Read the tool's own success signal → **verify:** 0 failed and the count you
    expected from a test runner, whatever other tools report instead — an exit
    code alone is half the proof (G4)
-5. For a bug fix, pair the run with the red evidence `build` recorded
+6. For a bug fix, pair the run with the red evidence `build` recorded
    → **verify:** the recorded failure and this pass describe the same test.
    With no record, prove it in a throwaway worktree — never by reverting the
    live tree, which can eat work that is not yours
-6. Run the full suite, not only the touched file, unless a flow already ran it
+7. Run the full suite, not only the touched file, unless a flow already ran it
    for this state → **verify:** exit code is 0, and you say which run you used
-7. Kill spawned processes, remove temp artifacts → **verify:** none left behind
+8. Kill spawned processes, remove temp artifacts → **verify:** none left behind
 
 ## Stop conditions
 - Tempted to adjust the test instead of the code: stop. That impulse is the
   finding.
 - No recorded red run and no worktree to prove one: the regression is unproven.
   Say that rather than calling the fix verified.
-- Three runs, three failures, same error: roll back and report (G9).
+- Three runs, three failures, same error: restore a required snapshot; otherwise
+  state the tree's condition, then report and ask (G9).
 - Reaching for "should" or "probably": you are about to claim without evidence.
   See RATIONALIZATIONS.
 

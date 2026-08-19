@@ -27,6 +27,7 @@ anyone who can push to a branch write the next agent's opening context.
     primeskills-run fail "export renders 4 pages"     # exits 3 on the third
     primeskills-run clear "export renders 4 pages"
     primeskills-run check verify                      # exits 2 when stale
+    PRIMESKILLS_CHAIN_STATE=1 primeskills-run may push # stale verify blocks land
     primeskills-run show
 
 Evidence of a run (notes, G9 counters) is per branch. Permissions (grant,
@@ -59,6 +60,8 @@ RUNGS = ("commit", "push", "pr", "merge", "migrate", "deploy", "rollback",
 # so one yes clears one counter and not the next one.
 SENSITIVE = ("migrate", "deploy", "rollback", "delete", "clear")
 LIFETIME = {"sensitive": 60, "ordinary": 480}  # minutes
+CHAIN_STATE_FLAG = "PRIMESKILLS_CHAIN_STATE"
+CHAIN_STATE_RUNGS = ("push", "pr")
 IGNORE = "# Written by skills, read by skills, and never committed.\n" \
          "# run/ names commands, targets and problems. handoff/ carries blockers,\n" \
          "# dead ends and internal context — and a committed handoff is read by\n" \
@@ -500,6 +503,14 @@ def cmd_may(path, argv):
     peek = "--peek" in argv
     code, message = rung_state(path, rung, target, spend=not peek, peek=peek)
     print(message)
+    if code:
+        return code
+    # `land` verifies before committing, but the commit changes the state the
+    # proof names. Its next existing machine gates are push and PR. Behind the
+    # rollout flag, make either refuse until verify records the committed tree.
+    if (os.environ.get(CHAIN_STATE_FLAG) == "1"
+            and rung in CHAIN_STATE_RUNGS):
+        return cmd_check(path, ["verify"])
     return code
 
 
