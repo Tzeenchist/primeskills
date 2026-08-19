@@ -250,11 +250,28 @@ def main():
                                    capture_output=True, text=True, env=env)
               if "uncommitted work" not in (out.stdout + out.stderr):
                   failures.append("снятие пина не заметило незакоммиченную работу")
-              subprocess.run([sys.executable, str(tool), "claude", "--unpin", "--force"],
-                             capture_output=True, text=True, env=env)
+              off = subprocess.run([sys.executable, str(tool), "claude", "--unpin",
+                                    "--force"], capture_output=True, text=True, env=env)
               checks += 1
               if "/.primeskills/pinned/" in os.path.realpath(link):
                   failures.append("снятие пина не вернуло ссылки на рабочую копию")
+              # PS-048: the guard used to survive unpinning in two copies, and
+              # the command reported success and then raised. Both were invisible
+              # until someone read settings.json.
+              checks += 1
+              if off.returncode != 0:
+                  failures.append(f"снятие пина завершилось не нулём:\n{off.stdout}{off.stderr}")
+              armed = json.loads((h / ".claude" / "settings.json").read_text(encoding="utf-8"))
+              cmds = [x["command"] for e in armed["hooks"]["PreToolUse"] for x in e["hooks"]]
+              checks += 1
+              if len(cmds) != 2 or any("/.primeskills/pinned/" in c for c in cmds):
+                  failures.append(f"после снятия пина сторож остался в двух деревьях: {cmds}")
+              checks += 1
+              if (h / ".primeskills" / "pin.json").exists():
+                  failures.append("запись пина пережила снятие")
+              checks += 1
+              if (h / ".primeskills" / "pinned").exists():
+                  failures.append("закреплённое дерево не снято — падение унесло уборку")
 
     # the update path must also take back only its own links: uninstall was
     # fixed first and reinstall kept deleting whole directories
