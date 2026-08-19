@@ -17,8 +17,8 @@ handed over.
 - Every rung it crosses is the user's: commit, push and pull request inside
   `land`, then merge, then migrate and deploy. Five decisions at least, not the
   three this flow is named after; it carries them out in order and grants
-  none of them. The one-use rungs are checked with `--peek`, so the check
-  itself spends nothing.
+  none of them. One-use rungs are checked ahead with `--peek`, which spends
+  nothing; the plain `may` at the moment of the act is what spends the use.
 - Each stage reads the previous one's evidence. Nothing here is assumed green.
 
 ## Procedure

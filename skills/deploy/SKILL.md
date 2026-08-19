@@ -44,12 +44,13 @@ Never on your own initiative, and never as the tail end of merging.
 4. Check what ships: the commit going out and how it differs from what runs now
    → **verify:** you can list migrations, config changes, and new dependencies
 5. `primeskills-run may migrate --target <the target from step 1> --peek`,
-   which asks without spending the one-use mandate, then run migrations as
-   the project requires. Migrations are their own rung because
+   then the same call without `--peek` as you run it — that one spends the
+   single use. Migrations are their own rung because
    they are usually the half you cannot undo → **verify:** the rung is open for
    this target, and the migration ran against the target you resolved, not
    against the one your shell happened to point at
-6. `primeskills-run may deploy --target <the same target> --peek`, then release
+6. `may deploy --target <the same target> --peek`, then without `--peek` as
+   you release
    → **verify:** the rung is open for this target, the process reports success,
    and the running version is the commit you intended, read from the
    environment rather than assumed
@@ -62,7 +63,7 @@ Never on your own initiative, and never as the tail end of merging.
   cannot undo is the user's decision, not your task — but once they have made
   it knowingly, it is a plan, not a blocker.
 - The target cannot be proved to be the intended one: stop (G17, G12).
-- Health check fails: `primeskills-run may rollback --target <the target> --peek`,
+- Health check fails: `primeskills-run may rollback --target <the target>`,
   then carry out the rollback decided in step 2, and if that decision was "forward only" —
   because a migration made the old version incompatible — say so and ask. Debugging a live environment while users sit
   on the broken version is the wrong order; rolling into a schema the old code
