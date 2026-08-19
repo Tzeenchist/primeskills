@@ -12,9 +12,15 @@ import argparse
 import json
 import os
 import shlex
+import re
 import shutil
 import subprocess
 import sys
+
+if sys.version_info < (3, 11):  # tomllib, used to read Kimi's configuration
+    raise SystemExit(f"primeskills-install needs Python 3.11 or newer; this is "
+                     f"{sys.version.split()[0]}. The floor is `tomllib`.")
+
 import tomllib
 from pathlib import Path
 
@@ -61,14 +67,29 @@ ALWAYS_LOADED = {
 }
 
 
+def rule_span():
+    """The highest P and G numbers, read from `core/` rather than typed.
+
+    The line below said G1-G17 while G18 was already in the file and already
+    installed in four agents' always-loaded configuration -- the one place
+    where a stale number is read by every session before anything else.
+    """
+    def top(name, prefix):
+        text = (ROOT / "core" / name).read_text(encoding="utf-8")
+        found = [int(n) for n in re.findall(rf"\*\*{prefix}(\d+)", text)]
+        return max(found) if found else 0
+    return top("PRINCIPLES.md", "P") or 8, top("GUARDRAILS.md", "G")
+
+
 def bootstrap_text():
     paths = "\n".join(f"- {ROOT / 'core' / f}" for f in CORE_FILES)
+    principles, guardrails = rule_span()
     return f"""{BEGIN}
 ## primeskills
 
 Before the first primeskills skill runs in a session, read these three files
-once. The skills reference them by number (PRINCIPLES §1-§8, GUARDRAILS G1-G17)
-and are incomplete without them.
+once. The skills reference them by number (PRINCIPLES §1-§{principles},
+GUARDRAILS G1-G{guardrails}) and are incomplete without them.
 
 {paths}
 {END}"""
@@ -510,12 +531,29 @@ def pin(ref, agents, force=False):
         sys.exit(f"primeskills-install: {PINNED} has uncommitted work. Commit it, "
                  f"move it, or repeat with --force to discard it.")
     previous = PIN_FILE.read_text(encoding="utf-8") if PIN_FILE.is_file() else None
+    was = (pin_state() or {}).get("commit")
+    PINNED.parent.mkdir(parents=True, exist_ok=True)
+    # Build the new tree beside the old one, not in its place. The old tree used
+    # to be removed first, so a `worktree add` that failed -- a bad commit, a
+    # full disk -- left four agents pointing at a directory that no longer
+    # existed. Nothing is taken away until the replacement is on disk.
+    staging = PINNED.with_name(PINNED.name + ".incoming")
+    if staging.exists():
+        git("-C", str(ROOT), "worktree", "remove", "--force", str(staging))
+    made = git("-C", str(ROOT), "worktree", "add", "--detach", str(staging), sha)
+    if made.returncode != 0:
+        sys.exit(f"primeskills-install: worktree failed — {made.stderr.strip()}. "
+                 f"The pinned tree in use was left alone.")
     if PINNED.exists():
         git("-C", str(ROOT), "worktree", "remove", "--force", str(PINNED))
-    PINNED.parent.mkdir(parents=True, exist_ok=True)
-    made = git("-C", str(ROOT), "worktree", "add", "--detach", str(PINNED), sha)
-    if made.returncode != 0:
-        sys.exit(f"primeskills-install: worktree failed — {made.stderr.strip()}")
+    moved = git("-C", str(ROOT), "worktree", "move", str(staging), str(PINNED))
+    if moved.returncode != 0:
+        # Put back what was there, so the agents' paths keep resolving.
+        if was:
+            git("-C", str(ROOT), "worktree", "add", "--detach", str(PINNED), was)
+        git("-C", str(ROOT), "worktree", "remove", "--force", str(staging))
+        sys.exit(f"primeskills-install: не удалось поставить новое дерево на "
+                 f"место — {moved.stderr.strip()}. Прежнее возвращено.")
     # --live on the inner call: the pinned tree installs itself from itself,
     # and without the flag it would try to pin again, forever.
     out = subprocess.run([sys.executable, str(PINNED / "bin" / "primeskills-install"),

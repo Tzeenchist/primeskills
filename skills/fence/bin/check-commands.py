@@ -13,9 +13,21 @@ is ignored and silently no-ops the guard.
 """
 import json
 import re
+import shlex
 import sys
+from pathlib import Path
 
 ALLOW = "{}"
+
+# Git's global options sit between `git` and the subcommand, so `git -C /tmp/x
+# reset --hard` and `git -c advice.detachedHead=false clean -fd` walked past
+# rules that assumed the subcommand comes first. Both were shown doing exactly
+# that by an external review on 2026-08-19. The options are stripped before
+# matching instead of widening every git rule.
+GIT_GLOBAL_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
+                         "--exec-path", "--config-env"}
+GIT_GLOBAL_FLAGS = {"-P", "--no-pager", "--paginate", "--bare",
+                    "--literal-pathspecs", "--no-replace-objects"}
 
 # A single rm of build artifacts, matched against the WHOLE command. Parsing
 # only the last rm is unsafe: `rm -rf / # rm -rf node_modules` would pass.
@@ -27,10 +39,7 @@ ARTIFACTS = r"(node_modules|\.next|dist|__pycache__|\.cache|build|\.turbo|covera
 # and `rm -rf ../../node_modules` rode the exemption -- the name at the end was
 # whitelisted, and the directory it named belonged to someone else.
 SAFE_PREFIX = r"((?!\.\.(/|$))[^\s;&|#(`/~][^\s;&|#(`/]*/)*"
-SAFE_RM = re.compile(
-    r"^\s*rm\s+(-[a-zA-Z]*[rR][a-zA-Z]*\s+|--recursive\s+)"
-    rf"({SAFE_PREFIX}{ARTIFACTS}\s*)+$"
-)
+SAFE_TARGET = re.compile(rf"{SAFE_PREFIX}{ARTIFACTS}/?$")
 
 OBFUSCATION = re.compile(
     r"\$\{IFS\}|\$IFS|\$\(echo[^)]*base64[^)]*\)"
@@ -77,6 +86,87 @@ def ask(reason):
     })
 
 
+def segments(command):
+    """Words of each command in the line, and a rebuilt string to match on.
+
+    Returns (tokens, text) pairs. Where the line cannot be tokenised at all --
+    unbalanced quotes, mostly -- the caller is told, because a guard that
+    cannot read a command must not pass it.
+    """
+    out, unreadable = [], False
+    for part in re.split(r"[;\n]|&&|\|\||\|", command):
+        if not part.strip():
+            continue
+        try:
+            tokens = shlex.split(part, comments=True)
+        except ValueError:
+            unreadable = True
+            continue
+        while tokens and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tokens[0]):
+            tokens.pop(0)          # FOO=bar rm -rf /
+        if tokens and tokens[0] == "git":
+            rest = tokens[1:]
+            while rest and rest[0].startswith("-"):
+                head = rest[0]
+                if head in GIT_GLOBAL_WITH_VALUE:
+                    rest = rest[2:]
+                elif head in GIT_GLOBAL_FLAGS or "=" in head:
+                    rest = rest[1:]
+                else:
+                    break
+            tokens = ["git"] + rest
+        if tokens:
+            out.append((tokens, " ".join(tokens)))
+    return out, unreadable
+
+
+def rm_verdict(tokens):
+    """`rm` is read by its flags and its targets, not by their order.
+
+    `rm -f -r /var/data` passed a rule that expected the recursive flag first,
+    and the artifact exemption used to be a whole-line pattern, which made the
+    same mistake in the other direction.
+    """
+    flags = [t for t in tokens[1:] if t.startswith("-")]
+    targets = [t for t in tokens[1:] if not t.startswith("-")]
+    recursive = any(t == "--recursive" or re.fullmatch(r"-[a-zA-Z]*[rR][a-zA-Z]*", t)
+                    for t in flags)
+    if not recursive:
+        return None
+    if targets and all(SAFE_TARGET.fullmatch(t) for t in targets):
+        return None            # build artifacts, inside the working directory
+    return "recursive delete (rm -r) permanently removes files"
+
+
+def git_verdict(tokens):
+    """`restore` and `checkout` throw work away by naming a path, not a flag.
+
+    `git restore <path>` discards that path with or without `--`. `git checkout
+    <path>` does the same and reads like switching branches, which is how it
+    got past this guard and cost the author an uncommitted rewrite of G18 on
+    2026-08-19. A branch name and a path are told apart the only way a guard
+    can: if the argument names something that exists on disk, it is a path.
+    """
+    if len(tokens) < 2:
+        return None
+    verb, rest = tokens[1], tokens[2:]
+    if verb == "restore":
+        if "--staged" in rest and "--worktree" not in rest:
+            return None        # unstages only; the working tree is untouched
+        return "git restore discards uncommitted changes in the paths it names"
+    if verb == "checkout":
+        for arg in rest:
+            if arg.startswith("-"):
+                continue
+            try:
+                if Path(arg).exists():
+                    return ("git checkout <path> discards uncommitted changes "
+                            "in that path")
+            except OSError:
+                continue
+    return None
+
+
 def decide(raw):
     if not raw.strip():
         return ALLOW
@@ -88,7 +178,19 @@ def decide(raw):
         return ask("could not read the tool payload to check this command. "
                    "Approve only if you know what it does.")
 
-    command = (payload.get("tool_input") or {}).get("command")
+    if not isinstance(payload, dict):
+        return ask("the tool payload was not an object, so this command could "
+                   "not be checked.")
+    tool_input = payload.get("tool_input")
+    if tool_input is None:
+        return ALLOW
+    if not isinstance(tool_input, dict):
+        # A payload of an unexpected shape used to raise, and a hook that dies
+        # is a hook that permits: the host reads the failure as "no decision".
+        return ask("the tool input was not an object, so this command could "
+                   "not be checked.")
+
+    command = tool_input.get("command")
     if not isinstance(command, str) or not command:
         return ALLOW  # not a shell call
 
@@ -96,12 +198,31 @@ def decide(raw):
         return ask("shell obfuscation (IFS word-splitting or base64 piped to a "
                    "shell). Read the command before approving.")
 
-    if "\n" not in command and SAFE_RM.match(command):
-        return ALLOW
+    parsed, unreadable = segments(command)
+    for tokens, text in parsed:
+        if tokens[0] == "rm":
+            reason = rm_verdict(tokens)
+            if reason:
+                return ask(reason)
+        if tokens[0] == "git":
+            reason = git_verdict(tokens)
+            if reason:
+                return ask(reason)
+        for pattern, reason in RULES:
+            if pattern.startswith("rm") and tokens[0] == "rm":
+                continue       # rm_verdict has already read this one properly
+            if re.search(pattern, text):
+                return ask(reason)
 
     for pattern, reason in RULES:
+        if pattern.startswith("rm"):
+            continue
         if re.search(pattern, command):
             return ask(reason)
+
+    if unreadable:
+        return ask("part of this line could not be parsed (unbalanced quotes), "
+                   "so it was not checked.")
     return ALLOW
 
 

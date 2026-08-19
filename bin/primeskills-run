@@ -31,6 +31,7 @@ anyone who can push to a branch write the next agent's opening context.
 """
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -116,12 +117,37 @@ def current_branch():
     return git("rev-parse", "--abbrev-ref", "HEAD").strip() or "detached"
 
 
+def no_symlink(path, top):
+    """Refuse a journal path that leaves the repository, or leads out by link.
+
+    The journal is read back as the basis for permissions and for "the tests
+    were green", so where it lives is part of what it proves. A cloned
+    repository can ship `.primeskills` as a symlink and take both: the writes
+    land in a file it controls, and the grants it planted there are read as the
+    user's own. Checked on every component, because a link one level up is the
+    same trick one level up.
+    """
+    if path.is_symlink():
+        sys.exit(f"primeskills-run: {path} is a symlink. The run journal is "
+                 f"refused outside the repository — remove the link or the "
+                 f"record it points at.")
+    try:
+        path.resolve().relative_to(top.resolve())
+    except ValueError:
+        sys.exit(f"primeskills-run: {path} resolves outside {top}. The journal "
+                 f"is only trusted inside the repository it describes.")
+
+
 def record_path():
     top = git("rev-parse", "--show-toplevel").strip()
     if not top:
         sys.exit("primeskills-run: not inside a git repository")
+    top = Path(top)
     branch = git("rev-parse", "--abbrev-ref", "HEAD").strip() or "detached"
-    root = Path(top) / ".primeskills" / "run"
+    root = top / ".primeskills" / "run"
+    for part in (root.parent, root):
+        if part.exists() or part.is_symlink():
+            no_symlink(part, top)
     root.mkdir(parents=True, exist_ok=True)
     ignore = root.parent / ".gitignore"
     if not ignore.is_file():
@@ -131,7 +157,10 @@ def record_path():
         # on every new repository costs more than the file it guards.
         print(f"primeskills-run: создан {ignore} — записи прогона и чекпоинты "
               f"остаются локальными", file=sys.stderr)
-    return root / (slug(branch) + ".jsonl")
+    record = root / (slug(branch) + ".jsonl")
+    if record.exists() or record.is_symlink():
+        no_symlink(record, top)
+    return record
 
 
 def slug(text):
@@ -164,7 +193,10 @@ def append(path, entry):
     commit, digest = state_digest()
     entry.update({"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   "commit": commit, "state": digest})
-    with path.open("a", encoding="utf-8") as fh:
+    # O_NOFOLLOW closes the window between the check in record_path and this
+    # write: a link planted in between would otherwise be followed here.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o644)
+    with os.fdopen(fd, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     return entry
 

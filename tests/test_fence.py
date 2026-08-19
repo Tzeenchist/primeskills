@@ -47,6 +47,31 @@ COMMANDS = [
     ('{"tool_input":{"command":"rm -rf ./build"}}', None),
     ('{"tool_input":{"command":"ls -la"}}', None),
     ('{"tool_input":{"file_path":"a.py"}}', None),                # not a shell call
+    # walked past the guard in the external review of 2026-08-19: flags out of
+    # order, and git's global options standing between `git` and the verb
+    ('{"tool_input":{"command":"rm -f -r /var/data"}}', "ask"),
+    ('{"tool_input":{"command":"rm --recursive /srv/data"}}', "ask"),
+    ('{"tool_input":{"command":"FOO=bar rm -f -r /srv"}}', "ask"),
+    ('{"tool_input":{"command":"git -C /tmp/x reset --hard"}}', "ask"),
+    ('{"tool_input":{"command":"git -c advice.detachedHead=false clean -fd"}}', "ask"),
+    ('{"tool_input":{"command":"git --git-dir=/tmp/x/.git branch -D main"}}', "ask"),
+    # `git restore <path>` throws the path away with or without `--`
+    ('{"tool_input":{"command":"git restore src/app.py"}}', "ask"),
+    ('{"tool_input":{"command":"rm -f -r frontend/node_modules"}}', None),
+    # a hook that dies is a hook that permits: unexpected shapes fail closed
+    ('{"tool_input":"a string, not an object"}', "ask"),
+    ('["a list, not an object"]', "ask"),
+    ('{"tool_input":{"command":"rm -rf \\"unbalanced"}}', "ask"),
+]
+
+
+# `git checkout <path>` needs a path that exists, so this pair runs in a
+# directory made for it: the author lost an uncommitted rewrite to exactly this
+# command on 2026-08-19, an hour after hardening the rest of this guard.
+IN_TREE = [
+    ('{"tool_input":{"command":"git checkout core-file.md"}}', "ask"),
+    ('{"tool_input":{"command":"git checkout main"}}', None),
+    ('{"tool_input":{"command":"git checkout -b feature/new"}}', None),
 ]
 
 
@@ -67,6 +92,14 @@ def main():
         got = decision(run(CMD, payload))
         if got != expected:
             failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+
+    with tempfile.TemporaryDirectory() as tree:
+        (Path(tree) / "core-file.md").write_text("x", encoding="utf-8")
+        for payload, expected in IN_TREE:
+            got = decision(run(CMD, payload, cwd=tree))
+            if got != expected:
+                failures.append(f"in tree: {payload[:60]!r} -> {got}, "
+                                f"expected {expected}")
 
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp)
@@ -96,7 +129,7 @@ def main():
 
     for f in failures:
         print(f)
-    total = len(COMMANDS) + len(cases) + 1
+    total = len(COMMANDS) + len(IN_TREE) + len(cases) + 1
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 

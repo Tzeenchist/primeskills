@@ -133,6 +133,23 @@ def main():
         if text.count('"kind": "fail"') < 4 or "12 passed" not in text:
             failures.append("журнал переписан вместо дописывания")
 
+        # A cloned repository can ship `.primeskills` as a link and take both
+        # halves of the journal: the writes land where it chose, and the grants
+        # it planted there are read as the user's own.
+        outside = Path(tmp) / "outside"
+        outside.mkdir(exist_ok=True)
+        record.rename(record.with_suffix(".kept"))
+        record.symlink_to(outside / "planted.jsonl")
+        checks += 1
+        code, out = run(repo, "grant", "deploy", "--target", "prod", "подложено")
+        if code == 0 or "symlink" not in out:
+            failures.append(f"журнал-симлинк принят: exit {code}, {out.strip()!r}")
+        checks += 1
+        if (outside / "planted.jsonl").exists():
+            failures.append("запись ушла наружу по симлинку")
+        record.unlink()
+        record.with_suffix(".kept").rename(record)
+
         # a branch with a slash must not become a directory
         subprocess.run(["git", "checkout", "-q", "-b", "feat/thing"], cwd=repo, check=True)
         checks += 1

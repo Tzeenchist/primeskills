@@ -33,13 +33,14 @@ does. A skill's full text loads only when that skill is needed.
 
 ```
 always in context        443 words for all 27 skills
-shared rules             2 685 words, once per session
-one skill call           3 382 … 3 794 words
+shared rules             2 696 words, once per session
+one skill call           3 393 … 3 824 words
 ```
 
-**The ceiling on one call is 4 000 words** (rule C3), and a check holds it
-rather than a promise: the linter refuses a skill that pushes a call over the
-ceiling. For comparison, one pass of the gstack set costs about 92 000 words —
+**The ceiling on one skill call is 4 000 words** (rule C3), and a check holds
+it rather than a promise: the linter refuses a skill that pushes a call over the
+ceiling. A sequence pays for the chain it calls and is deliberately outside that
+ceiling — `primeskills-status` prints what each one costs, up to about 6 000. For comparison, one pass of the gstack set costs about 92 000 words —
 measured in `bench/RESULT.md`.
 
 ## Discipline and evidence
@@ -85,7 +86,9 @@ implying otherwise.
 
 ## Requirements
 
-Python 3 and git. Nothing else: no packages to install, no network.
+Python 3.11 or newer, and git. Nothing else: no packages to install,
+no network. The version floor is `tomllib`, which the installer uses to read
+Kimi's configuration.
 
 ## Installation
 

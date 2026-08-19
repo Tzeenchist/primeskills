@@ -28,9 +28,12 @@ Never on your own initiative, and never as the tail end of merging.
    branch or tag → **verify:** print it and have the user confirm it is what
    they meant, when it is production
 2. State the rollback, its cost in minutes, and whether it is possible at all
-   after the migrations in this release. Where there is a way back, record the
-   permission to use it: `primeskills-run grant rollback --target <the target>
-   "<procedure>"`. Where there is none, record only that the user heard it —
+   after the migrations in this release. Where there is a way back, ask whether
+   you may use it without asking again, and record only the answer you were
+   given: `primeskills-run grant rollback --target <the target> "<what the user
+   allowed>"`. Writing that line before the question is granting yourself a
+   permission, which the ladder forbids and the journal cannot detect. Where
+   there is no way back, record only that the user heard it —
    `primeskills-run note deploy "forward only, heard and accepted"` — because
    understanding that a release cannot be undone is not permission to release
    it → **verify:** a concrete procedure with its prerequisites checked, or an

@@ -113,6 +113,14 @@ def main():
             failures.append("линтер исполнил код из проверяемого дерева")
         del failures_before
 
+    # The linter against the real set, not only fixtures. Everything here
+    # checked that the rules fire on planted cases; nothing checked that the
+    # set we ship passes them, so a core file over budget (C1) was green
+    # locally and would only have failed in CI.
+    code, out = run([sys.executable, str(LINT)])
+    if code != 0:
+        failures.append(f"линтер на самом наборе: {out.strip()}")
+
     # routing linter: good table passes, colliding table fails
     code, out = run([sys.executable, str(ROUTE), str(FIXTURES / "ok"),
                      str(FIXTURES / "routing-ok.txt")])
@@ -125,7 +133,7 @@ def main():
 
     for f in failures:
         print(f)
-    print(f"{len(EXPECT) + 3} checks, {len(failures)} failed")
+    print(f"{len(EXPECT) + 4} checks, {len(failures)} failed")
 
     fence = subprocess.run([sys.executable, str(Path(__file__).parent / "test_fence.py")])
     record = subprocess.run([sys.executable, str(Path(__file__).parent / "test_run.py")])
