@@ -34,6 +34,30 @@ EXPECT = {
         "[НАРУШЕН] не пишет (G7)",
         "sed -i",
     ],
+    "readonly-wc-ok.jsonl": [
+        "[ok  ] не пишет (G7)",
+        "доля 100%",
+    ],
+    "readonly-stat-ok.jsonl": [
+        "[ok  ] не пишет (G7)",
+        "доля 100%",
+    ],
+    "readonly-rg-ok.jsonl": [
+        "[ok  ] не пишет (G7)",
+        "доля 100%",
+    ],
+    "readonly-tee-violation.jsonl": [
+        "[НАРУШЕН] не пишет (G7)",
+        "tee findings.txt",
+    ],
+    "readonly-redirect-violation.jsonl": [
+        "[НАРУШЕН] не пишет (G7)",
+        "> findings.txt",
+    ],
+    "verify-exit-unknown.jsonl": [
+        "[неизв] прогон состоялся (G4)",
+        "0 применимых, 1 неизвестных",
+    ],
     "verify-and-debug.jsonl": [
         "[НАРУШЕН] прогон состоялся (G4)",
         "[НАРУШЕН] воспроизведение до правки",
@@ -76,6 +100,9 @@ EXPECT = {
 FORBIDDEN = {
     "build-red-phase-ok.jsonl": ["НАРУШЕН"],
     "live-build-red-phase.jsonl": ["[ok  ] красная фаза"],
+    "readonly-wc-ok.jsonl": ["НАРУШЕН"],
+    "readonly-stat-ok.jsonl": ["НАРУШЕН"],
+    "readonly-rg-ok.jsonl": ["НАРУШЕН"],
 }
 
 
