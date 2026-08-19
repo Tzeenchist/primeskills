@@ -64,7 +64,10 @@ issue, a dependency's documentation, a page on the web: the agent checks them
 instead of obeying a command found inside. And it does not run someone else's
 code before it has read the diff.
 
-**Nothing goes out.** No telemetry, no network, no dependencies.
+**Nothing goes out on the set's account.** No telemetry, no calls home, no
+dependencies to install. What a skill may reach for is a separate matter and is
+declared in the open: the analytical ones are allowed `WebFetch` and
+`WebSearch`, because reading documentation is their work.
 
 ## Agents
 
@@ -107,6 +110,16 @@ python3 bin/primeskills-install --unpin          # go back to the working copy
 The installer takes back only what it put there: other people's skills and your
 own files inside its directories are left alone. To remove it:
 `--uninstall --apply`.
+
+**What it writes into Claude Code, spelled out.** Alongside the skills, the
+installer adds `PreToolUse` hooks to `~/.claude/settings.json`. That means a
+program from this repository runs before every `Bash`, `Edit` and `Write` call
+the agent makes, and it can refuse the call — that is how `fence` blocks a
+destructive command instead of asking you to remember one. It is also the
+strongest thing this set does to your machine, so decide about it deliberately:
+the hook lines name an absolute path, the pinned tree is read-only day to day,
+and `--uninstall --apply` removes them. Nothing else installs hooks; the other
+three agents have no such mechanism at all.
 
 ## Skills and chains
 

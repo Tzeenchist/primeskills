@@ -1,8 +1,8 @@
 # Terms worth glossing
 
 Gloss one of these the first time it appears in a session, even if the
-user typed it first. One clause, not a lecture. Ported from gstack's
-curated list (77 terms); it is a prompt to explain, not a
+user typed it first. One clause, not a lecture. Ported from gstack's curated
+list, three near-duplicate pairs merged; it is a prompt to explain, not a
 dictionary to paste.
 
 - CAP theorem
@@ -12,7 +12,6 @@ dictionary to paste.
 - DDoS
 - GC pause
 - GIL
-- N+1
 - N+1 query
 - OLAP
 - OLTP
@@ -49,8 +48,7 @@ dictionary to paste.
 - hot reload
 - hydration
 - hydration mismatch
-- idempotency
-- idempotent
+- idempotent / idempotency
 - inbox pattern
 - kill switch
 - load balancer
@@ -73,8 +71,7 @@ dictionary to paste.
 - soft delete
 - stack overflow
 - tail call
-- throttle
-- throttle (UI)
+- throttle (rate, and the UI sense)
 - thundering herd
 - tombstone
 - tree-shaking
