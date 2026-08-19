@@ -1,0 +1,2 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "vet", "args": "посчитать строки"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "wc -l /srv/project/primeskills/bin/* 2>/dev/null | sort -n"}}]}}

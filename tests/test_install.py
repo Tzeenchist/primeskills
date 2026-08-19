@@ -168,6 +168,27 @@ def main():
         checks += 1
         if "/home/other/guard.py" not in armed or settings.get("theme") != "dark":
             failures.append("установка затёрла чужие настройки")
+
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        env = dict(os.environ, HOME=tmp)
+        checked = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                                 text=True, env=env)
+        checks += 1
+        if "[ok  ] claude     hook armed for Bash" not in checked.stdout:
+            failures.append(f"doctor не исполнил установленный command hook:\n{checked.stdout}")
+
+        for entry in settings["hooks"]["PreToolUse"]:
+            if entry.get("matcher") == "Bash":
+                entry["hooks"][0]["command"] = f"python3 {ROOT / 'bin' / 'primeskills-help'}"
+        (h / ".claude" / "settings.json").write_text(
+            json.dumps(settings), encoding="utf-8")
+        checked = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                                 text=True, env=env)
+        checks += 1
+        if "[FAIL] claude     hook armed for Bash" not in checked.stdout:
+            failures.append("doctor принял строку hook, не проверив её фактический ответ")
+        (h / ".claude" / "settings.json").write_text(armed, encoding="utf-8")
+
         run(tmp, "claude", "--uninstall", "--apply")
         left = (h / ".claude" / "settings.json").read_text(encoding="utf-8")
         checks += 1

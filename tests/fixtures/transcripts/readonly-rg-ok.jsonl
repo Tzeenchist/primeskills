@@ -1,0 +1,2 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Skill", "input": {"skill": "vet", "args": "искать опасные вызовы"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "rg -n 'subprocess|os\\.system|Popen|rmtree|rm|cp' bin/primeskills-adherence skills/fence/bin/check-commands.py"}}]}}

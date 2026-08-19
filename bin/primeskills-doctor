@@ -11,9 +11,11 @@ is switched on.
 Exit 0 when every check passes.
 """
 import json
+import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -77,20 +79,6 @@ def check_core(r, agent, path, needle):
         r.line(FAIL, agent, "core reachable", f"no pointer in {path.name}")
 
 
-def check_guards(r):
-    """The guards must refuse, not merely exist."""
-    cases = [
-        (FENCE / "check-commands.py", '{"tool_input":{"command":"rm -rf /var/data"}}', "ask",
-         "destructive command"),
-        (FENCE / "check-commands.py", "not json", "ask", "unreadable payload fails closed"),
-    ]
-    for script, payload, expect, what in cases:
-        out = subprocess.run([sys.executable, str(script)], input=payload,
-                             capture_output=True, text=True)
-        got = (json.loads(out.stdout or "{}").get("hookSpecificOutput") or {}).get("permissionDecision")
-        r.line(OK if got == expect else FAIL, "guards", what, f"decision={got}")
-
-
 def check_pin(r):
     """Which tree the agents actually read. Unpinned is legitimate and it is
     also the state in which an edit here changes a running session."""
@@ -111,23 +99,55 @@ def check_pin(r):
 
 
 def check_hooks_declared(r):
-    """Read what is actually installed, not what the skill says about itself.
-
-    This used to read fence/SKILL.md, so it reported green while the hook the
-    host would really run was elsewhere or absent.
-    """
+    """Run the command the host installed and compare its actual decision."""
     settings = Path.home() / ".claude" / "settings.json"
-    installed = ""
+    installed = {}
     if settings.is_file():
         try:
-            installed = json.dumps(json.loads(settings.read_text(encoding="utf-8")))
+            installed = json.loads(settings.read_text(encoding="utf-8"))
         except ValueError:
-            installed = ""
-    for matcher in ("Bash", "Edit|Write|NotebookEdit"):
-        live = matcher in installed and str(ROOT) in installed
-        r.line(OK if live else FAIL, "claude", f"hook armed for {matcher}",
-               "in settings.json, every session" if live
-               else "not in settings.json — run primeskills-install --apply")
+            installed = {}
+    entries = (installed.get("hooks") or {}).get("PreToolUse") or []
+    cases = [
+        ("Bash", "check-commands.py",
+         '{"tool_input":{"command":"rm -rf /var/data"}}', "ask"),
+        ("Edit|Write|NotebookEdit", "check-boundary.py",
+         '{"tool_input":{"file_path":"/outside"}}', "deny"),
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        boundary = Path(tmp) / ".primeskills"
+        boundary.mkdir()
+        (boundary / "boundary").write_text(str(Path(tmp) / "inside") + "\n",
+                                            encoding="utf-8")
+        for matcher, script, payload, expect in cases:
+            expected_script = FENCE / script
+            commands = [str(hook.get("command", ""))
+                        for entry in entries if entry.get("matcher") == matcher
+                        for hook in (entry.get("hooks") or [])]
+            argv = []
+            for command in commands:
+                try:
+                    candidate = shlex.split(command)
+                except ValueError:
+                    continue
+                if (len(candidate) == 2 and Path(candidate[0]).name.startswith("python")
+                        and Path(candidate[1]).resolve() == expected_script.resolve()):
+                    argv = candidate
+                    break
+            valid = bool(argv)
+            got = None
+            if valid:
+                out = subprocess.run(argv, input=payload, capture_output=True,
+                                     text=True, cwd=tmp)
+                try:
+                    got = (json.loads(out.stdout or "{}").get("hookSpecificOutput")
+                           or {}).get("permissionDecision")
+                except ValueError:
+                    got = None
+            live = valid and got == expect
+            detail = f"decision={got}" if valid else "installed command is not ours"
+            r.line(OK if live else FAIL, "claude", f"hook armed for {matcher}",
+                   detail if commands else "not in settings.json — run primeskills-install --apply")
 
 
 def check_profile(r, agent, dest):
@@ -193,7 +213,6 @@ def main():
     else:
         r.line(WARN, "kimi", "skills linked", "no config")
 
-    check_guards(r)
     check_command(r)
 
     print(f"\n{r.failed} failed")
