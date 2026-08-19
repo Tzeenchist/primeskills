@@ -22,8 +22,9 @@ see, and nobody asked for them just because the code compiles.
   on the pull request.
 
 ## Procedure
-1. If the change came from someone else, `vet` runs **first** and the suite
-   waits for it → **verify:** the diff is reviewed before anything from it is
+1. If the change came from someone else, `vet` runs **first** and
+   `primeskills-run check vet` must be current before the suite
+   → **verify:** the diff is reviewed before anything from it is
    executed. Collecting tests imports the application, so a payload in any
    imported module runs before a single test does; reading test files is not
    enough
@@ -41,8 +42,9 @@ see, and nobody asked for them just because the code compiles.
 7. Call `handoff` if work remains, before landing → **verify:** the checkpoint
    names what is left and stays in this tree — it is local and does not go
    into the pull request
-8. Call `land` → **verify:** PR exists, criteria marked, secrets pass done, and
-   no file from `.primeskills/` is in the diff
+8. Call `land`. With `PRIMESKILLS_CHAIN_STATE=1`, stale `verify` at its
+   `may push` or `may pr` returns to step 3 → **verify:** PR exists, criteria
+   marked, secrets pass done, and no file from `.primeskills/` is in the diff
 
 ## Stop conditions
 - Three trips back to `build` on the same finding: stop and ask (G9).

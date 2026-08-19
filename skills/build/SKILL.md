@@ -27,33 +27,36 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
    what is already dirty and whose it is, and find the project's real commands
    → **verify:** you can name the test command and you have not claimed
    someone else's uncommitted work
-2. Resolve what the suite will touch before running it — database, cache,
+2. Before executing someone else's change, call `vet`, then require current
+   `primeskills-run check vet`; without it, use a sandbox or obtain the user's
+   trust → **verify:** review precedes execution; trust boundary is named
+3. Resolve what the suite will touch before running it — database, cache,
    directories — and print each one (G17) → **verify:** every named target is a
    test target you can point at, not a working or dev store
-3. Run the suite once before touching anything → **verify:** you know which
+4. Run the suite once before touching anything → **verify:** you know which
    failures were already there
-4. Restate the task as a verifiable goal → **verify:** it names a command or an
+5. Restate the task as a verifiable goal → **verify:** it names a command or an
    observation that will settle it
-5. Cut it into steps a single commit can carry → **verify:** each step has its
+6. Cut it into steps a single commit can carry → **verify:** each step has its
    own check, and no step needs a later one to be meaningful
-6. Before a risky step — migration, bulk edit, refactor — take a snapshot that
+7. Before a risky step — migration, bulk edit, refactor — take a snapshot that
    covers untracked files too, and a dump for data (G14) → **verify:** you
    restored it somewhere disposable and saw your newest file come back
-7. **Red.** Write the test that fails for the right reason → **verify:** run it,
+8. **Red.** Write the test that fails for the right reason → **verify:** run it,
    record the failure message verbatim — that record is the red half of the
    proof and `verify` will read it rather than re-deriving it
-8. **Green.** Write the least code that passes. If the step fails, record it —
+9. **Green.** Write the least code that passes. If the step fails, record it —
    `primeskills-run fail "<problem>"` — before trying again, so the breaker
    counts here too and not only inside `cycle` → **verify:** `verify` reports
    PASS, or the attempt is on the counter
-9. **Refactor.** Clean only what you just wrote → **verify:** tests still PASS,
+10. **Refactor.** Clean only what you just wrote → **verify:** tests still PASS,
    and the diff contains no unrelated change
-10. Every 2–3 steps, commit atomically **where the commit rung is open**:
+11. Every 2–3 steps, commit atomically **where the commit rung is open**:
    `primeskills-run may commit` first, and if it refuses, ask instead of
    committing. Stage intentional files only, never `git add -A` → **verify:**
    the rung was checked, and `git diff --staged` shows exactly what you meant
    to include (G11)
-11. Repeat from 7 until the acceptance criteria are met → **verify:** re-read
+12. Repeat from 8 until the acceptance criteria are met → **verify:** re-read
    them line by line and mark each one
 
 ## Stop conditions

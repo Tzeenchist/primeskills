@@ -6,6 +6,7 @@ because that is the failure being fixed — state that only existed while one
 agent was still running.
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -16,9 +17,13 @@ ROOT = Path(__file__).resolve().parent.parent
 RUN = ROOT / "bin" / "primeskills-run"
 
 
-def run(repo, *args):
+def run(repo, *args, chain_state=False):
+    env = os.environ.copy()
+    env.pop("PRIMESKILLS_CHAIN_STATE", None)
+    if chain_state:
+        env["PRIMESKILLS_CHAIN_STATE"] = "1"
     p = subprocess.run([sys.executable, str(RUN), *args],
-                       capture_output=True, text=True, cwd=repo)
+                       capture_output=True, text=True, cwd=repo, env=env)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -76,6 +81,30 @@ def main():
         code, out = run(repo, "check", "vet")
         if code != 1:
             failures.append("check по незаписанной стадии должен отличаться от протухшей")
+
+        # land checks verify before commit, then commit changes the state that
+        # evidence described. With the chain flag, its next machine gate must
+        # stop at may push until verify is run against the committed tree.
+        (repo / "seed.txt").write_text("ready to commit\n", encoding="utf-8")
+        run(repo, "note", "verify", "pytest -q: 12 passed, exit 0")
+        subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-q", "-m", "change seed"],
+                       cwd=repo, check=True)
+        run(repo, "grant", "push", "ветка work")
+        checks += 1
+        code, out = run(repo, "may", "push")
+        if code != 0:
+            failures.append(f"снятый chain-state изменил прежний may push: {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "may", "push", chain_state=True)
+        if code != 2 or "STALE" not in out:
+            failures.append(f"commit не остановил land на протухшем verify: {code}\n{out}")
+        run(repo, "note", "verify", "pytest -q: 12 passed, exit 0")
+        checks += 1
+        code, out = run(repo, "may", "push", chain_state=True)
+        if code != 0:
+            failures.append(f"повторный verify не открыл land: {code}\n{out}")
 
         # G9: the counter belongs to the file, so a new process keeps counting
         for expected in (1, 2):
