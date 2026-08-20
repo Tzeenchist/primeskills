@@ -46,6 +46,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+SET_ROOT = Path(__file__).resolve().parent.parent  # набор, который читает агент
 BREAKER = 3  # G12: three failed attempts on one problem and the loop stops
 BIG_FILE = 4 * 1024 * 1024  # past this, hash size plus 64 KiB at each end
 SAMPLE_SIZE = 64 * 1024
@@ -298,6 +299,60 @@ def permission_entries(record):
     """
     return sorted(read(ledger_path(record), strict=True),
                   key=lambda e: e.get("ts", ""))
+
+
+def set_stamp():
+    """Version and content of the set the agent is reading right now."""
+    version = "?"
+    try:
+        version = (SET_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    digest = hashlib.sha1()
+    for part in (sorted(SET_ROOT.glob("core/*.md"))
+                 + sorted(SET_ROOT.glob("skills/*/SKILL.md"))):
+        try:
+            body = part.read_bytes()
+        except OSError:
+            continue
+        digest.update(str(part.relative_to(SET_ROOT)).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(body)
+    return version, digest.hexdigest()[:12]
+
+
+def warn_if_set_moved(path):
+    """Say it out loud when the set changed under the session.
+
+    The install is live: agents read this working copy, so an edit here lands in
+    the next call. A session reads `core/` once at the start and a skill body
+    later, and between those two reads the set can move — it did on 2026-08-19
+    and again on 2026-08-20, when parallel agents edited `core/GUARDRAILS.md`
+    and `skills/verify/SKILL.md` while other sessions were running. Nobody
+    learned of it: not the agent, which had already read the old rule, and not
+    the person, who saw two consistent-looking answers written against two
+    different sets. `--pin` exists against exactly this and nobody remembers to
+    use it.
+
+    Detection, not prevention: the earlier read has already happened. But a
+    named change is a question the next reader can ask, and silence is not.
+    Written to stderr so that `start`, which prints a path, stays parseable.
+
+    Blind spot worth naming: this measures the copy `primeskills-run` itself
+    lives in. Under `--pin` the agents read a pinned worktree while the program
+    on PATH may be the working copy, and then the two answer about different
+    trees — the same split-brain PS-048 closed for hooks.
+    """
+    version, digest = set_stamp()
+    previous = next((e for e in reversed(read(path)) if e.get("kind") == "set"), None)
+    if previous and previous.get("version") == version and previous.get("set") == digest:
+        return
+    if previous:
+        was = f"{previous.get('version')}+{previous.get('set')}"
+        print(f"primeskills-run: набор сдвинулся под сессией: было {was}, "
+              f"стало {version}+{digest}. Прочитанное раньше — из другого "
+              f"набора; перечитайте то, на что опираетесь.", file=sys.stderr)
+    append(path, {"kind": "set", "version": version, "set": digest})
 
 
 def append(path, entry):
@@ -601,14 +656,25 @@ def cmd_check(path, argv):
 
 
 def cmd_show(path):
-    entries = permission_entries(path)
+    """Everything this branch recorded, plus the ladder as it stands.
+
+    Two records, and `show` needs both. Evidence — notes, counters, guard
+    lines — is per branch; permissions are per repository since PS-047. When
+    that split landed in 0.6.0 this function kept asking `permission_entries()`
+    for everything, and a branch with a full run log but no grants printed
+    "nothing recorded yet". The test that should have caught it named a line
+    number that both records happened to share.
+    """
+    ladder = permission_entries(path)
+    entries = sorted(read(path, strict=True) + ladder,
+                     key=lambda e: e.get("ts", ""))
     if not entries:
         print("nothing recorded yet")
         return 0
     commit, digest = state_digest()
     print(f"# Run record — {path.stem}\n")
     print(f"Tree now: {commit[:8]}+{digest}\n")
-    open_rungs = mandates(entries)
+    open_rungs = mandates(ladder)
     print("## Заявленные полномочия (журнал, не гейт)\n")
     if open_rungs:
         for rung in RUNGS:
@@ -617,7 +683,7 @@ def cmd_show(path):
     else:
         print("- nothing granted: every rung of the ladder still asks")
     print()
-    counts = counters(entries)
+    counts = counters(entries)  # счётчики G12 ведутся по ветке
     if counts:
         print("## Counters\n")
         for k, v in sorted(counts.items()):
@@ -653,8 +719,10 @@ def main(argv):
     path = record_path()
     if action == "start":
         path.touch()  # `start` means the record exists, not that a path was computed
+        warn_if_set_moved(path)
         print(path)
         return 0
+    warn_if_set_moved(path)
     if action == "show":
         return cmd_show(path)
     if action == "note":

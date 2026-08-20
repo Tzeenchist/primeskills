@@ -440,6 +440,59 @@ def main():
         if code == 0 or "старой версией" in out:
             failures.append(f"грант из записи ветки всё ещё читается:\n{out}")
 
+    # The install is live, so the set can move between the read of core/ and
+    # the read of a skill body — it did, twice, while parallel agents worked.
+    # Detection, not prevention: the earlier read has already happened.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        code, out = run(repo, "start")
+        record = Path(out.strip().splitlines()[0])
+        checks += 1
+        if not any(json.loads(l).get("kind") == "set"
+                   for l in record.read_text(encoding="utf-8").splitlines() if l.strip()):
+            failures.append(f"отпечаток набора не записан при start:\n{out}")
+        checks += 1
+        code, out = run(repo, "show")
+        if "набор сдвинулся" in out:
+            failures.append(f"предупреждение на неподвижном наборе:\n{out}")
+        # запись от предыдущей версии набора: так это и выглядит после обновления
+        with record.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"kind": "set", "version": "0.0.1",
+                                 "set": "0" * 12, "ts": "2000-01-01T00:00:00+00:00",
+                                 "commit": "x", "state": "y"}, ensure_ascii=False) + "\n")
+        checks += 1
+        code, out = run(repo, "show")
+        if "набор сдвинулся" not in out or "0.0.1+000000000000" not in out:
+            failures.append(f"сдвиг набора не назван:\n{out}")
+        checks += 1
+        code, out = run(repo, "show")
+        if "набор сдвинулся" in out:
+            failures.append(f"о сдвиге сказано дважды — новый отпечаток не записан:\n{out}")
+
+    # `show` читает обе записи. С 0.6.0 полномочия живут отдельно от
+    # доказательств, и функция осталась спрашивать только их: ветка с полным
+    # журналом прогона и без единого гранта печатала «nothing recorded yet».
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
+        run(repo, "note", "verify", "зелёный прогон")
+        run(repo, "fail", "экспорт рисует 4 листа")
+        checks += 1
+        code, out = run(repo, "show")
+        if "зелёный прогон" not in out or "экспорт рисует" not in out:
+            failures.append(f"show потерял журнал ветки:\n{out}")
+        checks += 1
+        run(repo, "grant", "push", "ветка work")
+        code, out = run(repo, "show")
+        if "зелёный прогон" not in out or "**push**" not in out:
+            failures.append(f"show показывает не обе записи сразу:\n{out}")
+
     # --peek asks without spending: the pre-step check must not burn the
     # one-use mandate it only confirms (PS-047), and a plain `may` still spends
     with tempfile.TemporaryDirectory() as tmp:
@@ -476,14 +529,28 @@ def main():
         code, out = run(repo, "may", "deploy", "--target", "staging", "--peek")
         if code == 0 or "строка 2" not in out:
             failures.append(f"битая строка spent воскресила мандат: {code}\n{out}")
+    # то же для записи по ветке — в отдельном репозитории, чтобы отказ нельзя
+    # было спутать с отказом по журналу полномочий. Прежняя редакция держала
+    # обе проверки в одном дереве, и там битые строки обеих записей стояли
+    # вторыми: проверка проходила, не различая, на какой из них сработал отказ
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
         run(repo, "note", "verify", "green")
         record = next((repo / ".primeskills" / "run").glob("work-*.jsonl"))
         with record.open("a", encoding="utf-8") as fh:
             fh.write("не json\n")
+        # номер считается, а не вписывается: запись пополняемая, и отпечаток
+        # набора занимает в ней место наравне со всем остальным
+        bad = len(record.read_text(encoding="utf-8").splitlines())
         for args in (("check", "verify"), ("show",)):
             checks += 1
             code, out = run(repo, *args)
-            if code == 0 or "строка 2" not in out:
+            if code == 0 or f"строка {bad}" not in out or record.name not in out:
                 failures.append(f"{args[0]}: битая строка не дала отказ с номером: {code}\n{out}")
 
     # outside a repository it must refuse, not write somewhere surprising
