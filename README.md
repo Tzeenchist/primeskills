@@ -40,7 +40,7 @@ one skill call           3 461 … 3 897 words
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
 it rather than a promise: the linter refuses a skill that pushes a call over the
 ceiling. A sequence pays for the chain it calls and is deliberately outside that
-ceiling — `primeskills-status` prints what each one costs, up to about 6 000. For comparison, one pass of the gstack set costs about 92 000 words —
+ceiling — `primeskills-status` prints what each one costs, up to about 6 250. For comparison, one pass of the gstack set costs about 92 000 words —
 measured in `bench/RESULT.md`.
 
 ## Discipline and evidence
@@ -60,7 +60,8 @@ their size plus the first and last 64 KiB; symbolic links use their path and
 target without reading through the link or leaving the repository.
 
 **Authority by rungs.** Commit, push, pull request, merge, migrate, deploy,
-roll back, delete — eight separate yeses. One does not open the next,
+roll back, delete, clear a failure counter — nine separate yeses. One does not
+open the next,
 permission for staging does not open production, and permission for one deploy
 does not cover tomorrow's.
 
@@ -214,7 +215,7 @@ out of the repository.
 
 ## Licence
 
-MIT — `LICENSE`. The set was synthesised from six sources; what came from
+MIT — `LICENSE`. The set was synthesised from seven sources; what came from
 where, under which licence and from whom is in `ATTRIBUTIONS.md` and `NOTICE`,
 line by line in `docs/SKILL-SOURCES.md`.
 
@@ -222,6 +223,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules. `TODOS.md` —
-the queue. Version 0.2.0: the set works, but it has not yet proved itself by
+the queue. Version 0.8.0: the set works, but it has not yet proved itself by
 measurement on live tasks, and `PS-009` says in advance at which numbers it
 gets folded back.
