@@ -182,6 +182,30 @@ def main():
     except SystemExit:
         pass
 
+    # 3b''''. The changelog is wrapped at the width of the repository; a GitHub
+    #         release body is rendered with hard line breaks, so that wrapping
+    #         arrives as a column of ragged short lines. Undone on the way out,
+    #         and only there.
+    wrapped = ("- **Первый пункт.** Он занимает\n  две строки в файле.\n"
+               "- Второй пункт.\n\nАбзац, тоже\nв две строки.\n\n"
+               "```\nкод\n  остаётся\n```\n")
+    got = release.notes_for(wrapped, "2026-01-01")
+    checks += 1
+    if "**Первый пункт.** Он занимает две строки в файле." not in got:
+        failures.append(f"unwrap не склеил перенос внутри пункта:\n{got}")
+    checks += 1
+    if "- Второй пункт." not in got or got.count("- ") != 2:
+        failures.append(f"unwrap потерял границу между пунктами:\n{got}")
+    checks += 1
+    if "Абзац, тоже в две строки." not in got:
+        failures.append(f"unwrap не склеил абзац:\n{got}")
+    checks += 1
+    if "```\nкод\n  остаётся\n```" not in got:
+        failures.append(f"unwrap тронул код внутри ограды:\n{got}")
+    checks += 1
+    if "\n\n" not in got:
+        failures.append(f"unwrap съел пустые строки:\n{got}")
+
     # 3c. The guide is generated from the set, except two hand-written parts —
     #     and those are exactly the parts that went stale. Each claim below is
     #     tied to something the code decides.

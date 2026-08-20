@@ -39,6 +39,53 @@ def entry(version):
     return date, body
 
 
+ITEM = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|#{1,6}\s|>\s)")
+
+
+def unwrap(body):
+    """Undo the file's own line wrapping, because GitHub does not.
+
+    `CHANGELOG.md` is wrapped at the width the rest of the repository is
+    wrapped at. A release body is rendered as GitHub Flavored Markdown with
+    hard line breaks on, so every one of those newlines becomes a `<br>` and
+    the entry arrives as a column of ragged short lines. The wrapping is right
+    for the file and wrong for the page, so it is undone here rather than
+    removed there. Blank lines, list boundaries and fenced code survive.
+    """
+    out, block, fenced = [], [], False
+    def flush():
+        if block:
+            out.append(" ".join(line.strip() for line in block))
+            block.clear()
+    for line in body.splitlines():
+        if line.lstrip().startswith("```"):
+            flush()
+            fenced = not fenced
+            out.append(line)
+            continue
+        if fenced:
+            out.append(line)
+            continue
+        if not line.strip():
+            flush()
+            out.append("")
+            continue
+        if ITEM.match(line):
+            flush()
+        block.append(line)
+    flush()
+    return "\n".join(out)
+
+
+def notes_for(body, date):
+    """The release body as it will be posted. Separate from `main` so that the
+    unwrapping is tested where it is used, not only where it is defined: the
+    first test called `unwrap` directly and stayed green when `main` stopped
+    calling it."""
+    return (f"{unwrap(body)}\n\n---\nВыпущено {date}. "
+            f"Полный журнал изменений — `CHANGELOG.md`.")
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("version", nargs="?", help="по умолчанию — файл VERSION")
@@ -64,9 +111,13 @@ def main(argv):
         sys.exit("primeskills-release: дерево грязное — релиз описывает коммит, "
                  "а не рабочую копию")
 
+    # A tag subject that only repeats the version says nothing the title
+    # already carries, and it became the release title verbatim once.
     subject = git("tag", "-l", tag, "--format=%(contents:subject)").stdout.strip()
+    if subject in (version, tag, ""):
+        subject = ""
     title = subject or f"primeskills {version}"
-    notes = f"{body}\n\n---\nВыпущено {date}. Полный журнал изменений — `CHANGELOG.md`."
+    notes = notes_for(body, date)
 
     repo = ["--repo", args.repo] if args.repo else []
     exists = subprocess.run(["gh", "release", "view", tag, *repo],
