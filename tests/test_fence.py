@@ -307,6 +307,28 @@ def main():
                 if got is not None:
                     failures.append(f"authority open: {mode} {command!r} -> {got}")
 
+        # The hook is handed the session's directory, not the one the command
+        # acts on. Asked from outside a repository the ladder answers "not
+        # inside a git repository", which is a non-zero code and therefore a
+        # refusal — with the rung open the whole time. Both ways of naming the
+        # repository on the line must find its journal. This is the failure the
+        # rule shipped with: the author's own push was refused twice.
+        outside = Path(tmp) / "elsewhere"
+        outside.mkdir()
+        for command, expected in [
+                (f"cd {repo} && git push origin work", None),
+                (f"git -C {repo} push origin work", None),
+                ("git push origin work", "deny")]:
+            payload = json.dumps({"tool_name": "Bash",
+                                  "permission_mode": "bypassPermissions",
+                                  "cwd": str(outside),
+                                  "tool_input": {"command": command}})
+            got = decision(run(CMD, payload, cwd=outside, env=env))
+            authority_checks += 1
+            if got != expected:
+                failures.append(f"журнал не там: {command!r} -> {got}, "
+                                f"ожидалось {expected}")
+
         shadowed_authority = [
             ("git push origin work && rm -rf /srv/data", "bypassPermissions",
              "deny", None),

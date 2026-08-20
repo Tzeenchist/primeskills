@@ -387,6 +387,43 @@ def git_verdict(tokens):
     return None
 
 
+def journal_cwd(command, cwd):
+    """Where the run journal lives for the command about to run.
+
+    The hook is handed the session's directory, which is not always the one the
+    command acts on: `cd <repo> && git push` and `git -C <repo> push` both work
+    on a repository the session is not standing in. Asking the ladder from the
+    wrong place got `primeskills-run: not inside a git repository`, a non-zero
+    code and therefore a refusal — while the rung was open the whole time.
+
+    Read from the raw line rather than from `segments()`, which strips `-C`
+    along with the rest of git's global options before anyone sees it. Only the
+    journal is looked up this way; whether a path escapes is still judged
+    against the directory the session is actually in, which is the more
+    cautious base of the two.
+    """
+    for part in top_level_parts(command):
+        try:
+            words = shlex.split(part, comments=True)
+        except ValueError:
+            continue
+        candidate = None
+        if words[:1] == ["cd"] and len(words) > 1 and not words[1].startswith("-"):
+            candidate = words[1]
+        elif words[:1] == ["git"] and "-C" in words[:4]:
+            i = words.index("-C")
+            candidate = words[i + 1] if i + 1 < len(words) else None
+        if not candidate:
+            continue
+        try:
+            target = (Path(cwd or ".") / candidate).resolve()
+        except OSError:
+            continue
+        if target.is_dir():
+            return str(target)
+    return cwd
+
+
 def command_rung(tokens):
     """Return the authority rung for an exact command prefix, if it has one."""
     for prefix, rung in COMMAND_RUNGS.items():
@@ -591,18 +628,20 @@ def decide(raw):
         # words settle it: a mandate counts when what they named appears in the
         # command. The guard's guess at "the target" is a first operand; theirs
         # is a database or a path they meant.
-        code, said = run_tool(["may", rung, "--peek"], cwd)
+        code, said = run_tool(["may", rung, "--peek"], journal_cwd(command, cwd))
         named = re.search(r"target=(\S+)", said or "")
         covered = code == 0 and (not named or named.group(1).lower() in command.lower())
         if covered:
-            run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"], cwd)
+            run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"],
+                     journal_cwd(command, cwd))
             return ALLOW
         instruction = grant_command(rung)
         if mode not in SILENT_MODES:
             return ask(
                 f"{reason}. Open the {rung} rung before running it: "
                 f"`{instruction}`.")
-        run_tool(["note", "guard", f"refused, no {rung}: {command[:120]}"], cwd)
+        run_tool(["note", "guard", f"refused, no {rung}: {command[:120]}"],
+                 journal_cwd(command, cwd))
         return deny(
             f"{reason}. Confirmations are off, so this is refused rather than "
             f"asked: tell the user what it will do, and when they agree record "
