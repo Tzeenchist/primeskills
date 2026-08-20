@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The guards must block what they claim to block."""
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -176,9 +177,24 @@ SHADOWED = [
 ]
 
 
-def run(script, payload, cwd=None):
+# PS-041: on Claude Code the Bash hook is the gate for authority, not merely a
+# place where the agent records what it chose to do. These are the RUNGS whose
+# commands have one unambiguous spelling. Reading neighbours stay outside the
+# gate: inspecting git or a pull request changes nothing.
+AUTHORITY = [
+    ("git push origin work", "push", ("push", "ветка work")),
+    ("gh pr create --title x --body y", "pr", ("pr", "PR из work")),
+    ("git merge feature", "merge", ("merge", "feature в work")),
+    ("kubectl apply -f staging/deploy.yaml", "deploy",
+     ("deploy", "--target", "staging", "выкатить в staging")),
+]
+READ_ONLY = ["git status", "git log -1", "git diff", "gh pr view 12",
+             "gh run list"]
+
+
+def run(script, payload, cwd=None, env=None):
     p = subprocess.run([sys.executable, str(script)], input=payload,
-                       capture_output=True, text=True, cwd=cwd)
+                       capture_output=True, text=True, cwd=cwd, env=env)
     return json.loads(p.stdout or "{}")
 
 
@@ -186,9 +202,14 @@ def decision(out):
     return (out.get("hookSpecificOutput") or {}).get("permissionDecision")
 
 
+def reason(out):
+    return (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+
+
 def main():
     failures = []
     cases = []
+    authority_checks = 0
     for payload, expected in COMMANDS:
         got = decision(run(CMD, payload))
         if got != expected:
@@ -216,6 +237,121 @@ def main():
         if got != expected:
             failures.append(f"shadowed: {mode} {command!r} -> {got}, "
                             f"expected {expected}")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo,
+                       check=True)
+        (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+        subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-q", "-m", "init"], cwd=repo, check=True)
+        env = os.environ.copy()
+        env["PATH"] = str(ROOT / "bin") + os.pathsep + env.get("PATH", "")
+
+        for command, rung, _grant in AUTHORITY:
+            payload = json.dumps({"tool_name": "Bash", "permission_mode": "default",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            out = run(CMD, payload, cwd=repo, env=env)
+            authority_checks += 1
+            if decision(out) != "ask" or f"primeskills-run grant {rung}" not in reason(out):
+                failures.append(f"authority closed+ask: {command!r} -> {out}")
+
+            payload = json.dumps({"tool_name": "Bash",
+                                  "permission_mode": "bypassPermissions",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            authority_checks += 1
+            if got != "deny":
+                failures.append(f"authority closed+deny: {command!r} -> {got}")
+
+        # A global option sits between the program and its subcommand. `git -C
+        # x push` was already normalised; `gh --repo o/r pr create` walked
+        # straight past the pr rung until `gh` got the same treatment. Checked
+        # here, inside the disposable repository and while the rungs are still
+        # closed: run against the developer's own journal these read `allow`,
+        # because the developer has push open — a test whose verdict depends on
+        # that is not a test.
+        for command, expected in [
+                ("git -C /srv/x push origin master", "ask"),
+                ("git -c user.name=x push", "ask"),
+                ("gh --repo owner/repo pr create --fill", "ask"),
+                ("gh -R owner/repo pr create --fill", "ask"),
+                ("gh --repo owner/repo pr view 1", None)]:
+            payload = json.dumps({"tool_name": "Bash", "permission_mode": "default",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            authority_checks += 1
+            if got != expected:
+                failures.append(f"глобальная опция: {command!r} -> {got}, "
+                                f"ожидалось {expected}")
+
+        for command, rung, grant in AUTHORITY:
+            p = subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
+                                "grant", *grant], cwd=repo, env=env,
+                               capture_output=True, text=True)
+            authority_checks += 1
+            if p.returncode != 0:
+                failures.append(f"authority grant {rung}: {p.stdout}{p.stderr}")
+                continue
+            for mode in ("default", "bypassPermissions"):
+                payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
+                                      "cwd": str(repo),
+                                      "tool_input": {"command": command}})
+                got = decision(run(CMD, payload, cwd=repo, env=env))
+                authority_checks += 1
+                if got is not None:
+                    failures.append(f"authority open: {mode} {command!r} -> {got}")
+
+        shadowed_authority = [
+            ("git push origin work && rm -rf /srv/data", "bypassPermissions",
+             "deny", None),
+            ("git push origin work && dropdb prod", "bypassPermissions",
+             "deny", None),
+            ("git push origin work && git restore seed.txt", "default", "ask",
+             "discards uncommitted changes"),
+            ("git push --force origin work", "default", "ask",
+             "rewrites history others may already have"),
+        ]
+        for command, mode, expected, reason_part in shadowed_authority:
+            payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            out = run(CMD, payload, cwd=repo, env=env)
+            authority_checks += 1
+            if (decision(out) != expected
+                    or (reason_part and reason_part not in reason(out))):
+                failures.append(f"authority shadowed: {command!r} -> {out}")
+
+        # deploy is single-use. Seeing it twice through the hook proves that
+        # the gate peeks instead of spending the user's one permitted action.
+        deploy = AUTHORITY[-1][0]
+        payload = json.dumps({"tool_name": "Bash", "permission_mode": "default",
+                              "cwd": str(repo), "tool_input": {"command": deploy}})
+        got = decision(run(CMD, payload, cwd=repo, env=env))
+        authority_checks += 1
+        if got is not None:
+            failures.append(f"authority deploy mandate was spent by peek: {got}")
+
+        for command in READ_ONLY:
+            payload = json.dumps({"tool_name": "Bash", "permission_mode": "default",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            authority_checks += 1
+            if got is not None:
+                failures.append(f"authority read-only: {command!r} -> {got}")
+
+        records = list((repo / ".primeskills" / "run").glob("work-*.jsonl"))
+        journal = records[0].read_text(encoding="utf-8") if records else ""
+        for _command, rung, _grant in AUTHORITY:
+            authority_checks += 1
+            if f"allowed under an open {rung}" not in journal:
+                failures.append(f"authority journal: no allowed {rung} line")
 
     for command, expected in QUOTED:
         payload = json.dumps({"tool_input": {"command": command}})
@@ -269,7 +405,8 @@ def main():
         print(f)
     total = (len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
              + len(SHADOWED) + len(MODES) + len(QUOTED)
-             + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1)
+             + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1
+             + authority_checks)
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 

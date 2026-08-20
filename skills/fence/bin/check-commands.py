@@ -102,6 +102,15 @@ RULES = [
     (r"docker\s+(rm\s+-f|system\s+prune)", "Docker force-remove or prune deletes containers and images"),
 ]
 
+# The exact RUNGS-to-command correspondences defined by PS-041. This is
+# deliberately not a catalogue of guesses for the remaining ladder entries.
+COMMAND_RUNGS = {
+    ("git", "push"): "push",
+    ("gh", "pr", "create"): "pr",
+    ("git", "merge"): "merge",
+    ("kubectl", "apply"): "deploy",
+}
+
 
 def deny(reason):
     return json.dumps({
@@ -284,6 +293,14 @@ def top_level_parts(command):
     return parts
 
 
+# Which leading options belong to the program rather than to its subcommand,
+# split into the ones that swallow the next word and the ones that do not.
+GLOBAL_OPTIONS = {
+    "git": (GIT_GLOBAL_WITH_VALUE, GIT_GLOBAL_FLAGS),
+    "gh": ({"-R", "--repo"}, set()),
+}
+
+
 def segments(command):
     """Words of each command in the line, and a rebuilt string to match on.
 
@@ -302,17 +319,22 @@ def segments(command):
             continue
         while tokens and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tokens[0]):
             tokens.pop(0)          # FOO=bar rm -rf /
-        if tokens and tokens[0] == "git":
-            rest = tokens[1:]
+        # Global options sit between the program and its subcommand, so a rule
+        # keyed on the subcommand misses `git -C x push` and `gh --repo o/r pr
+        # create` unless they are stripped first. `gh` was added when the
+        # authority rules landed: `--repo` walked straight past the pr rung.
+        if tokens and tokens[0] in GLOBAL_OPTIONS:
+            with_value, flags = GLOBAL_OPTIONS[tokens[0]]
+            program, rest = tokens[0], tokens[1:]
             while rest and rest[0].startswith("-"):
                 head = rest[0]
-                if head in GIT_GLOBAL_WITH_VALUE:
+                if head in with_value:
                     rest = rest[2:]
-                elif head in GIT_GLOBAL_FLAGS or "=" in head:
+                elif head in flags or "=" in head:
                     rest = rest[1:]
                 else:
                     break
-            tokens = ["git"] + rest
+            tokens = [program] + rest
         if tokens:
             out.append((tokens, " ".join(tokens)))
     return out, unreadable
@@ -363,6 +385,21 @@ def git_verdict(tokens):
             except OSError:
                 continue
     return None
+
+
+def command_rung(tokens):
+    """Return the authority rung for an exact command prefix, if it has one."""
+    for prefix, rung in COMMAND_RUNGS.items():
+        if tuple(tokens[:len(prefix)]) == prefix:
+            return rung
+    return None
+
+
+def grant_command(rung):
+    if rung in {"deploy", "delete"}:
+        return (f"primeskills-run grant {rung} --target <the path or environment> "
+                f"\"<what the user allowed>\"")
+    return f'primeskills-run grant {rung} "<what the user allowed>"'
 
 
 OUTPUT_REDIRECTS = {">", ">>", ">|", "<>", "&>", "&>>"}
@@ -457,6 +494,7 @@ def decide(raw):
     parsed, unreadable = segments(command)
 
     verdict = None                     # (reason, rung or None, target or None)
+    authority_verdict = False
     for tokens, text in parsed:
         if tokens[0] == "rm":
             reason = rm_verdict(tokens)
@@ -500,6 +538,18 @@ def decide(raw):
                 verdict = (reason, None, None)
                 break
 
+    # Authority comes after every destructive rule. If it ran in the loop
+    # above, `git push && rm -rf /srv/data` would stop at push and the later rm
+    # would never be judged. It stays before output redirects because this
+    # verdict carries a rung and must not lose it to a rungless redirect.
+    if verdict is None:
+        for tokens, _text in parsed:
+            rung = command_rung(tokens)
+            if rung:
+                verdict = (f"this command requires the {rung} rung", rung, None)
+                authority_verdict = True
+                break
+
     # Last, and that position is the point. A redirect carries no rung, and a
     # rungless verdict passes silently where confirmations are off. Checked
     # first, it shadowed the rules that do carry one: `rm -rf /srv/data` was
@@ -531,13 +581,11 @@ def decide(raw):
         return ALLOW
 
     reason, rung, target = verdict
-    if mode not in SILENT_MODES:
+    # Existing destructive verdicts keep their confirmation-mode behaviour.
+    # In particular, opening push does not turn a force-push prompt into an
+    # allow. Only the explicit authority mappings gain the open-rung fast path.
+    if mode not in SILENT_MODES and not authority_verdict:
         return ask(reason)
-
-    # The user turned confirmations off. Asking anyway trains the reflex; going
-    # quiet everywhere removes the guard exactly where the agent runs unwatched.
-    # So: the short irreversible list needs a permission that was actually
-    # granted, and everything else passes with a line in the journal.
     if rung:
         # Peek at the ladder without spending anything, and let the human's own
         # words settle it: a mandate counts when what they named appears in the
@@ -549,12 +597,23 @@ def decide(raw):
         if covered:
             run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"], cwd)
             return ALLOW
+        instruction = grant_command(rung)
+        if mode not in SILENT_MODES:
+            return ask(
+                f"{reason}. Open the {rung} rung before running it: "
+                f"`{instruction}`.")
         run_tool(["note", "guard", f"refused, no {rung}: {command[:120]}"], cwd)
         return deny(
             f"{reason}. Confirmations are off, so this is refused rather than "
             f"asked: tell the user what it will do, and when they agree record "
-            f"it: `primeskills-run grant {rung} --target <the database, path "
-            f"or environment> \"<their words>\"`.")
+            f"it: `{instruction}`.")
+    if mode not in SILENT_MODES:
+        return ask(reason)
+
+    # The user turned confirmations off. Asking anyway trains the reflex; going
+    # quiet everywhere removes the guard exactly where the agent runs unwatched.
+    # So: the short irreversible list needs a permission that was actually
+    # granted, and everything else passes with a line in the journal.
     run_tool(["note", "guard", f"allowed silently: {command[:120]}"], cwd)
     return ALLOW
 
