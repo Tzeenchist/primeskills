@@ -231,6 +231,53 @@ def main():
     if "прошли через несколько агентов" not in p.stdout or "из них 1" not in p.stdout:
         failures.append(f"переход задачи между агентами не опознан:\n{p.stdout}")
 
+    # PS-009 asks its question about *this* set. A task that called
+    # `gstack-ship` is a task where some set was reached for, not evidence
+    # about ours, and counting the two together put foreign skills in the
+    # denominator the criterion is read off.
+    home3 = Path(tmp) / "home3"
+    mine = home3 / ".claude" / "projects" / "-srv-mine"
+    theirs = home3 / ".claude" / "projects" / "-srv-theirs"
+    for d in (mine, theirs):
+        d.mkdir(parents=True)
+    skill_call = ('{"type": "assistant", "cwd": "%s", "message": {"content": '
+                  '[{"type": "tool_use", "name": "Skill", "input": '
+                  '{"skill": "%s"}}]}}\n')
+    (mine / "a.jsonl").write_text(skill_call % ("/srv/mine", "build"),
+                                  encoding="utf-8")
+    (theirs / "b.jsonl").write_text(skill_call % ("/srv/theirs", "gstack-ship"),
+                                    encoding="utf-8")
+    env3 = dict(os.environ, HOME=str(home3))
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), "--all", "--summary"],
+                       capture_output=True, text=True, env=env3)
+    if "задач с вызовом любого скилла: 2" not in p.stdout:
+        failures.append(f"задачи с любым скиллом посчитаны не все:\n{p.stdout}")
+    checks += 1
+    if "с вызовом этого набора: 1" not in p.stdout:
+        failures.append(f"чужой скилл засчитан набору:\n{p.stdout}")
+    checks += 1
+    if "навыков набора вызвано хоть раз: 1 из" not in p.stdout:
+        failures.append(f"широта вызова набора посчитана неверно:\n{p.stdout}")
+
+    # a task run inside a checkout of the set is work *on* it: it belongs on
+    # the other side of the criterion from work done *with* it
+    inside = Path(tmp) / "checkout"
+    (inside / "bin").mkdir(parents=True)
+    (inside / "core").mkdir(parents=True)
+    (inside / "bin" / "primeskills-status").write_text("", encoding="utf-8")
+    (inside / "core" / "PRINCIPLES.md").write_text("", encoding="utf-8")
+    slug = "-" + str(inside).strip("/").replace("/", "-")
+    self_work = home3 / ".claude" / "projects" / slug
+    self_work.mkdir(parents=True)
+    (self_work / "c.jsonl").write_text(skill_call % (str(inside), "verify"),
+                                       encoding="utf-8")
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), "--all", "--summary"],
+                       capture_output=True, text=True, env=env3)
+    if "с вызовом этого набора: 2, и 1 из них шли внутри самого набора" not in p.stdout:
+        failures.append(f"работа над набором не отделена от применения:\n{p.stdout}")
+
     # command text out of someone's log must not carry a token into this report
     leaky = Path(tmp) / "leaky.jsonl"
     leaky.write_text(_json.dumps({"type": "assistant", "message": {"content": [

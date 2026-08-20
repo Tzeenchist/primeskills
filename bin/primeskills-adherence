@@ -892,6 +892,23 @@ def tasks_of(paths):
     return out
 
 
+def is_set_checkout(directory):
+    """Is this task directory a copy of the set itself?
+
+    A session run inside the set measures work *on* it, not work *with* it, and
+    the two belong on different sides of the PS-009 criterion. Worktrees count:
+    they are the same repository under another path, which is exactly how the
+    parallel agents run. Checked by what the directory contains rather than by
+    git, because the directory may be gone by the time it is read.
+    """
+    try:
+        root = Path(directory).resolve()
+    except (OSError, ValueError):
+        return False
+    return ((root / "bin" / "primeskills-status").exists()
+            and (root / "core" / "PRINCIPLES.md").exists())
+
+
 AGENTS = {"claude": claude_sessions, "codex": codex_sessions,
           "kimi": kimi_sessions, "opencode": opencode_sessions}
 
@@ -947,15 +964,35 @@ def main(argv):
 
     # `session_facts` and `report` are both re-read per session otherwise, and
     # a sweep of 661 sessions pays for it twice.
+    # Two denominators, because they answer two questions. "Any skill at all"
+    # says how often a set -- ours, gstack's, the host's -- gets reached for.
+    # Only this set's own skills can be evidence about this set, and PS-009
+    # asks its question about those. Until 2026-08-20 the first number wore the
+    # second's name: `gstack-ship`, `browse` and `artifact-design` were counted
+    # as "the set took part", and the criterion would have been read off a
+    # denominator that has nothing to do with the set being judged.
+    own = ({d.name for d in skills_dir.iterdir() if d.is_dir()}
+           if skills_dir.is_dir() else set())
     grouped = tasks_of(paths)
     crossing = [t for t in grouped if len({i[1] for i in t[1]}) > 1]
-    with_skills = sum(1 for _d, items in grouped
-                      if any(seen.get(str(i[0]), {}).get("skills") for i in items))
+
+    def names_of(items):
+        return [n for i in items for n in seen.get(str(i[0]), {}).get("skills", [])]
+
+    any_skill = sum(1 for _d, items in grouped if names_of(items))
+    ours = [(d, items) for d, items in grouped if own & set(names_of(items))]
+    on_the_set = [d for d, _items in ours if is_set_checkout(d)]
+    called = sorted(own & {n for _d, items in ours for n in names_of(items)})
 
     print(f"\nсессий: {len(paths)}   с чтением core/: {sessions_with_core}")
     print(f"задач: {len(grouped)} (сессии одного каталога в пределах "
           f"{TASK_GAP // 3600} ч), из них {len(crossing)} прошли через несколько "
-          f"агентов; набор участвовал в {with_skills}")
+          f"агентов")
+    print(f"задач с вызовом любого скилла: {any_skill}; из них с вызовом этого "
+          f"набора: {len(ours)}, и {len(on_the_set)} из них шли внутри самого "
+          f"набора — это работа над ним, а не применение его")
+    print(f"навыков набора вызвано хоть раз: {len(called)} из {len(own)}"
+          + (f" ({', '.join(called)})" if called else ""))
     print(f"вызовов скиллов: {len(invoked)}"
           + (f" ({', '.join(sorted(set(invoked)))})" if invoked else ""))
 
