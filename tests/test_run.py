@@ -423,8 +423,10 @@ def main():
         if len(names) != 2:
             failures.append(f"две ветки делят журнал доказательств: {names}")
 
-        # переходный период: грант, дописанный старой версией в журнал ветки,
-        # читается — обновление посреди работы не гасит открытые ярусы
+        # переходный период кончился в 0.6.0: грант, дописанный старой версией
+        # в журнал ветки, больше не читается. Ронять его молча было бы плохо,
+        # но 480 минут — самый долгий мандат, поэтому всё, что писала старая
+        # версия, к этому моменту истекло по построению.
         code, out = run(repo, "start")
         branch_record = Path(out.strip())
         legacy = {"kind": "grant", "rung": "merge", "scope": "записан старой версией",
@@ -435,8 +437,8 @@ def main():
             fh.write(json.dumps(legacy, ensure_ascii=False) + "\n")
         checks += 1
         code, out = run(repo, "may", "merge")
-        if code != 0 or "старой версией" not in out:
-            failures.append(f"грант из записи ветки не читается в переходный период:\n{out}")
+        if code == 0 or "старой версией" in out:
+            failures.append(f"грант из записи ветки всё ещё читается:\n{out}")
 
     # --peek asks without spending: the pre-step check must not burn the
     # one-use mandate it only confirms (PS-047), and a plain `may` still spends

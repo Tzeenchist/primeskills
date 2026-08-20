@@ -33,8 +33,9 @@ anyone who can push to a branch write the next agent's opening context.
 Evidence of a run (notes, G12 counters) is per branch. Permissions (grant,
 revoke, spent) live in one record per repository, `run/repo.jsonl`: `land` and
 `merge` cross branches by design, and a mandate written on master was
-invisible from the branch the merge ran on (PS-047). For one transition period
-both records are read and only the repo-wide one is written.
+invisible from the branch the merge ran on (PS-047). 0.5.x also read the
+per-branch record so an update mid-work would not close an open rung; 0.6.0
+reads only the ledger.
 """
 import hashlib
 import json
@@ -286,15 +287,17 @@ def ledger_path(record):
 
 
 def permission_entries(record):
-    """Grant history from every record that can hold it, oldest first.
+    """Grant history, oldest first. One record per repository.
 
-    Transition period (PS-047): this version reads BOTH the repo-wide ledger
-    and the per-branch record older versions wrote grants into, and writes
-    only to the ledger — an update mid-work must not silently close open
-    rungs. Чтение записи по ветке снимается в 0.6.0.
+    0.5.x also read the per-branch record older versions wrote grants into, so
+    that updating mid-work would not silently close an open rung. That window
+    is closed in 0.6.0 (PS-047): a mandate written by an older version into a
+    branch record is no longer seen, and the rung has to be granted again. The
+    longest mandate lives 480 minutes, so nothing older than the transition can
+    still be open — what is dropped is expired by construction.
     """
-    entries = read(record, strict=True) + read(ledger_path(record), strict=True)
-    return sorted(entries, key=lambda e: e.get("ts", ""))
+    return sorted(read(ledger_path(record), strict=True),
+                  key=lambda e: e.get("ts", ""))
 
 
 def append(path, entry):
