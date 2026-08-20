@@ -231,6 +231,30 @@ def main():
         if code != 2 or "STALE" not in out:
             failures.append(f"listed ignored file did not stale evidence: {code}\n{out}")
 
+    # A name that runs straight into the bytes after it lets a rename pay for
+    # a content change. digest-include paths appear nowhere else in the digest,
+    # so there the ambiguity decided the verdict: `a.py` holding "z" and an
+    # empty `a.pyz` are two different trees with one fingerprint.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        (repo / ".gitignore").write_text("a.*\n", encoding="utf-8")
+        subprocess.run(["git", "add", ".gitignore"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+        run(repo, "start")
+        (repo / ".primeskills" / "digest-include").write_text("a.*\n",
+                                                              encoding="utf-8")
+        (repo / "a.py").write_text("z", encoding="utf-8")
+        run(repo, "note", "verify", "green")
+        (repo / "a.py").unlink()
+        (repo / "a.pyz").write_text("", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 2 or "STALE" not in out:
+            failures.append(f"переименование оплатило правку содержимого: {code}\n{out}")
+
     # Large untracked files use stable content samples: metadata-only touch is
     # irrelevant, while a same-size rewrite in a sampled region is a new tree.
     with tempfile.TemporaryDirectory() as tmp:

@@ -76,8 +76,18 @@ def git(*args):
 
 
 def hash_path(out, path, display):
-    """Add one repository path without ever following a symbolic link."""
+    """Add one repository path without ever following a symbolic link.
+
+    The name is terminated rather than run straight into the bytes that follow
+    it. Without the terminator the two halves are one string and a rename can
+    pay for a content change: `a.py` holding "z" and an empty `a.pyz` hash the
+    same. Untracked files were covered by accident -- their names also reach the
+    digest through `git status` -- but digest-include paths appear nowhere else,
+    so for them the ambiguity was live. NUL cannot occur in a path, so the
+    boundary is unambiguous even when the content carries one.
+    """
     out.update(str(display).encode("utf-8"))
+    out.update(b"\0")
     if path.is_symlink():
         try:
             target = os.readlink(path)
