@@ -50,20 +50,31 @@ def bootstrap_words():
     return mod.bootstrap_text().split()
 
 
-def call_budget():
-    """C3 as the linter defines it.
+_LINT = None
 
-    This number was typed here as a literal and stayed 3 000 while the linter
-    moved to 3 600 -- the second copy of a number in this repository and the
-    second time it drifted. Read it, never retype it.
+
+def lint_module():
+    """The linter, loaded once: it owns every ceiling this program prints.
+
+    C3 was typed here as a literal and stayed 3 000 while the linter moved to
+    3 600 -- the second copy of a number in this repository and the second time
+    it drifted. The default budget was a third copy, sitting in `budget_of`
+    under this very warning until 2026-08-20. Read them, never retype them.
     """
-    spec = importlib.util.spec_from_loader(
-        "primeskills_lint",
-        importlib.machinery.SourceFileLoader(
-            "primeskills_lint", str(ROOT / "bin" / "primeskills-lint")))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.CALL_BUDGET
+    global _LINT
+    if _LINT is None:
+        spec = importlib.util.spec_from_loader(
+            "primeskills_lint",
+            importlib.machinery.SourceFileLoader(
+                "primeskills_lint", str(ROOT / "bin" / "primeskills-lint")))
+        _LINT = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_LINT)
+    return _LINT
+
+
+def call_budget():
+    """C3 as the linter defines it."""
+    return lint_module().CALL_BUDGET
 
 
 def expand(name, call_map, seen=None):
@@ -86,7 +97,9 @@ def calls_optional_of(name, skills):
 
 def budget_of(path):
     m = re.search(r"^budget:\s*(\d+)", path.read_text(encoding="utf-8"), re.M)
-    return int(m.group(1)) if m else 800
+    # The default was a literal here too -- a third copy, under a docstring
+    # warning about the second. Read it from the linter, which owns it.
+    return int(m.group(1)) if m else lint_module().DEFAULT_BUDGET
 
 
 def calls_of(path, key="calls"):
