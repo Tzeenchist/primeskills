@@ -210,6 +210,83 @@ def main():
         if code != 2 or "STALE" not in out:
             failures.append(f"правка untracked-файла не протухила запись: {code}\n{out}")
 
+    # Tests can depend on ignored local configuration. Listing it explicitly
+    # makes that input part of the evidence without walking every ignored tree.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        (repo / ".gitignore").write_text("local_settings.py\n", encoding="utf-8")
+        subprocess.run(["git", "add", ".gitignore"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+        (repo / "local_settings.py").write_text("MODE = 'first'\n", encoding="utf-8")
+        run(repo, "start")
+        (repo / ".primeskills" / "digest-include").write_text(
+            "# local test inputs\nlocal_*.py\n", encoding="utf-8")
+        run(repo, "note", "verify", "green")
+        (repo / "local_settings.py").write_text("MODE = 'second'\n", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 2 or "STALE" not in out:
+            failures.append(f"listed ignored file did not stale evidence: {code}\n{out}")
+
+    # Large untracked files use stable content samples: metadata-only touch is
+    # irrelevant, while a same-size rewrite in a sampled region is a new tree.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
+        large = repo / "large.bin"
+        large.write_bytes(b"a" * (4 * 1024 * 1024 + 1))
+        original = large.stat()
+        run(repo, "note", "verify", "green")
+        os.utime(large, ns=(original.st_atime_ns, original.st_mtime_ns + 1_000_000))
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 0 or "current" not in out:
+            failures.append(f"touch changed large-file evidence: {code}\n{out}")
+        with large.open("r+b") as fh:
+            fh.write(b"b")
+        os.utime(large, ns=(original.st_atime_ns, original.st_mtime_ns))
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 2 or "STALE" not in out:
+            failures.append(f"same-size large-file rewrite was invisible: {code}\n{out}")
+
+    # A symlink contributes its own path and target, never the target's bytes:
+    # evidence changes on retargeting without reading outside the repository.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        outside = Path(tmp) / "outside"
+        repo.mkdir()
+        outside.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-q", "--allow-empty", "-m", "seed"],
+                       cwd=repo, check=True)
+        first = outside / "first.txt"
+        second = outside / "second.txt"
+        first.write_text("first\n", encoding="utf-8")
+        second.write_text("second\n", encoding="utf-8")
+        link = repo / "fixture"
+        link.symlink_to(first)
+        run(repo, "note", "verify", "green")
+        first.write_text("changed outside\n", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 0 or "current" not in out:
+            failures.append(f"symlink target contents entered evidence: {code}\n{out}")
+        link.unlink()
+        link.symlink_to(second)
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 2 or "STALE" not in out:
+            failures.append(f"retargeted symlink was invisible: {code}\n{out}")
+
     # the G9 breaker counts a problem, not a phrasing of it
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"

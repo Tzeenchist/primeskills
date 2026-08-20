@@ -53,7 +53,11 @@ failed attempts on one problem: stop and ask.
 **Evidence outlives the session.** A test run is recorded on disk together with
 a fingerprint of the tree it ran against. Change a file after a green run and
 the record goes stale, and the next step sees that. The agent cannot appeal to
-a check that never happened, or to one that was about different code.
+a check that never happened, or to one that was about different code. Ignored
+test inputs can join the fingerprint through `.primeskills/digest-include`, one
+repository-root glob per line with `#` comments. Untracked files over 4 MB use
+their size plus the first and last 64 KiB; symbolic links use their path and
+target without reading through the link or leaving the repository.
 
 **Authority by rungs.** Commit, push, pull request, merge, migrate, deploy,
 roll back, delete — eight separate yeses. One does not open the next,

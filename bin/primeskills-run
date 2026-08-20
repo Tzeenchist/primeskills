@@ -46,7 +46,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BREAKER = 3  # G9: three failed attempts on one problem and the loop stops
-BIG_FILE = 4 * 1024 * 1024  # past this, an untracked file is hashed by size+mtime
+BIG_FILE = 4 * 1024 * 1024  # past this, hash size plus 64 KiB at each end
+SAMPLE_SIZE = 64 * 1024
 # The rungs of the authority ladder, in order. Each is a separate yes and one
 # never implies the next; `may` refuses anything not on this list rather than
 # guessing what a new word means.
@@ -74,51 +75,102 @@ def git(*args):
     return p.stdout if p.returncode == 0 else ""
 
 
+def hash_path(out, path, display):
+    """Add one repository path without ever following a symbolic link."""
+    out.update(str(display).encode("utf-8"))
+    if path.is_symlink():
+        try:
+            target = os.readlink(path)
+        except OSError:
+            return
+        out.update(b"\0link\0")
+        out.update(target.encode("utf-8"))
+        return
+    try:
+        stat = path.stat()
+    except OSError:
+        return
+    if not path.is_file():
+        return
+    with path.open("rb") as fh:
+        if stat.st_size > BIG_FILE:
+            out.update(f"{stat.st_size}:".encode("utf-8"))
+            out.update(fh.read(SAMPLE_SIZE))
+            fh.seek(-SAMPLE_SIZE, os.SEEK_END)
+            out.update(fh.read(SAMPLE_SIZE))
+            return
+        for chunk in iter(lambda: fh.read(65536), b""):
+            out.update(chunk)
+
+
 def untracked_content():
     """Bytes of every untracked file, not just its name.
 
     `git status --porcelain` names an untracked file and says nothing about
     what is in it, so a PASS stayed fresh while the new module under test was
     rewritten -- the one hole in the idea that evidence expires with the tree.
-    Ignored files are still outside the digest: they are excluded on purpose
-    and walking them would drag node_modules into every check.
+    Ignored files are handled separately and only when digest-include names
+    them, so this walk cannot drag node_modules into every check.
     """
     out = hashlib.sha1()
     for line in git("status", "--porcelain", "-z").split("\0"):
         if not line.startswith("?? "):
             continue
         target = Path(line[3:])
-        files = sorted(target.rglob("*")) if target.is_dir() else [target]
+        files = (sorted(target.rglob("*"))
+                 if target.is_dir() and not target.is_symlink() else [target])
         for f in files:
-            if not f.is_file() or f.is_symlink():
+            hash_path(out, f, f)
+    return out.hexdigest()
+
+
+def included_content():
+    """Content selected by .primeskills/digest-include, rooted at the repo."""
+    top = Path(git("rev-parse", "--show-toplevel").strip())
+    include = top / ".primeskills" / "digest-include"
+    if not include.is_file() or include.is_symlink():
+        return ""
+    out = hashlib.sha1()
+    paths = set()
+    for raw in include.read_text(encoding="utf-8").splitlines():
+        pattern = raw.strip()
+        if not pattern or pattern.startswith("#"):
+            continue
+        if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+            continue
+        out.update(pattern.encode("utf-8"))
+        for match in top.glob(pattern):
+            parent = top
+            linked_parent = False
+            for part in match.relative_to(top).parts[:-1]:
+                parent /= part
+                if parent.is_symlink():
+                    linked_parent = True
+                    break
+            if linked_parent:
                 continue
-            out.update(str(f).encode("utf-8"))
-            # Hashing every untracked byte on every call turns a note into a
-            # scan of whatever the tree happens to be carrying. Past the cap,
-            # size and mtime stand in: they still change when the file does,
-            # and they cost nothing.
-            try:
-                stat = f.stat()
-            except OSError:
-                continue
-            if stat.st_size > BIG_FILE:
-                out.update(f"{stat.st_size}:{stat.st_mtime_ns}".encode("utf-8"))
-                continue
-            with f.open("rb") as fh:
-                for chunk in iter(lambda: fh.read(65536), b""):
-                    out.update(chunk)
+            paths.add(match)
+            if match.is_dir() and not match.is_symlink():
+                paths.update(match.rglob("*"))
+    for path in sorted(paths):
+        hash_path(out, path, path.relative_to(top))
     return out.hexdigest()
 
 
 def state_digest():
-    """Commit plus what is not in it. Two runs share a digest when the tracked
-    diff and the untracked files match — which is close to byte-identical and
-    is not the same claim. Ignored files are outside it by design, untracked
-    files past BIG_FILE are represented by size and mtime, symlinks are
-    skipped, and a binary tracked file reaches us as git's "files differ" line.
-    README says the same in prose; neither should promise more than this."""
+    """Commit plus the uncommitted tree inputs that a test run can prove.
+
+    Tracked changes come from git; untracked files contribute content, with
+    files past BIG_FILE represented by size and 64 KiB from each end. Ignored
+    paths contribute content only when a repository-root glob in
+    .primeskills/digest-include selects them. Symbolic links contribute their
+    path and link target, never bytes reached through the link: following one
+    could read outside the repository, the same trust break no_symlink()
+    refuses for the run journal. A binary tracked file still reaches us as
+    git's "files differ" line. README documents the same boundary."""
     commit = git("rev-parse", "HEAD").strip() or "no-commit"
-    pending = git("diff", "HEAD") + git("status", "--porcelain") + untracked_content()
+    pending = (git("diff", "HEAD") + git("status", "--porcelain")
+               + untracked_content() + included_content())
     return commit, hashlib.sha1(pending.encode("utf-8")).hexdigest()[:12]
 
 
