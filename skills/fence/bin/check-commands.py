@@ -17,6 +17,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ALLOW = "{}"
@@ -264,6 +265,10 @@ def top_level_parts(command):
                 i += 1
                 continue
             if ch == "|":
+                if buf and buf[-1] == ">":
+                    buf.append(ch)      # >| is one output-redirection operator
+                    i += 1
+                    continue
                 parts.append("".join(buf))
                 buf = []
                 i += 2 if command.startswith("||", i) else 1
@@ -360,6 +365,61 @@ def git_verdict(tokens):
     return None
 
 
+OUTPUT_REDIRECTS = {">", ">>", ">|", "<>", "&>", "&>>"}
+
+
+def output_verdict(command, parsed, cwd):
+    """Ask when a redirect or tee names a file outside the session tree."""
+    targets = []
+    for part in top_level_parts(command):
+        lexer = shlex.shlex(part, posix=False, punctuation_chars="<>|&")
+        lexer.whitespace_split = True
+        lexer.commenters = "#"
+        try:
+            words = list(lexer)
+        except ValueError:
+            continue
+        for i, word in enumerate(words[:-1]):
+            if word not in OUTPUT_REDIRECTS:
+                continue
+            try:
+                target = shlex.split(words[i + 1], comments=False)
+            except ValueError:
+                continue
+            if len(target) == 1:
+                targets.append(target[0])
+
+    for tokens, _text in parsed:
+        if Path(tokens[0]).name != "tee":
+            continue
+        after_options = False
+        for token in tokens[1:]:
+            if token == "--":
+                after_options = True
+            elif token == "-":
+                continue
+            elif after_options or not token.startswith("-"):
+                targets.append(token)
+
+    try:
+        temp = Path(tempfile.gettempdir()).resolve()
+    except OSError:
+        temp = None
+    for target in targets:
+        try:
+            resolved = (Path(cwd or ".") / target).resolve()
+        except OSError:
+            resolved = None
+        if resolved == Path("/dev/null"):
+            continue
+        if (temp is not None and Path(target).is_absolute() and resolved is not None
+                and (resolved == temp or temp in resolved.parents)):
+            continue
+        if escapes(target, cwd):
+            return f"output writes outside the working directory: {target}"
+    return None
+
+
 def decide(raw):
     if not raw.strip():
         return ALLOW
@@ -439,6 +499,16 @@ def decide(raw):
             if not pattern.startswith("rm") and re.search(pattern, command):
                 verdict = (reason, None, None)
                 break
+
+    # Last, and that position is the point. A redirect carries no rung, and a
+    # rungless verdict passes silently where confirmations are off. Checked
+    # first, it shadowed the rules that do carry one: `rm -rf /srv/data` was
+    # refused, and `rm -rf /srv/data > /etc/hosts` was allowed silently --
+    # appending a redirect bought the delete a pass.
+    if verdict is None:
+        reason = output_verdict(command, parsed, cwd)
+        if reason:
+            verdict = (reason, None, None)
 
     if verdict is None:
         if unreadable:

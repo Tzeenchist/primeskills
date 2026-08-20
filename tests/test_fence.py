@@ -92,6 +92,8 @@ MODES = [
     ("bypassPermissions", "ls -la", None),
     ("default", f"psql -c '{KILL} prod'", "ask"),     # режим со спросом не меняется
     ("acceptEdits", FORCE, "ask"),
+    ("default", "printf x > /etc/hosts", "ask"),
+    ("bypassPermissions", "printf x > /etc/hosts", None),
 ]
 
 
@@ -133,9 +135,44 @@ WIPE = "rm -" + "rf /srv/data"
 HEREDOCS = [
     (f"cat > notes.md <<'EOF'\n{WIPE}\nEOF", None),
     (f"tee notes.md <<'EOF'\n{WIPE}\nEOF", None),
+    ("cat > /etc/passwd <<'EOF'\nreplacement\nEOF", "ask"),
     (f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", "ask"),
     (f"bash <<'SH'\n{WIPE}\nSH", "ask"),
     (f"{WIPE} && cat > f <<'EOF'\nhi\nEOF", "ask"),
+]
+
+
+# Output redirection is judged by its destination. Writing outside the session
+# tree needs a decision; descriptor plumbing, sinks, temporary files, and
+# destinations inside the tree do not.
+REDIRECTS = [
+    ("cat > /etc/passwd", "ask"),
+    ("echo key >> ~/.ssh/authorized_keys", "ask"),
+    ("printf '' >/etc/hosts", "ask"),
+    ("printf x >| /etc/hosts", "ask"),
+    ("printf x > '/etc/a file'", "ask"),
+    ("printf x 2>/dev/null", None),
+    ("printf x 1>&2", None),
+    ("printf x >&2", None),
+    ("printf x 2>&1", None),
+    ("printf x >/dev/null 2>&1", None),
+    ("printf x > /tmp/fence-output", None),
+    ("printf x > notes.md", None),
+    ("printf x | tee /etc/hosts", "ask"),
+    ("printf x | tee -a notes.md", None),
+    ("printf x | tee /dev/null", None),
+]
+
+
+# A rungless verdict passes silently where confirmations are off, so a rule
+# without a rung must never answer for a rule that has one. The redirect check
+# is the first rungless rule that can match a destructive line, and checked
+# first it let `rm -rf` through by the simple trick of appending a redirect.
+SHADOWED = [
+    ("bypassPermissions", WIPE, "deny"),
+    ("bypassPermissions", f"{WIPE} > /etc/hosts", "deny"),
+    ("bypassPermissions", f"{WIPE} > out.txt", "deny"),
+    ("default", f"{WIPE} > /etc/hosts", "ask"),
 ]
 
 
@@ -162,6 +199,22 @@ def main():
         got = decision(run(CMD, payload))
         if got != expected:
             failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
+                            f"expected {expected}")
+
+    with tempfile.TemporaryDirectory() as tree:
+        redirects = REDIRECTS + [(f"printf x > {tree}/absolute.txt", None)]
+        for command, expected in redirects:
+            payload = json.dumps({"cwd": tree, "tool_input": {"command": command}})
+            got = decision(run(CMD, payload, cwd=tree))
+            if got != expected:
+                failures.append(f"redirect: {command!r} -> {got}, expected {expected}")
+
+    for mode, command, expected in SHADOWED:
+        payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
+                              "tool_input": {"command": command}})
+        got = decision(run(CMD, payload))
+        if got != expected:
+            failures.append(f"shadowed: {mode} {command!r} -> {got}, "
                             f"expected {expected}")
 
     for command, expected in QUOTED:
@@ -214,7 +267,8 @@ def main():
 
     for f in failures:
         print(f)
-    total = (len(COMMANDS) + len(HEREDOCS) + len(MODES) + len(QUOTED)
+    total = (len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
+             + len(SHADOWED) + len(MODES) + len(QUOTED)
              + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1)
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
