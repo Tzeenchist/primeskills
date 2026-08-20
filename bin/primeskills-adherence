@@ -22,6 +22,7 @@ phase and is not applicable. Neither one enters the denominator.
     primeskills-adherence --newest                    # with either: newest session only
     primeskills-adherence --summary <files...>        # rates only
 """
+import functools
 import json
 import importlib.util
 import re
@@ -723,7 +724,8 @@ def report(path, skills_dir, quiet=False):
             print(f"  [{mark}] цель разрешена до разрушения (G8) — #{n}: {safe(cmd)}")
 
     return {"skills": [s["skill"] for s in found], "core_at": core_at,
-            "tally": tally, "guard": guard, "by_rule": by_rule}
+            "tally": tally, "guard": guard, "by_rule": by_rule,
+            "on_set": wrote_into_the_set(calls)}
 
 
 def sessions_of(project_dir, newest_only):
@@ -892,8 +894,9 @@ def tasks_of(paths):
     return out
 
 
+@functools.lru_cache(maxsize=None)
 def is_set_checkout(directory):
-    """Is this task directory a copy of the set itself?
+    """Is this directory a copy of the set itself?
 
     A session run inside the set measures work *on* it, not work *with* it, and
     the two belong on different sides of the PS-009 criterion. Worktrees count:
@@ -907,6 +910,36 @@ def is_set_checkout(directory):
         return False
     return ((root / "bin" / "primeskills-status").exists()
             and (root / "core" / "PRINCIPLES.md").exists())
+
+
+def wrote_into_the_set(calls):
+    """Did this session edit the set, wherever it happened to be standing?
+
+    Asking `is_set_checkout` about the session's working directory answers a
+    different question than the one PS-009 needs. On 2026-08-20 a whole day of
+    editing this repository was counted as work *with* the set, because the
+    sessions ran from `$HOME` and reached the repository by absolute path:
+    `is_set_checkout("/home/admin")` is False and always will be. The report
+    said "0 of 14 tasks were inside the set" on a day when at least one was.
+
+    So the judgement moves from where the session stood to what it wrote. Two
+    signals, because shell edits carry no structured path: an absolute write
+    path with a checkout above it, and the `skills/<name>/SKILL.md` shape
+    anywhere in the path or the command text -- the same signal `real_calls`
+    already trusts to tell editing the set from using it.
+    """
+    for c in calls:
+        if c["tool"] not in WRITING_TOOLS and not c["cmd"]:
+            continue
+        if SKILL_FILE.search(c["path"] + c["cmd"]):
+            return True
+        target = c["path"]
+        if not target.startswith("/"):
+            continue
+        for parent in Path(target).parents:
+            if is_set_checkout(str(parent)):
+                return True
+    return False
 
 
 AGENTS = {"claude": claude_sessions, "codex": codex_sessions,
@@ -981,7 +1014,9 @@ def main(argv):
 
     any_skill = sum(1 for _d, items in grouped if names_of(items))
     ours = [(d, items) for d, items in grouped if own & set(names_of(items))]
-    on_the_set = [d for d, _items in ours if is_set_checkout(d)]
+    on_the_set = [d for d, items in ours
+                  if is_set_checkout(d)
+                  or any(seen.get(str(i[0]), {}).get("on_set") for i in items)]
     called = sorted(own & {n for _d, items in ours for n in names_of(items)})
 
     print(f"\nсессий: {len(paths)}   с чтением core/: {sessions_with_core}")

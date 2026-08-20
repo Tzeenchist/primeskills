@@ -278,6 +278,26 @@ def main():
     if "с вызовом этого набора: 2, и 1 из них шли внутри самого набора" not in p.stdout:
         failures.append(f"работа над набором не отделена от применения:\n{p.stdout}")
 
+    # ...and a session that never stood in the set still edits it: it runs from
+    # $HOME and reaches the repository by absolute path. Judged by the working
+    # directory alone, a whole day of work *on* the set counted as work *with*
+    # it (found 2026-08-20, PS-007).
+    outside = home3 / ".claude" / "projects" / "-home-someone"
+    outside.mkdir(parents=True)
+    (outside / "d.jsonl").write_text(
+        _json.dumps({"type": "assistant", "cwd": "/home/someone", "message": {"content": [
+            {"type": "tool_use", "name": "Skill", "input": {"skill": "vet"}}]}}) + "\n"
+        + _json.dumps({"type": "assistant", "cwd": "/home/someone", "message": {"content": [
+            {"type": "tool_use", "name": "Edit",
+             "input": {"file_path": str(inside / "core" / "PRINCIPLES.md")}}]}}) + "\n",
+        encoding="utf-8")
+    checks += 1
+    p = subprocess.run([sys.executable, str(TOOL), "--all", "--summary"],
+                       capture_output=True, text=True, env=env3)
+    if "с вызовом этого набора: 3, и 2 из них шли внутри самого набора" not in p.stdout:
+        failures.append("правка набора из чужого каталога не опознана как "
+                        f"работа над ним:\n{p.stdout}")
+
     # command text out of someone's log must not carry a token into this report
     leaky = Path(tmp) / "leaky.jsonl"
     leaky.write_text(_json.dumps({"type": "assistant", "message": {"content": [
