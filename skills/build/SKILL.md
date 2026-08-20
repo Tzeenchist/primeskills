@@ -15,7 +15,8 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 - Write the failing test first for executable behaviour. Documentation,
   declarative config and generated files take the cheapest deterministic proof
   instead — say which and why.
-- A test written after the code proves the code runs, not that it is right.
+- A test after the code pins behaviour (lawful for inherited code), not what
+  was asked.
 - Red, green, refactor are three phases. Never blur them: no cleanup while
   making it pass, no new behaviour while refactoring.
 - Every changed line traces to the request (PRINCIPLES 3).

@@ -12,7 +12,7 @@ The sentence on the left arrives sounding reasonable. That is the tell.
 | "Just this once" | No exceptions |
 | "The linter passed" | A linter is not a compiler |
 | "The agent reported success" | Check the diff yourself |
-| "A partial check is enough" | Partial proves nothing |
+| "A partial check is enough" | Partial proves the part it covered; name that part, and what stayed unproven |
 | "I'm tired" | Exhaustion is not an excuse |
 | "Different wording, so the rule doesn't apply" | Spirit over letter |
 | "The push was rejected, force-push fixes it" | A rejected push is information |

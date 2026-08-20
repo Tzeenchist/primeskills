@@ -320,7 +320,7 @@ Not needed for read-only analysis.
 ## Invariants
 - Absence of a crash is not a pass. See core/GUARDRAILS P Exit-Code Proof.
 - Never edit tests, fixtures, or thresholds to make a build green.
-- A cycle closes only when the new test passes AND the full suite passes.
+- A cycle closes only when the new test passes AND the covering run passes.
 
 ## Procedure
 1. Run the project's test command → **verify:** exit code is 0

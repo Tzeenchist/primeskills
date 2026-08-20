@@ -100,7 +100,7 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   resets a counter: `clear` is a rung, target the problem, one use. A
   breaker its own subject can lift is a reminder.
   Every retry tests a fundamentally new hypothesis, not cosmetics. A cycle closes
-  only when the new test passes *and* the full suite passes.
+  only when the new test and covering run pass, gaps named.
 - **G13 Hypothesis ledger.** Before each new attempt, write one line:
   "hypothesis N failed because X; hypothesis N+1 does Y differently."
 - **G11 Checkpoints.** Every 2–3 completed steps, leave a point you can come

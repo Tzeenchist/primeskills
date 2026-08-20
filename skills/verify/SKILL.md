@@ -24,7 +24,8 @@ pushing, and before handing work to another agent.
   looks wrong, say so and stop. Changing a test because the requirement changed
   is different work, not an exception to this: name the requirement, change the
   test deliberately, and never in the same step as making it pass.
-- The cycle closes only when the new test passes and the full suite passes.
+- The cycle closes only when the new test passes and the suite covering the
+  change passes, gaps named.
 
 ## Procedure
 1. Before executing someone else's change, call `vet`, then require a current
@@ -42,8 +43,9 @@ pushing, and before handing work to another agent.
    → **verify:** the recorded failure and this pass describe the same test.
    With no record, prove it in a throwaway worktree — never by reverting the
    live tree, which can eat work that is not yours
-7. Run the full suite, not only the touched file, unless a flow already ran it
-   for this state → **verify:** exit code is 0, and you say which run you used
+7. Run the full suite unless a flow already ran it for this state; where it is
+   impractical or impossible, run what covers the change and its neighbours
+   → **verify:** exit code is 0, and you name the run used and what it left out
 8. Kill spawned processes, remove temp artifacts → **verify:** none left behind
 
 ## Stop conditions
