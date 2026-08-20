@@ -250,6 +250,19 @@ def main():
         failures.append(f"VERSION {version}, а верхняя запись CHANGELOG "
                         f"{newest.group(1)}")
 
+    # 4b. Both READMEs name the version in prose, and prose drifts. This one
+    #     reached 0.2.0 while the set shipped 0.8.0 -- six releases behind, in
+    #     the first document anyone reads. `VERSION` settles it.
+    for doc, pattern in ((ROOT / "README.md", r"Version (\S+?):"),
+                         (ROOT / "README.ru.md", r"Версия (\S+?):")):
+        checks += 1
+        hit = re.search(pattern, doc.read_text(encoding="utf-8"))
+        if not hit:
+            failures.append(f"{doc.name}: версия в тексте не найдена")
+        elif hit.group(1) != version:
+            failures.append(f"{doc.name}: назвал версию {hit.group(1)}, "
+                            f"VERSION держит {version}")
+
     # 5. The queue promises its own sections by name. It lost one of them and
     #    kept describing four, which is the same defect as any other document
     #    claiming behaviour that is not there.
