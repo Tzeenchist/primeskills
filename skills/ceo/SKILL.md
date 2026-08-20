@@ -41,4 +41,4 @@ Findings with the user's decision on each, and one line on whether the scope
 should shrink.
 
 ## References
-`eng` and `beauty` are the other lenses; `teams` runs all three.
+`money`, `eng` and `beauty` are the other lenses; `teams` runs the panel.

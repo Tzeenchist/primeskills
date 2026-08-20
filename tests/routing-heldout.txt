@@ -53,3 +53,5 @@ stop me from wiping anything by accident -> fence
 это письмо уйдёт наружу, вычитай -> prose
 расскажи, что вообще умеет этот набор -> primeskills
 как у вас тут всё устроено -> primeskills
+как мы на этом заработаем -> money
+стоит ли брать деньги за эту фичу или раздать бесплатно -> money

@@ -9,6 +9,7 @@ save state before I run out of limit -> handoff
 run the implementation loop until green -> cycle
 break this into ordered tasks -> plan
 is this the right work at all -> ceo
+how would this be paid for -> money
 review the architecture and edge cases -> eng
 check the interface states and accessibility -> beauty
 what do I actually want here -> brief

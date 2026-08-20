@@ -50,4 +50,4 @@ The goal, what is out of scope, ordered tasks with acceptance criteria, the
 standing bar, and whether approval is required before implementation.
 
 ## References
-Lenses `ceo`, `eng`, `beauty` review this plan; `teams` runs all three.
+Lenses `ceo`, `money`, `eng`, `beauty` review this plan; `teams` runs the panel.

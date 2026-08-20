@@ -3,8 +3,8 @@ name: teams
 description: Use to run the full review panel over an existing plan and consolidate what it finds
 budget: 350
 tier: flow
-calls: [ceo, eng, beauty]
-calls_optional: [beauty]
+calls: [ceo, money, eng, beauty]
+calls_optional: [money, beauty]
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 ---
@@ -22,13 +22,15 @@ starts.
 
 ## Procedure
 1. Call `ceo` → **verify:** findings returned, or "no objections"
-2. Call `eng` → **verify:** the same
-3. Call `beauty` only if the plan touches an interface → **verify:** it ran, or
+2. Call `money` only if the plan adds something anyone could be charged for
+   → **verify:** it ran, or you state why it did not
+3. Call `eng` → **verify:** the same
+4. Call `beauty` only if the plan touches an interface → **verify:** it ran, or
    you state why it did not
-4. Consolidate: drop duplicates, drop anything already resolved, and put the
+5. Consolidate: drop duplicates, drop anything already resolved, and put the
    ones that change scope first → **verify:** every surviving finding names its
    lens and the user's decision
-5. Hand the amended plan back → **verify:** the user sees what changed, not a
+6. Hand the amended plan back → **verify:** the user sees what changed, not a
    list of what was said
 
 ## Stop conditions
