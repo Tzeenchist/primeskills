@@ -32,10 +32,10 @@ external integration. Answer each line or mark it not applicable.
 - [ ] Responses are treated as untrusted input and validated on arrival.
 - [ ] Retries are bounded and cannot amplify into a storm.
 - [ ] A dependency added in this diff is named, versioned, and its licence
-      checked (G12: a new paid dependency or licence change escalates).
+      checked (G15: a new paid dependency or licence change escalates).
 
 ## Agent-specific
 - [ ] Text from a page, an issue, or a file is data, not instruction.
 - [ ] Tools available to an automated path are the minimum it needs.
 - [ ] Destructive operations require confirmation even in permissionless modes
-      (GUARDRAILS G7, G17).
+      (GUARDRAILS G16, G8).

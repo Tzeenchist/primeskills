@@ -46,14 +46,14 @@ P1 и P7 в учёте не значились вовсе, хотя несли �
 ## Sources without a licence file
 
 - **[prompt-eng-interactive-tutorial](https://github.com/anthropics/prompt-eng-interactive-tutorial)** (Anthropic) — techniques applied while writing. No text ships.
-- **Published system prompts of claude.ai** (Anthropic) — reading them in 2026-08-17 raised four questions we had not asked: how much formatting an answer earns, how a refusal should read, whether "I can't" was ever checked, and whether edits are judged one at a time. The rules that answer them were rewritten from our own practice on 2026-08-18 and now stand on our own evidence and our own numbering: the formatting test counts bullet lines, the refusal rule explains itself by how a bulleted refusal gets argued clause by clause, the capability check is P6 leaning on G15, and the cumulative radius is part of G6, where the definition of "the change" already lived. Nothing of theirs is reproduced; the debt is that they made us look. See PS-017.
+- **Published system prompts of claude.ai** (Anthropic) — reading them in 2026-08-17 raised four questions we had not asked: how much formatting an answer earns, how a refusal should read, whether "I can't" was ever checked, and whether edits are judged one at a time. The rules that answer them were rewritten from our own practice on 2026-08-18 and now stand on our own evidence and our own numbering: the formatting test counts bullet lines, the refusal rule explains itself by how a bulleted refusal gets argued clause by clause, the capability check is P6 leaning on G5, and the cumulative radius is part of G17, where the definition of "the change" already lived. Nothing of theirs is reproduced; the debt is that they made us look. See PS-017.
 - **[i-have-adhd](https://github.com/ayghri/i-have-adhd)** (MIT, stated in the skill) — the pre-send deletion check in `core/OUTPUT.md`. See PS-019.
 - **[deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)** (MIT) — three ideas: checking a new queue entry against existing ones, rejection as a first-class outcome with its reason in the line, and the test for session-vantage prose. See PS-018.
 
 ## What is not from anyone
 
 Ten of the twenty-five rules in `core/` have no prototype in any source:
-G3, G4, G8, G9, G11, G12, G13, G14, G16, G17. The tools in `bin/`, the linter
+G3, G4, G7, G12, G14, G15, G13, G11, G6, G8. The tools in `bin/`, the linter
 rules, the run record and the adherence reader are ours. The accounting is in
 `docs/SKILL-SOURCES.md`, including the cases where an earlier version of that
 count was wrong.

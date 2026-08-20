@@ -44,7 +44,7 @@ trial-and-error are what you do *after* the docs fall short, never instead.
 Knowing what exists earns the right to write your own 30 lines (§2). Same for your own
 reach: before saying you cannot — no access, no tool, no data — check whether
 the capability exists and is merely not loaded. "I can't" is a claim, and claims
-need evidence (G15).
+need evidence (G5).
 
 ## 7. Turn tasks into verifiable goals
 A goal you cannot check is a wish. "Make the import safer" becomes "a malformed

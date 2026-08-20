@@ -204,7 +204,7 @@ def main():
     # failure (R4).
     # Against a clone, never against this repository: pinning writes worktree
     # metadata into .git, and a test that leaves traces in the tree it tests is
-    # the harness tampering G8 forbids.
+    # the harness tampering G7 forbids.
     in_repo = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--git-dir"],
                              capture_output=True).returncode == 0
     if not in_repo:

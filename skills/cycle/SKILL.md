@@ -13,7 +13,7 @@ role: write
 An approved plan, when you want the loop closed without stopping between steps.
 
 ## Invariants
-- The attempt counter (G9) lives in `primeskills-run`, not in your head, and
+- The attempt counter (G12) lives in `primeskills-run`, not in your head, and
   has exactly one writer: the command `primeskills-run fail`, called by whichever
   skill hit the failure.
   This flow reads it. Two writers counted one failure twice and tripped the
@@ -28,7 +28,7 @@ An approved plan, when you want the loop closed without stopping between steps.
 3. On FAIL, call `debug` — it records the attempt — then read the count with
    `primeskills-run show` and return to 2 → **verify:** the count rose by one,
    not two, and is below three
-4. When it exits 3, stop: restore the G14 snapshot if the work took one, and
+4. When it exits 3, stop: restore the G11 snapshot if the work took one, and
    where none was required say plainly what state the tree is in instead of
    inventing a restore. Report what each attempt ruled out, ask → **verify:**
    the user knows where the tree stands and has the ledger, not a summary
@@ -37,11 +37,11 @@ An approved plan, when you want the loop closed without stopping between steps.
 
 ## Stop conditions
 - The plan proves wrong: leave the loop and say so. Never replan silently.
-- Anything on the escalation list (G12): stop the loop first, then ask.
+- Anything on the escalation list (G15): stop the loop first, then ask.
 
 ## Output
 Per step: diff, verification result, rounds taken. At the end, the acceptance
 criteria with each marked.
 
 ## References
-`build`, `verify`, `debug`. Round limit and ledger: `GUARDRAILS.md` G9, G13.
+`build`, `verify`, `debug`. Round limit and ledger: `GUARDRAILS.md` G12, G13.

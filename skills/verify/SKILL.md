@@ -32,7 +32,7 @@ pushing, and before handing work to another agent.
    `primeskills-run check vet`; without it, use a sandbox or obtain the user's
    trust → **verify:** review precedes execution, and the trust boundary is named
 2. Resolve the target the run will act on — database, schema, directory — and
-   print it → **verify:** it is the isolated one, not the working store (G17)
+   print it → **verify:** it is the isolated one, not the working store (G8)
 3. Name the command that would prove the claim → **verify:** it tests the claim,
    not a neighbour of it
 4. Run it whole and fresh → **verify:** exit code is 0
@@ -54,7 +54,7 @@ pushing, and before handing work to another agent.
 - No recorded red run and no worktree to prove one: the regression is unproven.
   Say that rather than calling the fix verified.
 - Three runs, three failures, same error: restore a required snapshot; otherwise
-  state the tree's condition, then report and ask (G9).
+  state the tree's condition, then report and ask (G12).
 - Reaching for "should" or "probably": you are about to claim without evidence.
   See RATIONALIZATIONS.
 

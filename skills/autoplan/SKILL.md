@@ -30,7 +30,7 @@ A rough idea and the wish to reach an approved plan in one pass.
 ## Stop conditions
 - The brief shows the request is exploratory: stop and say a prototype would
   answer more than a plan.
-- Any escalation trigger appears (G12): leave the chain, then ask.
+- Any escalation trigger appears (G15): leave the chain, then ask.
 
 ## Output
 The approved plan, and one line on what the panel changed in it.

@@ -47,7 +47,7 @@ Knowing what exists earns the right to write your own 30 lines (P2). Same for yo
 reach: before saying you cannot — no access, no tool, no data — look for the
 capability instead of consulting memory. Tools arrive unloaded, permissions
 arrive unread, and a directory nobody's config mentions still holds files.
-"I can't" is a claim about the world, claims need evidence (G15), and an
+"I can't" is a claim about the world, claims need evidence (G5), and an
 unchecked one costs the user a workaround they never needed.
 
 ## P7. Turn tasks into verifiable goals

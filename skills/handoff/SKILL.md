@@ -18,7 +18,7 @@ the task to another agent. Also on request: "save state", "checkpoint".
   so a hand-off to another machine needs the text itself, not a promise that
   the file will be there.
 - Remaining work is assembled from the repository and the record, never copied
-  from the previous checkpoint. Copying is how finished work stays open (G16).
+  from the previous checkpoint. Copying is how finished work stays open (G6).
 - What was tried and failed is the most valuable section. It is the part the
   next reader cannot reconstruct.
 

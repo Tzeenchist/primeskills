@@ -106,7 +106,7 @@ def main():
         if code != 0:
             failures.append(f"повторный verify не открыл land: {code}\n{out}")
 
-        # G9: the counter belongs to the file, so a new process keeps counting
+        # G12: the counter belongs to the file, so a new process keeps counting
         for expected in (1, 2):
             code, out = run(repo, "fail", "flaky export")
             checks += 1
@@ -311,7 +311,7 @@ def main():
         if code != 2 or "STALE" not in out:
             failures.append(f"retargeted symlink was invisible: {code}\n{out}")
 
-    # the G9 breaker counts a problem, not a phrasing of it
+    # the G12 breaker counts a problem, not a phrasing of it
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
         repo.mkdir()
@@ -320,7 +320,7 @@ def main():
         checks += 1
         code, out = run(repo, "fail", "The login  RETURNS 500!")
         if "2 of 3" not in out:
-            failures.append(f"переформулировка обнулила счётчик G9:\n{out}")
+            failures.append(f"переформулировка обнулила счётчик G12:\n{out}")
         checks += 1
         code, out = run(repo, "fail", "css margin is wrong")
         if "1 of 3" not in out:

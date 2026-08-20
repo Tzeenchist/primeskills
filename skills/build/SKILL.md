@@ -32,7 +32,7 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
    `primeskills-run check vet`; without it, use a sandbox or obtain the user's
    trust → **verify:** review precedes execution; trust boundary is named
 3. Resolve what the suite will touch before running it — database, cache,
-   directories — and print each one (G17) → **verify:** every named target is a
+   directories — and print each one (G8) → **verify:** every named target is a
    test target you can point at, not a working or dev store
 4. Run the suite once before touching anything → **verify:** you know which
    failures were already there
@@ -41,7 +41,7 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 6. Cut it into steps a single commit can carry → **verify:** each step has its
    own check, and no step needs a later one to be meaningful
 7. Before a risky step — migration, bulk edit, refactor — take a snapshot that
-   covers untracked files too, and a dump for data (G14) → **verify:** you
+   covers untracked files too, and a dump for data (G11) → **verify:** you
    restored it somewhere disposable and saw your newest file come back
 8. **Red.** Write the test that fails for the right reason → **verify:** run it,
    record the failure message verbatim — that record is the red half of the
@@ -56,7 +56,7 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
    `primeskills-run may commit` first, and if it refuses, ask instead of
    committing. Stage intentional files only, never `git add -A` → **verify:**
    the rung was checked, and `git diff --staged` shows exactly what you meant
-   to include (G11)
+   to include (G14)
 12. Repeat from 8 until the acceptance criteria are met → **verify:** re-read
    them line by line and mark each one
 
@@ -67,10 +67,10 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
   build something else (PRINCIPLES 8).
 - A step needs an abstraction "for later": that is the moment to cut, not to
   generalise (PRINCIPLES 2).
-- Three failed attempts at the same step, counted on the shared counter (G9):
+- Three failed attempts at the same step, counted on the shared counter (G12):
   stop building. Handing to `debug` is allowed and improvising is not — `debug`
   starts by reproducing and stating a hypothesis, which is the opposite of a
-  fourth attempt. If `debug` also runs out, that is the breaker (G9) and the
+  fourth attempt. If `debug` also runs out, that is the breaker (G12) and the
   answer is the user, not a fifth idea.
 
 ## Output

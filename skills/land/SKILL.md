@@ -17,7 +17,7 @@ order exists to prevent.
 ## Invariants
 - The commit message describes what the diff does. If you cannot write the
   message from the diff, the commit contains more than one change.
-- Two passes over the whole change (G6): once for secrets, once for whether the
+- Two passes over the whole change (G17): once for secrets, once for whether the
   message matches. Neither substitutes for the other.
 - Integration is the user's decision. You prepare it; merging, releasing, and
   deploying are theirs to choose (PRINCIPLES 8).
@@ -30,7 +30,7 @@ order exists to prevent.
    `primeskills-run check verify`. Stale or missing means run the full suite
    again on the final state → **verify:** exit 0, counts match, and `check`
    answers `current`
-2. First pass over the whole change (G6): scan for keys, tokens, passwords,
+2. First pass over the whole change (G17): scan for keys, tokens, passwords,
    `.env` changes, real identifiers, absolute paths from your machine
    → **verify:** you name each hit or state there are none
 3. Second pass over the same range: read it and write the message from it → **verify:** every
@@ -76,4 +76,4 @@ Branch, commit, PR URL, the acceptance criteria with each marked, and one line
 on what is left for the user to decide.
 
 ## References
-`GUARDRAILS.md` G6 for the commit audit, G12 for what escalates.
+`GUARDRAILS.md` G17 for the commit audit, G15 for what escalates.

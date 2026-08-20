@@ -515,7 +515,7 @@ def check_repro_first(span):
 
 
 def check_read_only(span):
-    """G7: the skill does not touch the work. A `reports` skill may still write
+    """G16: the skill does not touch the work. A `reports` skill may still write
     its verdict under .primeskills/ -- a verdict nobody can read is not one."""
     for c in span["calls"]:
         if c["tool"] in WRITING_TOOLS:
@@ -528,7 +528,7 @@ def check_read_only(span):
 
 
 def check_diff_before_commit(span):
-    """land, G6: the change is read before it is committed."""
+    """land, G17: the change is read before it is committed."""
     commits = [c for c in span["calls"]
                if c["tool"] == "Bash" and re.search(r"\bgit\s+commit\b", c["cmd"])]
     if not commits:
@@ -542,7 +542,7 @@ def check_diff_before_commit(span):
 
 
 def check_git_hygiene(span):
-    """land, merge, G11: never `git add -A`, never force, never rewrite.
+    """land, merge, G14: never `git add -A`, never force, never rewrite.
 
     The cheapest check in the set and the one with the worst failure mode:
     `git add -A` has twice pulled foreign work into a commit in this project's
@@ -617,15 +617,15 @@ def check_flow_order(span, call_map, later_skills):
 
 PER_SKILL = {
     "build": [("красная фаза (P7, TDD)", check_red_phase),
-              ("гигиена git (G11)", check_git_hygiene)],
+              ("гигиена git (G14)", check_git_hygiene)],
     "cycle": [("красная фаза (P7, TDD)", check_red_phase)],
     "verify": [("прогон состоялся (G4)", check_suite_ran),
                ("зелень не куплена правкой теста", check_green_by_editing_test)],
     "debug": [("воспроизведение до правки (P3)", check_repro_first)],
-    "land": [("дифф прочитан до коммита (G6)", check_diff_before_commit),
-             ("гигиена git (G11)", check_git_hygiene)],
-    "merge": [("гигиена git (G11)", check_git_hygiene)],
-    "revise": [("гигиена git (G11)", check_git_hygiene)],
+    "land": [("дифф прочитан до коммита (G17)", check_diff_before_commit),
+             ("гигиена git (G14)", check_git_hygiene)],
+    "merge": [("гигиена git (G14)", check_git_hygiene)],
+    "revise": [("гигиена git (G14)", check_git_hygiene)],
     "handoff": [("чекпоинт в репозитории, не в доме", check_checkpoint_in_repo)],
 }
 
@@ -636,7 +636,7 @@ def targets_in(cmd):
 
 
 def check_target_resolved(calls):
-    """G17, session-wide: a destructive command resolves its target first.
+    """G8, session-wide: a destructive command resolves its target first.
 
     The print counts only when it is the immediately preceding command and names
     the same target as the destruction. Both looser rules fail: crediting any
@@ -670,7 +670,7 @@ def report(path, skills_dir, quiet=False):
     core_at = next((c["n"] for c in calls
                     if any(f in c["raw"] for f in CORE_FILES)), None)
     # Two questions, two tallies. Mixing them produced one number that answered
-    # neither: 138 of 151 checks were the session-wide G17, so "adherence 56%"
+    # neither: 138 of 151 checks were the session-wide G8, so "adherence 56%"
     # was really a measurement of destructive-target hygiene wearing the name of
     # skill adherence.
     tally = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0}
@@ -685,10 +685,10 @@ def report(path, skills_dir, quiet=False):
     order = [s["skill"] for s in found]
     for i, span in enumerate(found):
         checks = list(PER_SKILL.get(span["skill"], []))
-        # `exercises` writes through the application on purpose (G7); holding
+        # `exercises` writes through the application on purpose (G16); holding
         # it to the read-only check reported its own design as a violation.
         if role_of(span["skill"], skills_dir) in ("read-only", "reports"):
-            checks.append(("не пишет (G7)", check_read_only))
+            checks.append(("не пишет (G16)", check_read_only))
         declared = calls_of(span["skill"], skills_dir)
         if declared:
             call_map = {span["skill"]: declared}
@@ -720,7 +720,7 @@ def report(path, skills_dir, quiet=False):
         guard[verdict] += 1
         if not quiet:
             mark = "ok  " if verdict == "ok" else "НАРУШЕН"
-            print(f"  [{mark}] цель разрешена до разрушения (G17) — #{n}: {safe(cmd)}")
+            print(f"  [{mark}] цель разрешена до разрушения (G8) — #{n}: {safe(cmd)}")
 
     return {"skills": [s["skill"] for s in found], "core_at": core_at,
             "tally": tally, "guard": guard, "by_rule": by_rule}
@@ -1015,7 +1015,7 @@ def main(argv):
               f"эти смотреть глазами, прежде чем считать")
 
     g_applicable, g_rate = share(guard)
-    print(f"\n## Ограничитель G17 (по всей сессии, вне зависимости от скиллов)")
+    print(f"\n## Ограничитель G8 (по всей сессии, вне зависимости от скиллов)")
     print(f"проверок: {g_applicable}")
     print(f"соблюдено: {guard['ok']}, нарушено: {guard['violated']}, доля {g_rate}")
     print("это база поведения, а не мера набора: она набрана и там, где набор "

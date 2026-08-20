@@ -341,7 +341,7 @@ def git_verdict(tokens):
 
     `git restore <path>` discards that path with or without `--`. `git checkout
     <path>` does the same and reads like switching branches, which is how it
-    got past this guard and cost the author an uncommitted rewrite of G18 on
+    got past this guard and cost the author an uncommitted rewrite of G10 on
     2026-08-19. A branch name and a path are told apart the only way a guard
     can: if the argument names something that exists on disk, it is a path.
     """

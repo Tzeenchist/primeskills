@@ -46,7 +46,7 @@ KIMI_CONFIG = HOME / ".kimi-code" / "config.toml"
 OPENCODE_CONFIG = HOME / ".config" / "opencode" / "opencode.json"
 PREFIX = "prime-"
 
-# Skills reference core by number (PRINCIPLES §3, GUARDRAILS G17). Linking
+# Skills reference core by number (PRINCIPLES §3, GUARDRAILS G8). Linking
 # skills/ alone leaves every one of those references pointing at a file no host
 # ever loads. Each host has one file it always reads; a managed block there
 # makes core reachable. Markers keep uninstall exact.
@@ -70,7 +70,7 @@ ALWAYS_LOADED = {
 def rule_span():
     """The highest P and G numbers, read from `core/` rather than typed.
 
-    The line below said G1-G17 while G18 was already in the file and already
+    The line below said G1-G8 while G10 was already in the file and already
     installed in four agents' always-loaded configuration -- the one place
     where a stale number is read by every session before anything else.
     """
@@ -186,7 +186,7 @@ CLAUDE_SETTINGS = HOME / ".claude" / "settings.json"
 # The guard hooks used to be declared in fence's own frontmatter, so nothing was
 # intercepted until someone invoked the skill: a destructive command on step two
 # of a session that reached `/fence` on step twenty went through untouched, while
-# G10 promised the opposite. Installing them puts the guard up with the set. The
+# G9 promised the opposite. Installing them puts the guard up with the set. The
 # command names this repository's absolute path, which also removes the older
 # defect of pointing at ~/.claude/skills/fence/ when a collision had renamed the
 # skill to prime-fence.

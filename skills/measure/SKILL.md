@@ -28,7 +28,7 @@ nobody knows. Not for a failure — a wrong answer is `debug`.
    would count as fixed → **verify:** both are numbers, not adjectives
 2. Resolve where you are measuring — host, database, dataset size, build mode
    → **verify:** you printed it, and it is not production unless the user said
-   so (G17)
+   so (G8)
 3. Take the baseline on the current commit and record it:
    `primeskills-run note measure "<quantity>: <number> on <conditions>"`
    → **verify:** the record names the commit and the conditions
@@ -48,7 +48,7 @@ nobody knows. Not for a failure — a wrong answer is `debug`.
 - Numbers stitched from different runs, machines or datasets: throw them out
   and start one clean series.
 - The profiler needs a production database or real user data to be meaningful:
-  stop and ask (G17, G12).
+  stop and ask (G8, G15).
 - You start fixing: stop. Hand the breakdown to `build`.
 
 ## Output

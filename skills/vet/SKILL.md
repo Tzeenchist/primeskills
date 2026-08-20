@@ -25,12 +25,12 @@ not the running system — that is `probe`.
 
 ## Procedure
 1. Read the whole change — `git diff <base>...HEAD` plus staged and unstaged
-   (G6) — and state what it is meant to do
+   (G17) — and state what it is meant to do
    → **verify:** your statement matches the plan or the commit message, and you
    say so when it does not
 2. Scan for secrets first: keys, tokens, passwords, `.env` files, real
    identifiers in tests → **verify:** you name each hit or state there are none
-   (G6)
+   (G17)
 3. Correctness: for each changed path, what happens on nil, empty, and error
    input → **verify:** each has an answer drawn from the code, not assumed
 4. Scope: does every changed line trace to the request → **verify:** you name
@@ -51,7 +51,7 @@ not the running system — that is `probe`.
 - You disagree with a decision the user already made: say it once as an
   optional finding and move on. Re-litigating is not reviewing.
 - A finding you raised earlier is already fixed in this diff: strike it, do not
-  carry it (G16).
+  carry it (G6).
 - The change is too large to review honestly: say so and ask for it in parts.
 
 ## Output

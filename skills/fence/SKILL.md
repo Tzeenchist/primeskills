@@ -19,7 +19,7 @@ unattended session. Also on request: "be careful", "lock edits here".
   `sed -i`, `tee`, `cp` and redirection walk past it. It is a reminder you
   cannot forget, not a wall.
 - Pattern matching is necessary and never sufficient: destruction usually
-  arrives through a harmless command with a misconfigured target (G17).
+  arrives through a harmless command with a misconfigured target (G8).
 - **Where confirmations are off, the guard decides instead of asking.** In
   `bypassPermissions` and `dontAsk` a prompt is not protection: it is approved
   unread, and it trains the reflex that answers the one that mattered. So a
@@ -47,4 +47,4 @@ unattended session. Also on request: "be careful", "lock edits here".
 One line: guards armed, boundary paths, host support.
 
 ## References
-`GUARDRAILS.md` G7, G10, G14, G17 hold the rules these hooks enforce.
+`GUARDRAILS.md` G16, G9, G11, G8 hold the rules these hooks enforce.

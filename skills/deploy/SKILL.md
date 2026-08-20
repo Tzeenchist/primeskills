@@ -15,7 +15,7 @@ Never on your own initiative, and never as the tail end of merging.
 - The rung is checked before the first write, not before the last one. The
   migration is a write.
 - Name the environment out loud before touching it. The worst outcome here is
-  not a failed deploy, it is a successful one somewhere unintended (G17).
+  not a failed deploy, it is a successful one somewhere unintended (G8).
 - The rollback exists before the deploy starts, and you have said how long it
   takes. A plan to "revert the commit" is not a rollback.
 - Deployed is not working. Until something observed says the new version serves
@@ -40,7 +40,7 @@ Never on your own initiative, and never as the tail end of merging.
    explicit "forward only" the user has heard before you start, and the record
    says which
 3. Back up what the deploy can destroy — data, uploaded files, configuration
-   → **verify:** the backup exists and you can name how to restore from it (G14)
+   → **verify:** the backup exists and you can name how to restore from it (G11)
 4. Check what ships: the commit going out and how it differs from what runs now
    → **verify:** you can list migrations, config changes, and new dependencies
 5. `primeskills-run may migrate --target <the target from step 1> --peek`,
@@ -62,7 +62,7 @@ Never on your own initiative, and never as the tail end of merging.
 - No rollback and no forward-only decision in the record: stop. A deploy you
   cannot undo is the user's decision, not your task — but once they have made
   it knowingly, it is a plan, not a blocker.
-- The target cannot be proved to be the intended one: stop (G17, G12).
+- The target cannot be proved to be the intended one: stop (G8, G15).
 - Health check fails: `primeskills-run may rollback --target <the target>`,
   then carry out the rollback decided in step 2, and if that decision was "forward only" —
   because a migration made the old version incompatible — say so and ask. Debugging a live environment while users sit

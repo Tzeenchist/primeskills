@@ -19,7 +19,7 @@ attempt, not after the third.
 - Numbers come from one clean run. Observations stitched from several runs
   describe a system that never existed.
 - The bug is in the code until proven otherwise. Blaming the framework,
-  the compiler, or the machine needs the same evidence as any other claim (G15).
+  the compiler, or the machine needs the same evidence as any other claim (G5).
 - When the unknown is someone else's tool — its format, flags, or where it looks
   for files — read its documentation before probing it. Guessing costs more
   attempts than reading, and reverse-engineering costs more than both.
@@ -29,7 +29,7 @@ attempt, not after the third.
    dirty and whose it is, and find the real test command → **verify:** you can
    reproduce from a state you can describe
 2. Resolve and print what reproduction will touch — database, cache,
-   directories (G17) → **verify:** every target is disposable; a shared or
+   directories (G8) → **verify:** every target is disposable; a shared or
    production-like one stops here and escalates
 3. Reproduce it once, cleanly → **verify:** the failure appears, and you can
    state the exact command and starting condition
@@ -58,7 +58,7 @@ attempt, not after the third.
    passes and the full suite passes
 
 ## Stop conditions
-- Three failures on the shared counter (G9) — whether they happened here or in
+- Three failures on the shared counter (G12) — whether they happened here or in
   `build` — restore the snapshot and report what each attempt ruled out.
 - You cannot reproduce it: say so. An unreproducible bug is not fixed by a
   plausible patch.

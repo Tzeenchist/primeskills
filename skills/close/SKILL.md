@@ -35,7 +35,7 @@ see, and nobody asked for them just because the code compiles.
 4. Call `vet`, unless step 1 already did → **verify:** findings sorted, verdict
    stated
 5. On a blocking finding, return to `build`, then restart at 1 → **verify:** the
-   finding is struck once fixed, not carried (G16)
+   finding is struck once fixed, not carried (G6)
 6. Call `probe` if the change touches a running interface → **verify:** it
    returned PASS; BLOCK returns to step 5, and NOT RUN on a change
    that touches an interface is not a pass — it is an unknown
@@ -47,7 +47,7 @@ see, and nobody asked for them just because the code compiles.
    marked, secrets pass done, and no file from `.primeskills/` is in the diff
 
 ## Stop conditions
-- Three trips back to `build` on the same finding: stop and ask (G9).
+- Three trips back to `build` on the same finding: stop and ask (G12).
 - `vet` says rework rather than merge: leave the flow, do not patch around it.
 
 ## Output

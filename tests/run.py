@@ -64,7 +64,7 @@ def arm_c3_fixture(tmp):
     tests the number, not the rule — so the number is written at run time.
 
     Into a copy, never into the tracked fixture: a test suite that edits the
-    working tree before running is the harness tampering G8 forbids, and it was
+    working tree before running is the harness tampering G7 forbids, and it was
     this file doing it.
     """
     src = FIXTURES / "c3-over"

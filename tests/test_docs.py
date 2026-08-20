@@ -162,6 +162,23 @@ def main():
         if missing_flows:
             failures.append(f"{doc.name}: последовательности не названы: {missing_flows}")
 
+    # 3a''. Numbers were handed out in the order rules were written, while the
+    #        registry is grouped by theme, so it read G1 G2 G3 G4 G15 G16 G8 …
+    #        and "see G15" told a reader nothing about where to look. Renumbered
+    #        2026-08-20; this keeps the two orders welded together.
+    guardrails = (ROOT / "core" / "GUARDRAILS.md").read_text(encoding="utf-8")
+    numbers = [int(n) for n in re.findall(r"^- \*\*G(\d+) ", guardrails, flags=re.M)]
+    checks += 1
+    if numbers != list(range(1, len(numbers) + 1)):
+        failures.append(f"core/GUARDRAILS.md: номера не идут подряд сверху вниз: "
+                        f"{numbers}. Перенумеровать и дописать строку в "
+                        f"docs/GUARDRAIL-NUMBERS.md")
+    checks += 1
+    aliases = (ROOT / "docs" / "GUARDRAIL-NUMBERS.md").read_text(encoding="utf-8")
+    missing = [n for n in numbers if f"**G{n}**" not in aliases]
+    if missing:
+        failures.append(f"docs/GUARDRAIL-NUMBERS.md: нет строк для {missing}")
+
     # 3b'''. A tag without a changelog entry cannot be released with notes, and
     #        nine of them were pushed that way before anyone noticed. Tags are
     #        absent from a shallow CI checkout, so their absence is not a
@@ -219,8 +236,8 @@ def main():
         failures.append("справка молчит про пин по умолчанию")
     checks += 1
     core_rules_text = (ROOT / "core" / "GUARDRAILS.md").read_text(encoding="utf-8")
-    if "G18" in core_rules_text and "never an order" not in guide:
-        failures.append("справка не перечисляет правило G18 среди всегда действующих")
+    if "G10" in core_rules_text and "never an order" not in guide:
+        failures.append("справка не перечисляет правило G10 среди всегда действующих")
 
     # 4. VERSION and the newest CHANGELOG entry are one statement in two files.
     checks += 1

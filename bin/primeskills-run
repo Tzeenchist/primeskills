@@ -2,7 +2,7 @@
 """Per-branch run record: what was proved, against which state of the tree.
 
 Written because two external reviews landed on the same defect from different
-directions. The G9 circuit breaker counts failed attempts "per problem, owned by
+directions. The G12 circuit breaker counts failed attempts "per problem, owned by
 whoever runs the loop" -- but the owner died with the session, so the counter
 reset every time context was cleared. And `release` claims "each stage reads the
 previous one's evidence" while that evidence lived only in the conversation.
@@ -30,7 +30,7 @@ anyone who can push to a branch write the next agent's opening context.
     PRIMESKILLS_CHAIN_STATE=1 primeskills-run may push # stale verify blocks land
     primeskills-run show
 
-Evidence of a run (notes, G9 counters) is per branch. Permissions (grant,
+Evidence of a run (notes, G12 counters) is per branch. Permissions (grant,
 revoke, spent) live in one record per repository, `run/repo.jsonl`: `land` and
 `merge` cross branches by design, and a mandate written on master was
 invisible from the branch the merge ran on (PS-047). For one transition period
@@ -45,7 +45,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-BREAKER = 3  # G9: three failed attempts on one problem and the loop stops
+BREAKER = 3  # G12: three failed attempts on one problem and the loop stops
 BIG_FILE = 4 * 1024 * 1024  # past this, hash size plus 64 KiB at each end
 SAMPLE_SIZE = 64 * 1024
 # The rungs of the authority ladder, in order. Each is a separate yes and one
@@ -56,7 +56,7 @@ RUNGS = ("commit", "push", "pr", "merge", "migrate", "deploy", "rollback",
 # Rungs where a mandate must name what it covers and is spent when used. A
 # migration is often irreversible where the deploy around it is not, so it
 # carries its own yes rather than riding on deploy's. `clear` is here for a
-# different reason: it lifts the G9 breaker, and a breaker its own subject can
+# different reason: it lifts the G12 breaker, and a breaker its own subject can
 # lift is a reminder, not a breaker. Its target is the problem being cleared,
 # so one yes clears one counter and not the next one.
 SENSITIVE = ("migrate", "deploy", "rollback", "delete", "clear")
@@ -276,7 +276,7 @@ def ledger_path(record):
     They used to live in the per-branch record, and `land`/`merge` cross
     branches by design — a mandate written on master was invisible from the
     branch, and one written on the branch was invisible from the base
-    (PS-047). Evidence and G9 counters stay per branch; authority is granted
+    (PS-047). Evidence and G12 counters stay per branch; authority is granted
     to the work, not to the branch.
     """
     ledger = record.with_name("repo.jsonl")
@@ -381,7 +381,7 @@ def cmd_fail(path, argv):
     counts = counters(read(path))
     n = counts.get(match_key(counts, problem), 0)
     if n >= BREAKER:
-        print(f"{problem}: {n} — G9 breaker. Restore the G14 snapshot, report "
+        print(f"{problem}: {n} — G12 breaker. Restore the G11 snapshot, report "
               f"what each attempt ruled out, ask.")
         return 3
     print(f"{problem}: {n} of {BREAKER}")
@@ -389,7 +389,7 @@ def cmd_fail(path, argv):
 
 
 def cmd_clear(path, argv):
-    """Reset one G9 counter -- on the user's yes, never on the agent's own.
+    """Reset one G12 counter -- on the user's yes, never on the agent's own.
 
     The rung is `clear` and its target is the problem, so the permission that
     lifts the breaker on one failure does not lift it on the next. The target
@@ -517,7 +517,7 @@ def rung_state(path, rung, target, spend=True, peek=False):
     """Is this rung open, for this target, right now? (code, message).
 
     Shared by `may` and `clear` on purpose. When `clear` did its own reading of
-    the journal it did no reading at all: the command that lifts the G9 breaker
+    the journal it did no reading at all: the command that lifts the G12 breaker
     was the one command on no rung, so the agent the breaker stops could stop
     the breaker. One path also means one place where a single-use mandate is
     spent, instead of two that can disagree about whether it was.

@@ -25,7 +25,7 @@ runs; the properties of the diff are `vet`.
   say which states you could not produce. Do not call yourself read-only here:
   the code is safe, the data is not.
 - Test against development or a staging copy. Production is touched only with
-  explicit confirmation, and never with writes (G17).
+  explicit confirmation, and never with writes (G8).
 - A defect report that cannot be reproduced from its own text is not a report.
 - What you did not test is part of the result. Say it.
 - Reach is HTTP, the command line, and what the system writes to its logs and
@@ -37,7 +37,7 @@ runs; the properties of the diff are `vet`.
 ## Procedure
 1. Confirm what you are pointed at: URL, branch, commit, database, and how it
    gets reset → **verify:** it is disposable — not a working store, not
-   production (G17)
+   production (G8)
 2. Walk the main path a real user takes, end to end — through the interface if
    you have a way to drive one, through its endpoints if you do not
    → **verify:** you performed each step, not read the code that implements it,

@@ -18,7 +18,7 @@ starts.
 ## Invariants
 - This flow knows the order and nothing else. It does not restate what the
   lenses say, and it does not review on their behalf.
-- A finding resolved during the panel is struck, not carried (G16).
+- A finding resolved during the panel is struck, not carried (G6).
 
 ## Procedure
 1. Call `ceo` → **verify:** findings returned, or "no objections"

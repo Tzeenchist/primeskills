@@ -41,4 +41,4 @@ A written plan, before implementation. The question is not "will it work" but
 Findings per axis with the user's decision, and the four-path table.
 
 ## References
-`GUARDRAILS.md` G17 on targets; `verify` owns the standing bar.
+`GUARDRAILS.md` G8 on targets; `verify` owns the standing bar.
