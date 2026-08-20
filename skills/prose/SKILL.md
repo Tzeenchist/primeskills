@@ -1,11 +1,13 @@
 ---
 name: prose
 description: Use before text leaves the building, to strip machine tells without flattening the writing
-budget: 600
+budget: 650
 role: write
 refs:
   - path: ref/tells.md
     when: running the mechanical pass, or the text is in Russian
+  - path: ref/keep.md
+    when: before cutting anything, and whenever a count sits over a threshold
 ---
 
 # Prose
@@ -43,16 +45,20 @@ not for code comments.
 2. Identify the language and load the matching column of `ref/tells.md`
    → **verify:** you say which language rules you are applying
 3. Mechanical pass: grep each pattern, count hits, record the rate per
-   thousand words, the unit `ref/tells.md` uses → **verify:** you have counts, not impressions
-4. Cut only what exceeds a human rate, keeping the strongest instance of each
-   pattern → **verify:** for every cut you can name the pattern and the count
-   that justified it
+   thousand words, the unit `ref/tells.md` uses, discounting hits inside
+   quotations, titles and examples → **verify:** you have counts, not impressions
+4. Cut only what exceeds a human rate, sparing what `ref/keep.md` protects and
+   keeping the strongest instance of each pattern → **verify:** for every cut
+   you can name the pattern and the count that justified it
 5. Structural pass by eye: paragraphs of equal length, every section ending on
    a punchy line, triples everywhere, headings that announce instead of naming
    → **verify:** you quote the passage, not the category
 6. Read the result aloud against the original → **verify:** the argument is
    unchanged, and you can point to nothing you improved beyond the brief
-7. Report: what was cut, at what count, and what you deliberately left
+7. Check the result against the source for anything the edit introduced: a
+   fact, name, number, date, or citation absent from the original
+   → **verify:** you list what you added, or state that the list is empty
+8. Report: what was cut, at what count, and what you deliberately left
    → **verify:** the list of what you left is not empty, or you say why
 
 ## Stop conditions
@@ -69,3 +75,4 @@ patterns you left in place with the reason.
 
 ## References
 `ref/tells.md` — the patterns, per language, with the counts that matter.
+`ref/keep.md` — what a count must not be read as, and what to leave alone.

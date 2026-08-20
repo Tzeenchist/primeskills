@@ -124,6 +124,52 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## ai-copywriter
+
+https://github.com/mikiarlo3/ai-copywriter
+
+Two lists in `skills/prose/ref/keep.md` come from its humanizer half: what must
+not be read as a machine tell, and what to leave alone. The debt is larger than
+an idea and smaller than a copy, so it is worth stating precisely. Both lists
+are a condensed Russian rendering of theirs: the selection of entries is theirs,
+and several of the reasons are theirs compressed into a clause. No English
+sentence of theirs is reproduced, and their illustrative examples were replaced
+with our own after review found two of them translated rather than rewritten.
+`bin/primeskills-shingle` cannot settle any of this, because it compares words
+and the two texts share no language — the claim above rests on reading, and it
+is here so a reader can check it against their file rather than trust it.
+
+The patterns they gathered are in turn credited by them to
+[Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
+(CC BY-SA 4.0), maintained by WikiProject AI Cleanup. That page is the origin
+of the observations, and it is named here so the chain does not stop one link
+short.
+
+```
+MIT License
+
+Copyright (c) 2025 Siqi Chen (original humanizer)
+Copyright (c) 2026 Mickey Haslavsky (AI Copywriter additions)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## i-have-adhd
 
 https://github.com/ayghri/i-have-adhd
