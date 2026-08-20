@@ -44,4 +44,6 @@ print(f"   gstack   {gt} words (SKILL.md only) / {gtf} with references")
 print(f"   prime    {pt} words, of which {sum(BUDGETS.values())} are budgets, not code yet")
 print(f"   ratio    {gt / pt:.1f}x .. {gtf / pt:.1f}x")
 print("\nOurs are ceilings the linter enforces; gstack's are what the files"
-      "\nactually weigh. The projection can only move in our favour.")
+      "\nactually weigh -- and a session loads neither. Measured live on"
+      "\n2026-08-20: 5.4x..8.3x, about half the projection, because the"
+      "\nprojection overstated both sides. See bench/RUN-7-LOG.md.")
