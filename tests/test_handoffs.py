@@ -6,6 +6,7 @@ Everything here is about the rest of them -- a file written on a branch that is
 gone reads as an ordinary row unless the program says the branch is gone, and
 that row is exactly the one PS-050 was raised for.
 """
+import json
 import os
 import subprocess
 import sys
@@ -17,9 +18,20 @@ ROOT = Path(__file__).resolve().parent.parent
 TOOL = ROOT / "bin" / "primeskills-handoffs"
 
 
-def run(cwd):
-    return subprocess.run([sys.executable, str(TOOL)], capture_output=True,
-                          text=True, cwd=cwd)
+def run(cwd, *args, home=None):
+    """HOME is always set: the register lives there, and a test that reads the
+    machine's own register is testing the machine, not the change."""
+    env = dict(os.environ, HOME=str(home or cwd))
+    return subprocess.run([sys.executable, str(TOOL), *args],
+                          capture_output=True, text=True, cwd=cwd, env=env)
+
+
+def register(home, *tops):
+    path = Path(home) / ".primeskills" / "trees.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({str(t): "2026-08-21T00:00:00+00:00"
+                                for t in tops}), encoding="utf-8")
+    return path
 
 
 def git(cwd, *args):
@@ -55,16 +67,57 @@ def main():
         if not condition:
             failures.append(complaint)
 
-    # 1. Outside a repository there is no tree to list, and saying "no
-    #    checkpoints" there would be a claim about a place we never looked.
+    # 1. Outside a repository with nothing registered: still a refusal, but it
+    #    must hand the caller the way forward. The first version stopped at
+    #    "not inside a git repository", and three agents stopped with it while
+    #    eight checkpoints sat one directory away (2026-08-21).
     with tempfile.TemporaryDirectory() as tmp:
         done = run(tmp)
         want(done.returncode != 0,
-             "вне репозитория программа должна отказывать, а не печатать пустой список")
-        want("репозит" in done.stdout + done.stderr,
-             "отказ вне репозитория не называет причину")
+             "пустой реестр вне репозитория — отказ, а не пустой список")
+        told = done.stdout + done.stderr
+        want("реестр" in told, "отказ не называет реестр")
+        want("primeskills-handoffs <путь>" in told,
+             f"отказ не показывает, как назвать дерево:\n{told}")
 
-    # 2. An empty tree refuses in a way the skill can branch on: a message and
+    # 2. Outside a repository, with a tree in the register: this is the case
+    #    the agents actually hit, and it must answer instead of refusing.
+    with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as home:
+        top = Path(tmp)
+        repo(top)
+        checkpoint(top, "master", "живой чекпоинт\n")
+        register(home, top)
+        done = run(Path(home), home=home)
+        want(done.returncode == 0,
+             f"из дома с непустым реестром ждали код 0:\n{done.stdout}{done.stderr}")
+        want("master" in done.stdout and str(top) in done.stdout,
+             f"чекпоинт зарегистрированного дерева не показан:\n{done.stdout}")
+        want("реестр" in done.stdout,
+             f"не сказано, откуда взялся список:\n{done.stdout}")
+
+        # a named tree works from anywhere, register or no register
+        done = run(Path(home), str(top), home=str(Path(home) / "empty"))
+        want(done.returncode == 0 and "master" in done.stdout,
+             f"дерево, названное аргументом, не показано:\n{done.stdout}")
+
+        # a named tree that never held checkpoints says so rather than lying
+        done = run(Path(home), home, home=home)
+        want(done.returncode == 1,
+             "каталог без .primeskills/handoff должен быть отказом")
+
+    # 3. A register entry whose tree is gone is dropped, not crashed on
+    with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as home:
+        top = Path(tmp)
+        repo(top)
+        checkpoint(top, "master", "живой\n")
+        register(home, top, Path(home) / "снесённое-дерево")
+        done = run(Path(home), home=home)
+        want(done.returncode == 0 and "master" in done.stdout,
+             f"пропавшее дерево в реестре уронило список:\n{done.stdout}{done.stderr}")
+        want("больше нет" in done.stdout,
+             f"про пропавшее дерево реестра не сказано:\n{done.stdout}")
+
+    # 4. An empty tree refuses in a way the skill can branch on: a message and
     #    a non-zero code. "Nothing to show" printed with success is how a
     #    caller learns to ignore the answer.
     with tempfile.TemporaryDirectory() as tmp:
@@ -86,7 +139,7 @@ def main():
         want("заметка" not in done.stdout,
              "в список попал файл, который не чекпоинт")
 
-    # 3. The list itself: every checkpoint, newest first, with the date it was
+    # 5. The list itself: every checkpoint, newest first, with the date it was
     #    last touched and the branch it belongs to.
     with tempfile.TemporaryDirectory() as tmp:
         top = Path(tmp)
@@ -115,7 +168,7 @@ def main():
         want("текущая ветка" in done.stdout,
              f"чекпоинт текущей ветки не помечен:\n{done.stdout}")
 
-    # 4. The orphan. A checkpoint whose branch was deleted is still a file, and
+    # 6. The orphan. A checkpoint whose branch was deleted is still a file, and
     #    without a mark it is indistinguishable from a live one.
     with tempfile.TemporaryDirectory() as tmp:
         top = Path(tmp)
@@ -128,7 +181,7 @@ def main():
         want(done.stdout.count("←") == 2,
              f"пометок должно быть две — текущая и сирота:\n{done.stdout}")
 
-    # 5. A checkpoint reached through a link out of the tree is not this tree's
+    # 7. A checkpoint reached through a link out of the tree is not this tree's
     #    checkpoint. It becomes the next agent's opening context, so it is
     #    skipped and named, never listed as one of ours (`primeskills-run` uses
     #    the same rule for the run journal).

@@ -194,7 +194,11 @@ HOOKS = [("Bash", "check-commands.py", "fence: checking the command"),
          ("Edit|Write|NotebookEdit", "check-boundary.py", "fence: checking the boundary")]
 MANIFEST = HOME / ".primeskills" / "installed.json"
 LOCAL_BIN = HOME / ".local" / "bin"
-SHARED_TOOLS = ("primeskills-run", "primeskills-help")
+# Every tool a skill names by bare name belongs here: `handon` called
+# `primeskills-handoffs` and Codex answered 127, command not found
+# (2026-08-21). A skill that names a command the shell cannot find is an
+# instruction that fails silently.
+SHARED_TOOLS = ("primeskills-run", "primeskills-help", "primeskills-handoffs")
 
 
 def hook_command(script):

@@ -215,7 +215,8 @@ def check_command(r):
     """Skills name these tools by bare name. If the shell cannot find one, the
     instruction fails silently -- the exact failure this tool exists to catch."""
     for name, probe in (("primeskills-run", "--help"),
-                        ("primeskills-help", "--which-lang")):
+                        ("primeskills-help", "--which-lang"),
+                        ("primeskills-handoffs", "--help")):
         found = shutil.which(name)
         if not found:
             r.line(FAIL, "shared", f"{name} on PATH", "not found")

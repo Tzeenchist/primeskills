@@ -211,11 +211,45 @@ def no_symlink(path, top):
                  f"is only trusted inside the repository it describes.")
 
 
+TREES = Path.home() / ".primeskills" / "trees.json"
+
+
+def remember_tree(top):
+    """Note that the set worked in this tree, for `primeskills-handoffs`.
+
+    Checkpoints stay in the tree they describe (PS-022) and never travel. That
+    made them unfindable from anywhere else: `/handon` from `$HOME` -- where
+    agents are actually started -- answered "not inside a git repository" and
+    stopped, with eight checkpoints in seven trees a directory away
+    (2026-08-21). The register holds paths, nothing from inside a checkpoint,
+    and it is written here rather than by the listing program because `handon`
+    is read-only (G16) and reads what this journal already knows.
+
+    Never fatal: a machine that cannot write it still gets its run record.
+    """
+    try:
+        known = json.loads(TREES.read_text(encoding="utf-8"))
+        if not isinstance(known, dict):
+            known = {}
+    except (OSError, ValueError):
+        known = {}
+    known[str(top)] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    try:
+        TREES.parent.mkdir(parents=True, exist_ok=True)
+        tmp = TREES.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(known, indent=2, ensure_ascii=False) + "\n",
+                       encoding="utf-8")
+        os.replace(tmp, TREES)
+    except OSError:
+        pass
+
+
 def record_path():
     top = git("rev-parse", "--show-toplevel").strip()
     if not top:
         sys.exit("primeskills-run: not inside a git repository")
     top = Path(top)
+    remember_tree(top)
     branch = git("rev-parse", "--abbrev-ref", "HEAD").strip() or "detached"
     root = top / ".primeskills" / "run"
     for part in (root.parent, root):

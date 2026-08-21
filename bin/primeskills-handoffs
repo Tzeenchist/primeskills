@@ -1,21 +1,34 @@
 #!/usr/bin/env python3
-"""List every checkpoint saved in this tree, newest first.
+"""List every checkpoint saved on this machine, newest first.
 
 `core/OUTPUT.md` §Session start reads exactly one: the file named after the
 current branch. Everything written on another branch is invisible to everyone,
 and once that branch is deleted its checkpoint is an orphan -- the file is
 alive, no session will ever open it again. That is what this program answers:
-what has been saved here, when it was last touched, and which of those
-checkpoints nothing points at any more.
+what has been saved, when it was last touched, and which of those checkpoints
+nothing points at any more.
 
-It only prints. Choosing one and reading it is the `handon` skill's half,
-because the text has to land in the agent's context, and a program cannot put
-it there. What it reads is a report, never an order (`core/OUTPUT.md`).
+Three sources, in this order: the trees named on the command line, the tree the
+caller stands in, or the register of trees the set has worked in
+(`~/.primeskills/trees.json`). The register exists because the first version
+answered "not inside a git repository" and stopped -- and agents are started
+from `$HOME`, where that is the normal case, not the edge one. Eight checkpoints
+in seven trees were invisible from there (2026-08-21, reported by OpenCode and
+Kimi). The filesystem is never scanned: what is listed is where the set has
+already worked, or what the caller named.
+
+It only prints, and it writes nothing -- not even the register, which
+`primeskills-run` maintains. `handon` is a read-only skill (G16), and this is
+the program it runs.
 """
+import argparse
+import json
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+REGISTER = Path.home() / ".primeskills" / "trees.json"
 
 
 def git(*args, cwd=None):
@@ -24,16 +37,31 @@ def git(*args, cwd=None):
     return done.returncode, done.stdout.strip()
 
 
-def repo_top():
-    code, top = git("rev-parse", "--show-toplevel")
-    if code != 0 or not top:
-        sys.exit("primeskills-handoffs: не внутри git-репозитория — "
-                 "чекпоинты лежат в .primeskills/ рабочего дерева")
-    return Path(top)
+def repo_top(cwd=None):
+    code, top = git("rev-parse", "--show-toplevel", cwd=cwd)
+    return Path(top) if code == 0 and top else None
+
+
+def registered():
+    """Trees the set has worked in, most recent first. Missing ones are dropped.
+
+    A read of a record, not a search: `primeskills-run` writes an entry every
+    time it resolves a repository, so a tree appears here once any skill has
+    used the journal in it.
+    """
+    try:
+        data = json.loads(REGISTER.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return [], 0
+    seen = sorted(((str(when), path) for path, when in data.items()),
+                  reverse=True)
+    alive = [Path(p) for _, p in seen
+             if (Path(p) / ".primeskills" / "handoff").is_dir()]
+    return alive, len(seen) - len(alive)
 
 
 def inside(path, top):
-    """Is this a real file of this repository, reached without a symlink?
+    """Is this a real file of this tree, reached without a symlink?
 
     The chosen file becomes the next agent's opening context, so where it comes
     from is part of what it proves. A link -- at the file or at any directory
@@ -56,30 +84,19 @@ def plural(n):
     return {1: "слово", 2: "слова", 3: "слова", 4: "слова"}.get(n % 10, "слов")
 
 
-def branch_of(path, root):
-    """The branch a checkpoint was written for, from its path."""
-    return str(path.relative_to(root).with_suffix("")).replace("\\", "/")
-
-
-def main():
-    top = repo_top()
+def rows_of(top, here_branch):
+    """Every checkpoint of one tree, plus what only that tree can answer."""
     root = top / ".primeskills" / "handoff"
-    code, current = git("rev-parse", "--abbrev-ref", "HEAD")
-    current = current if code == 0 else ""
-
-    if not root.is_dir():
-        print(f"primeskills-handoffs: чекпоинтов нет — каталог {root} "
-              f"не заведён. Первый напишет навык handoff.")
-        return 1
-
     rows, skipped = [], []
+    if not root.is_dir():
+        return rows, skipped
     for path in root.rglob("*.md"):
         if not path.is_file():
             continue
         if not inside(path, top):
             skipped.append(path)
             continue
-        branch = branch_of(path, root)
+        branch = str(path.relative_to(root).with_suffix("")).replace("\\", "/")
         exists = git("show-ref", "--verify", "--quiet",
                      f"refs/heads/{branch}", cwd=top)[0] == 0
         rows.append({
@@ -87,28 +104,90 @@ def main():
             "mtime": path.stat().st_mtime,
             "words": len(path.read_text(encoding="utf-8",
                                         errors="replace").split()),
-            "mark": ("текущая ветка" if branch == current
+            "mark": ("текущая ветка" if branch == here_branch
                      else "" if exists else "ветки нет — сирота"),
         })
-
-    if not rows:
-        print(f"primeskills-handoffs: в {root} нет ни одного .md — "
-              f"сохранённых чекпоинтов нет.")
-        for path in skipped:
-            print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
-        return 1
-
     rows.sort(key=lambda r: r["mtime"], reverse=True)
-    width = max(len(r["branch"]) for r in rows)
-    print(f"чекпоинты в {root} ({len(rows)}):")
+    return rows, skipped
+
+
+def show(rows, width):
     for r in rows:
         when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
         line = (f"  {when}  {r['branch']:<{width}}  "
                 f"{r['words']:>5} {plural(r['words'])}")
         print(line + (f"  ← {r['mark']}" if r["mark"] else ""))
+
+
+def sources(args, here, known):
+    """Which trees to list, and the one line saying where they came from."""
+    if args.trees:
+        return [repo_top(cwd=name) or Path(name) for name in args.trees], \
+            "названы в командной строке"
+    if args.all:
+        return list(dict.fromkeys(([here] if here else []) + known)), \
+            f"реестр {REGISTER}"
+    if here:
+        return [here], ""
+    return known, f"реестр {REGISTER}"
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Показать сохранённые чекпоинты и откуда они.")
+    ap.add_argument("trees", nargs="*", help="каталоги деревьев; без них — "
+                    "текущее дерево, а вне репозитория — реестр")
+    ap.add_argument("--all", action="store_true",
+                    help="все деревья реестра, даже когда вызван внутри одного")
+    args = ap.parse_args()
+
+    here = repo_top()
+    here_branch = git("rev-parse", "--abbrev-ref", "HEAD")[1] if here else ""
+    known, forgotten = registered()
+    tops, source = sources(args, here, known)
+
+    if not tops:
+        print(f"primeskills-handoffs: чекпоинтов нет. Не внутри "
+              f"git-репозитория, и реестр {REGISTER} пуст — он заполняется, "
+              f"когда набор работает в дереве. Назовите дерево: "
+              f"primeskills-handoffs <путь>")
+        return 1
+
+    listed, empty, skipped = [], [], []
+    for top in tops:
+        rows, links = rows_of(top, here_branch if top == here else "")
+        skipped += links
+        (listed if rows else empty).append(top)
+
+    if not listed:
+        print(f"primeskills-handoffs: в "
+              f"{empty[0] / '.primeskills' / 'handoff'} нет ни одного .md — "
+              f"сохранённых чекпоинтов нет.")
+        for path in skipped:
+            print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
+        return 1
+
+    trees = [(top, rows_of(top, here_branch if top == here else "")[0])
+             for top in listed]
+    total = sum(len(rows) for _, rows in trees)
+    width = max(len(r["branch"]) for _, rows in trees for r in rows)
+    if len(trees) == 1 and not source:
+        print(f"чекпоинты в {trees[0][0] / '.primeskills' / 'handoff'} "
+              f"({total}):")
+        show(trees[0][1], width)
+    else:
+        print(f"чекпоинтов {total} в {len(trees)} деревьях ({source}):")
+        for top, rows in trees:
+            print(f"{top}")
+            show(rows, width)
     for path in skipped:
         print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
-    print("не коммитятся (PS-022) и живут только в этом дереве")
+    if forgotten:
+        print(f"в реестре ещё {forgotten}, где каталога чекпоинтов больше нет")
+    if here and not args.all and not args.trees and len(known) > 1:
+        print(f"ещё деревьев в реестре: {len(known) - 1} — "
+              f"primeskills-handoffs --all")
+    print("не коммитятся (PS-022) и живут только в своих деревьях")
     return 0
 
 
