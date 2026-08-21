@@ -10,6 +10,8 @@ is switched on.
 
 Exit 0 when every check passes.
 """
+import importlib.machinery
+import importlib.util
 import json
 import shlex
 import shutil
@@ -22,11 +24,34 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+_INSTALLER = None
+
+
+def installer():
+    """The installer module: it owns the answer to "is this ours".
+
+    Loaded rather than reimplemented. The rule has been wrong three times in
+    three copies -- hooks (PS-048), skills (PS-051), and this file, which called
+    a correct pinned installation "none found" because it only knew the tree it
+    was running from. A rule with three owners drifts; this one now has one.
+    """
+    global _INSTALLER
+    if _INSTALLER is None:
+        spec = importlib.util.spec_from_loader(
+            "primeskills_install",
+            importlib.machinery.SourceFileLoader(
+                "primeskills_install", str(ROOT / "bin" / "primeskills-install")))
+        _INSTALLER = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_INSTALLER)
+    return _INSTALLER
+
+
 def under_root(path):
     """Ours by path components, not by substring: a sibling directory whose
-    name merely starts with ours is not ours (same defect as the installer's)."""
+    name merely starts with ours is not ours. Both trees count -- the working
+    copy and the pinned worktree -- and so does the installer's own record."""
     try:
-        return Path(path).resolve().is_relative_to(ROOT)
+        return installer().under_root(path)
     except (OSError, ValueError):
         return False
 HOME = Path.home()
@@ -53,10 +78,11 @@ def installed_skills(root):
         return []
     found = []
     for entry in sorted(root.iterdir()):
-        skill = entry / "SKILL.md"
-        if not skill.exists():
+        if not (entry / "SKILL.md").exists():
             continue
-        if under_root(skill):
+        # the installer's own test, so "ours" means the same thing on both
+        # sides: either tree of the set, or its record of what it installed
+        if installer().is_ours(entry):
             found.append(entry.name)
     return found
 

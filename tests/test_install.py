@@ -176,6 +176,39 @@ def main():
         if "someone else took this name" not in (taken / "SKILL.md").read_text(encoding="utf-8"):
             failures.append("запись манифеста дала снести чужой каталог под тем же именем")
 
+    # the doctor asks the same question and must get the same answer. Run from
+    # the working copy against an installation made from another tree, it said
+    # "none found" for all three agents -- a correct pinned installation
+    # reported as missing (2026-08-21, the third copy of this rule).
+    with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as other:
+        h = Path(home)
+        skills = h / ".claude" / "skills"
+        skills.mkdir(parents=True)
+        elsewhere = Path(other) / "skills" / "verify"
+        elsewhere.mkdir(parents=True)
+        (elsewhere / "SKILL.md").write_text("verify, from another tree\n", encoding="utf-8")
+        dest = skills / "verify"
+        dest.mkdir()
+        (dest / "SKILL.md").symlink_to(elsewhere / "SKILL.md")
+        record = h / ".primeskills" / "installed.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(json.dumps({str(dest): str(elsewhere)}), encoding="utf-8")
+
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=dict(os.environ, HOME=home)).stdout
+        want = len(list(ROOT.glob("skills/*/SKILL.md")))
+        # only claude has anything installed in this HOME; the other two are
+        # legitimately empty, and "none found" there is the right answer
+        said = next((l for l in told.splitlines()
+                     if "claude" in l and "skills linked" in l), "")
+        checks += 1
+        if "none found" in said:
+            failures.append(f"доктор не узнал установку из другого дерева:\n{told}")
+        checks += 1
+        if f"1 of {want}" not in said:
+            failures.append(f"доктор не засчитал узнанный навык:\n{told}")
+
     # a foreign directory under the prefix is still not ours to clear
     with tempfile.TemporaryDirectory() as home:
         h = Path(home)
