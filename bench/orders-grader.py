@@ -116,7 +116,11 @@ def main():
         print("  [FAIL] регрессионного теста на повтор клиента нет")
 
     print(f"итого {score}/4")
+    return score
 
 
 if __name__ == "__main__":
-    main()
+    # The exit code is what gates read; a FAIL printout with exit 0 trained
+    # run 7's write-up to call both arms green without a second look (PS-037
+    # п.2). Four axes, four points: anything less is a failed grade.
+    sys.exit(0 if main() == 4 else 1)

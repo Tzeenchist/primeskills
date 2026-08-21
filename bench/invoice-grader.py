@@ -29,3 +29,5 @@ for name, fn, expected in CASES:
     else:
         print(f"  FAIL {name}: got {got}, expected {expected}")
 print(f"{passed}/{len(CASES)} hidden tests passed")
+# A grade that prints FAIL and exits 0 is how run 7 recorded both arms green.
+sys.exit(0 if passed == len(CASES) else 1)
