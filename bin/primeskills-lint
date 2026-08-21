@@ -32,6 +32,10 @@ MUTATING_PATTERNS = [
      r"revert|stash|switch|tag|branch|checkout)\b",
      "state-changing git"),
 ]
+# A step that hands the user a decision must name the means (OUTPUT §Asking):
+# "accepted or declined" without it degrades to printed prose in every host
+# whose picker the agent was never told to open (PS-052).
+DECISION_STEP = re.compile(r"accept\w* or declin\w*|accepts, shrinks, or rejects")
 CORE_BUDGET = 3220          # always-loaded files; a ceiling, not a target
 # What one skill call actually costs: core, every description, the pointer the
 # installer writes, and the body. This is the number that matters -- C1 and F4
@@ -199,6 +203,13 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
             m = re.search(pattern, body)
             if m:
                 bad("F16", f"{why} in a {meta['role']} skill: ...{m.group(0)}...")
+
+    # F17: the decision step names its means. The asking rule lives once in
+    # core/OUTPUT §Asking; a skill that asks without pointing at it is the
+    # handon defect again, one skill later.
+    if DECISION_STEP.search(body) and "§Asking" not in body:
+        bad("F17", "a decision step ('accepted or declined') without the means "
+                   "named — reference OUTPUT §Asking")
 
     desc = str(meta.get("description", ""))
     if len(desc) > DESC_MAX:

@@ -34,7 +34,8 @@ API, a hosted service, a marketplace. Not a refactor and not a bug fix.
 5. Say which route this thing's shape supports → **verify:** the other is left
    standing as a condition, and you quote the line of the plan that would have
    to change
-6. Walk the user through the findings one at a time → **verify:** each comes
+6. Walk the user through the findings one at a time, by the means named in
+   OUTPUT §Asking → **verify:** each comes
    back accepted or declined, in the user's own words
 
 ## Stop conditions

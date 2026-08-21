@@ -40,6 +40,7 @@ EXPECT = {
     "f10-role-tools": "F10",
     "f11-ref-missing": "F11",
     "f16-readonly-mutates": "F16",
+    "f17-decision-without-means": "F17",
 }
 
 
@@ -143,6 +144,7 @@ def main():
     install = subprocess.run([sys.executable, str(Path(__file__).parent / "test_install.py")])
     docs = subprocess.run([sys.executable, str(Path(__file__).parent / "test_docs.py")])
     checkpoints = subprocess.run([sys.executable, str(Path(__file__).parent / "test_handoffs.py")])
+    coverage = subprocess.run([sys.executable, str(Path(__file__).parent / "test_rule_coverage.py")])
 
     # routing over the real skill set, not just fixtures
     live = subprocess.run([sys.executable, str(ROUTE), str(ROOT / "skills"),
@@ -151,7 +153,8 @@ def main():
     return 1 if (failures or fence.returncode or record.returncode
                  or adherence.returncode or guide.returncode
                  or install.returncode or docs.returncode
-                 or checkpoints.returncode or live.returncode) else 0
+                 or checkpoints.returncode or coverage.returncode
+                 or live.returncode) else 0
 
 
 if __name__ == "__main__":
