@@ -32,15 +32,20 @@ not the running system — that is `probe`.
    identifiers in tests → **verify:** you name each hit or state there are none
    (G17)
 3. Correctness: for each changed path, what happens on nil, empty, and error
-   input → **verify:** each has an answer drawn from the code, not assumed
-4. Scope: does every changed line trace to the request → **verify:** you name
-   any line that does not, including formatting and comment churn (G1)
+   input, judged on behaviour alone — ignore naming and style here
+   → **verify:** each has an answer drawn from the code, not assumed
+4. Scope: does every changed line trace to the request — intent is the only
+   question; ignore whether the change is good
+   → **verify:** you name any line that does not, including formatting and
+   comment churn (G1)
 5. Security: read `ref/security.md` if the diff touches input, auth, storage, or
    an integration → **verify:** the checklist is answered or explicitly not
    applicable
-6. Tests: does a new test fail without this change → **verify:** you can point
-   at the test, or you say coverage is missing
-7. Readability: would someone unfamiliar understand this in six months
+6. Tests: does a new test fail without this change — coverage only; ignore
+   test style and speed
+   → **verify:** you can point at the test, or you say coverage is missing
+7. Readability: would someone unfamiliar understand this in six months —
+   the reader's path only; ignore behaviour, which other axes own
    → **verify:** you name the place they would stumble, or state there is none
 8. Sort findings: blocking, worth fixing, optional → **verify:** each blocking
    finding says what breaks, with the input that breaks it

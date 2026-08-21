@@ -71,6 +71,7 @@
 | superpowers `verification-before-completion` | 580 | Iron Law, Gate Function (5 шагов), Common Failures (7→5 строк) | Red Flags и Rationalizations → `core`; When To Apply → в триггер |
 | karpathy §4 Goal-Driven | 130 | «действие → verify:» как форма шага; дословный кусок в 10 слов убран из P7 2026-08-19 | |
 | addy `ci-cd-and-automation` | 1 560 | ничего; гейты качества — тема `land` | целиком |
+| llm-as-a-verifier `criteria/swe_bench.md` | 19 | концепция, 2026-08-21: правка после последнего зелёного прогона обнуляет доказательство («edited again after the last successful verification step») → инвариант `verify`, нашими словами | их рантайм: скоринг логпробов, Best-of-N, верификатор отдельной моделью |
 
 **Пишем сами:** шаг 0 — разрешить и напечатать фактическую цель прогона
 (база, схема, каталог), сверить, что она изолированная (**G8**, из инцидента

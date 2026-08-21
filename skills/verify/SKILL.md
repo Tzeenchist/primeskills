@@ -1,7 +1,7 @@
 ---
 name: verify
 description: Use before claiming tests pass or work is done, and before any commit or PR
-budget: 550
+budget: 650
 role: write
 refs:
   - path: ref/harness.md
@@ -26,6 +26,9 @@ pushing, and before handing work to another agent.
   test deliberately, and never in the same step as making it pass.
 - The cycle closes only when the new test passes and the suite covering the
   change passes, gaps named.
+- An edit after the last green run voids the proof: the recorded pass describes
+  a tree that no longer exists. Re-run whole, or say the final state is
+  unverified — never point at a green run your later edits left behind.
 
 ## Procedure
 1. Before executing someone else's change, call `vet`, then require a current

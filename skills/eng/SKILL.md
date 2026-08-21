@@ -15,6 +15,8 @@ A written plan, before implementation. The question is not "will it work" but
 ## Invariants
 - Every axis is evaluated. "No issues here" is a valid answer; skipping is not,
   because the skipped axis is where the bug waits.
+- An axis judges its own question only; say what it ignores, so findings do
+  not leak between axes.
 - Read and report only. No edits, no code.
 
 ## Procedure
