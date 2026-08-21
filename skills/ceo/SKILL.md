@@ -28,7 +28,8 @@ engineer's: is this worth building?
    concrete
 5. Ask what the smallest version that a real user would use looks like
    → **verify:** it is smaller than the plan, or you say plainly that it is not
-6. Present findings one at a time and let the user decide each → **verify:**
+6. Present findings one at a time and let the user decide each, by the means
+   named in OUTPUT §Asking → **verify:**
    every finding is marked accepted or declined, with the user's reason
 
 ## Stop conditions

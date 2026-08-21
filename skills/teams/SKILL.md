@@ -28,7 +28,8 @@ starts.
 4. Call `beauty` only if the plan touches an interface → **verify:** it ran, or
    you state why it did not
 5. Consolidate: drop duplicates, drop anything already resolved, and put the
-   ones that change scope first → **verify:** every surviving finding names its
+   ones that change scope first; the user decides by the means named in
+   OUTPUT §Asking → **verify:** every surviving finding names its
    lens and the user's decision
 6. Hand the amended plan back → **verify:** the user sees what changed, not a
    list of what was said

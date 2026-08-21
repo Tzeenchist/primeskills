@@ -32,7 +32,8 @@ they want.
    → **verify:** it is specific enough to be visibly wrong
 5. Ask what happens today without it, and what the workaround costs
    → **verify:** the cost is concrete
-6. Propose what to cut: name the smallest version a real user would accept
+6. Propose what to cut: name the smallest version a real user would accept;
+   the choice goes by the means named in OUTPUT §Asking
    → **verify:** the user accepts, shrinks, or rejects the cut explicitly
 7. Ask how you will both know it worked → **verify:** the criterion is
    observable after shipping

@@ -32,7 +32,8 @@ backend-only work — this lens costs nothing when it does not run.
 5. Look for the tells of generated design: even spacing everywhere, no
    hierarchy, decorative gradients, three fonts → **verify:** you name specific
    places or state there are none
-6. Present findings one at a time → **verify:** each accepted or declined
+6. Present findings one at a time, each decided by the means named in
+   OUTPUT §Asking → **verify:** each accepted or declined
 
 ## Stop conditions
 - No interface in this plan: say so and stop. That is a complete review.

@@ -45,6 +45,14 @@ real uncertainty — deleting that manufactures confidence (G5).
 Then check: from the first line and the last alone, does the user know what
 happens next and what changed?
 
+## Asking
+A choice among enumerable options goes to the host's picker, named by name:
+`AskUserQuestion` (Claude Code, Kimi), `question` (OpenCode),
+`request_user_input` (Codex, interactive terminal only). An instruction to
+"ask" that does not name the means degrades to prose — the agent prints a list
+instead of opening a menu. Not among this turn's tools, or the options are
+open-ended: numbered list or plain question.
+
 ## Deliver in readable pieces
 When something needs the user's approval, hand it over in chunks short enough
 to actually read. A wall of text is not a review.

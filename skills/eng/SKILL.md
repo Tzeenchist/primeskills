@@ -29,7 +29,8 @@ A written plan, before implementation. The question is not "will it work" but
    → **verify:** the answer is a procedure, not "revert the commit"
 5. Check the test plan covers the paths from step 1 → **verify:** each path maps
    to a named test
-6. Present findings one at a time → **verify:** each is accepted or declined by
+6. Present findings one at a time, each decided by the means named in
+   OUTPUT §Asking → **verify:** each is accepted or declined by
    the user
 
 ## Stop conditions
