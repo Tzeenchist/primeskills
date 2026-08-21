@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUN = ROOT / "bin" / "primeskills-run"
 
 
-def run(repo, *args, chain_state=False):
+def run(repo, *args, chain_state=False, env_extra=None):
     # HOME points inside the temporary repository: the journal also writes the
     # register of trees (`~/.primeskills/trees.json`), and without this every
     # temporary repository of this suite landed in the register of the machine
@@ -28,6 +28,8 @@ def run(repo, *args, chain_state=False):
     env.pop("PRIMESKILLS_CHAIN_STATE", None)
     if chain_state:
         env["PRIMESKILLS_CHAIN_STATE"] = "1"
+    if env_extra:
+        env.update(env_extra)
     p = subprocess.run([sys.executable, str(RUN), *args],
                        capture_output=True, text=True, cwd=repo, env=env)
     return p.returncode, p.stdout + p.stderr
@@ -40,6 +42,12 @@ def make_repo(repo):
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
                     "commit", "-q", "-m", "init"], cwd=repo, check=True)
+    # ship --commit runs plain `git commit` with no -c overrides, so the
+    # repository itself must carry an identity -- a temporary HOME has none.
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"],
+                   check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t"],
+                   check=True)
 
 
 def main():
@@ -54,6 +62,10 @@ def main():
         subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
                         "commit", "-q", "-m", "init"],
                        cwd=repo, check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"],
+                       check=True)
+        subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t"],
+                       check=True)
 
         code, out = run(repo, "start")
         checks += 1
@@ -138,6 +150,61 @@ def main():
                         sys.executable, "-c", "raise SystemExit(1)")
         if code == 0 or "not recorded" not in out:
             failures.append(f"ship красного прогона записал: exit {code}\n{out}")
+
+        # ship --commit closes the rot window: prove the tree, commit what is
+        # staged, re-prove against the commit and re-bind the note to it.
+        (repo / "work.txt").write_text("work\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "work.txt"], check=True)
+        before = int(subprocess.run(
+            ["git", "-C", str(repo), "rev-list", "--count", "HEAD"],
+            capture_output=True, text=True).stdout)
+        checks += 1
+        code, out = run(repo, "ship", "--commit", "bench work", "--expect",
+                        "0 failed", "--",
+                        sys.executable, "-c", "print('4 checks, 0 failed')")
+        after = int(subprocess.run(
+            ["git", "-C", str(repo), "rev-list", "--count", "HEAD"],
+            capture_output=True, text=True).stdout)
+        if code != 0 or after != before + 1 or "переписано после коммита" not in out:
+            failures.append(f"ship --commit не замкнул цикл: exit {code}, "
+                            f"коммитов {before} -> {after}\n{out}")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 0:
+            failures.append(f"после ship --commit verify не current: {code}\n{out}")
+        # nothing staged is a refusal: staging stays manual and intentional
+        checks += 1
+        code, out = run(repo, "ship", "--commit", "empty", "--",
+                        sys.executable, "-c", "print('ok')")
+        if code == 0 or "в индексе пусто" not in out:
+            failures.append(f"ship --commit без staged прошёл: exit {code}\n{out}")
+
+        # check <flow> --chain walks the declared calls; a fake skills dir
+        # keeps this about the walk, not about our own set.
+        fakes = repo / "fakeskills" / "fixture-flow"
+        fakes.mkdir(parents=True)
+        (fakes / "SKILL.md").write_text(
+            "---\nname: fixture-flow\ndescription: d\nrole: read-only\n"
+            "calls: [alpha, beta]\n---\n\n# F\n", encoding="utf-8")
+        chain = lambda *a: run(repo, "check", "fixture-flow", "--chain", *a)
+        checks += 1
+        code, out = run(repo, "check", "fixture-flow", "--chain",
+                        env_extra={"PRIMESKILLS_SKILLS_DIR": str(repo / "fakeskills")})
+        if code != 1 or "ничего не записано" not in out:
+            failures.append(f"пустая цепочка не назвала пропуск: exit {code}\n{out}")
+        run(repo, "note", "alpha", "a done")
+        run(repo, "note", "beta", "b done")
+        checks += 1
+        code, out = run(repo, "check", "fixture-flow", "--chain",
+                        env_extra={"PRIMESKILLS_SKILLS_DIR": str(repo / "fakeskills")})
+        if code != 0 or out.count("current") != 2:
+            failures.append(f"полная цепочка не зелёная: exit {code}\n{out}")
+        (repo / "work2.txt").write_text("dirty\n", encoding="utf-8")
+        checks += 1
+        code, out = run(repo, "check", "fixture-flow", "--chain",
+                        env_extra={"PRIMESKILLS_SKILLS_DIR": str(repo / "fakeskills")})
+        if code != 2 or out.count("STALE") != 2:
+            failures.append(f"протухшая цепочка прошла: exit {code}\n{out}")
 
         # G12: the counter belongs to the file, so a new process keeps counting
         for expected in (1, 2):

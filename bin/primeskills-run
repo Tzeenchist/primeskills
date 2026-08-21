@@ -674,10 +674,59 @@ def cmd_may(path, argv):
     return code
 
 
+def cmd_chain(path, flow):
+    """Walk a flow's declared calls and report each stage's evidence.
+
+    The transition table already exists -- the `calls` list in the flow's
+    frontmatter -- so the state machine needs no new format, only this walk:
+    per stage, is its newest note current against the tree in front of us?
+    A stale or missing stage names the step to re-run; that is PS-037 п.1
+    done without a fourth way to describe a flow.
+    """
+    try:
+        import psmeta
+    except ImportError:
+        sys.exit("check --chain: рядом с primeskills-run нет psmeta.py")
+    root = os.environ.get("PRIMESKILLS_SKILLS_DIR") or str(SET_ROOT / "skills")
+    skill = Path(root) / flow / "SKILL.md"
+    if not skill.is_file():
+        sys.exit(f"check --chain: нет навыка {flow} под {root}")
+    meta, _, problems = psmeta.split_frontmatter(
+        skill.read_text(encoding="utf-8"))
+    if not isinstance(meta, dict):
+        sys.exit(f"check --chain: {flow} без читаемого фронтматтера")
+    for problem in problems:
+        print(f"frontmatter: {problem}")
+    calls = list(meta.get("calls") or [])
+    if not calls:
+        sys.exit(f"check --chain: у {flow} пустой calls — цепочке не по чему "
+                 f"идти")
+    entries = [e for e in read(path, strict=True)
+               if e.get("kind") == "note"]
+    commit, digest = state_digest()
+    print(f"# цепочка {flow}: " + " -> ".join(calls))
+    worst = 0
+    for c in calls:
+        hits = [e for e in entries if e.get("stage") == c]
+        if not hits:
+            print(f"{c}: ничего не записано — шаг не выполнялся")
+            worst = max(worst, 1)
+        elif hits[-1]["commit"] == commit and hits[-1]["state"] == digest:
+            print(f"{c}: current — {hits[-1]['text'][:80]}")
+        else:
+            what = ("другой коммит" if hits[-1]["commit"] != commit
+                    else "дерево менялось после записи")
+            print(f"{c}: STALE ({what}) — перезапустить шаг и записать снова")
+            worst = max(worst, 2)
+    return worst
+
+
 def cmd_check(path, argv):
     """Is the newest record for this stage still about the tree in front of us?"""
     if not argv:
-        sys.exit("usage: primeskills-run check <stage>")
+        sys.exit("usage: primeskills-run check <stage> | check <flow> --chain")
+    if "--chain" in argv[1:]:
+        return cmd_chain(path, argv[0])
     stage = argv[0]
     hits = [e for e in read(path, strict=True)
             if e.get("kind") == "note" and e.get("stage") == stage]
@@ -705,31 +754,63 @@ def cmd_ship(path, argv):
 
     A red run records nothing: evidence of failure belongs to G12 (`fail`),
     not to the stage every later gate reads as green.
+
+    With `--commit "<message>"` the rot window closes entirely: prove the
+    working tree, commit what is already staged, re-prove against the new
+    commit and re-bind the note to it. Nothing staged is a refusal, not an
+    empty commit -- staging stays intentional (G14).
     """
-    stage, expect = "verify", None
+    stage, expect, commit_msg = "verify", None, None
     while argv and argv[0].startswith("--") and argv[0] != "--":
         if argv[0] == "--stage" and len(argv) > 1:
             stage, argv = argv[1], argv[2:]
         elif argv[0] == "--expect" and len(argv) > 1:
             expect, argv = argv[1], argv[2:]
+        elif argv[0] == "--commit" and len(argv) > 1:
+            commit_msg, argv = argv[1], argv[2:]
         else:
             sys.exit(f"ship: unknown option {argv[0]!r}")
     if argv[:1] != ["--"] or len(argv) < 2:
         sys.exit("usage: primeskills-run ship [--stage <s>] [--expect <text>] "
-                 "-- <command...>")
+                 "[--commit \"<message>\"] -- <command...>")
+    if commit_msg is not None:
+        staged = subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode
+        if staged == 0:
+            sys.exit("ship --commit: в индексе пусто. Staging остаётся "
+                     "ручным и намеренным (G14); добавьте файлы сами.")
     cmd = argv[1:]
-    p = subprocess.run(cmd, capture_output=True, text=True)
-    lines = (p.stdout + p.stderr).strip().splitlines()
-    summary = (lines[-1] if lines else "(no output)")[:160]
-    if p.returncode != 0 or (expect and expect not in p.stdout + p.stderr):
-        why = (f"exit {p.returncode}" if p.returncode
-               else f"--expect {expect!r} not found in the output")
+
+    def prove():
+        p = subprocess.run(cmd, capture_output=True, text=True)
+        lines = (p.stdout + p.stderr).strip().splitlines()
+        summary = (lines[-1] if lines else "(no output)")[:160]
+        ok = p.returncode == 0 and (not expect or expect in p.stdout + p.stderr)
+        return ok, summary
+
+    ok, summary = prove()
+    if not ok:
+        why = "red run" if expect is None else \
+              f"--expect {expect!r} not found in the output"
         print(f"ship: {why} — not recorded:\n{summary}")
         return 1
     e = append(path, {"kind": "note", "stage": stage,
                       "text": f"{' '.join(cmd)} — tail: {summary}"})
     print(f"{stage} recorded against {e['commit'][:8]}+{e['state']}")
     print(f"{summary} (exit 0)")
+
+    if commit_msg is not None:
+        c = subprocess.run(["git", "commit", "-m", commit_msg],
+                           capture_output=True, text=True)
+        if c.returncode != 0:
+            sys.exit(f"ship --commit: git commit отказал:\n{c.stderr.strip()}")
+        ok2, summary2 = prove()
+        e2 = append(path, {"kind": "note", "stage": stage,
+                           "text": f"{' '.join(cmd)} — tail: {summary2}"})
+        state = ("переписано после коммита"
+                 if ok2 else "ВНИМАНИЕ: прогон на закоммиченном дереве красный")
+        print(f"{stage} {state}: bound to {e2['commit'][:8]}+{e2['state']}")
+        if not ok2:
+            return 1
     code = cmd_check(path, [stage])
     ladder = mandates(permission_entries(path))
     open_now = [f"{r}: {ladder[r]['scope'][:60]}" for r in RUNGS if r in ladder]
