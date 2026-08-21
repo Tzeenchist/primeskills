@@ -28,6 +28,7 @@ anyone who can push to a branch write the next agent's opening context.
     primeskills-run clear "export renders 4 pages"
     primeskills-run check verify                      # exits 2 when stale
     PRIMESKILLS_CHAIN_STATE=1 primeskills-run may push # stale verify blocks land
+    primeskills-run ship --expect "0 failed" -- make test  # prove + record + ladder
     primeskills-run show
 
 Evidence of a run (notes, G12 counters) is per branch. Permissions (grant,
@@ -694,6 +695,48 @@ def cmd_check(path, argv):
     return 2
 
 
+def cmd_ship(path, argv):
+    """Run the proof, record it, and show the ladder — one call instead of four.
+
+    The ceremony it replaces: run the suite, read its own success signal from
+    the output (G4), `note verify`, `check verify`, and `show` for which rungs
+    stand open. Each was one forgotten piece of a longer cycle, and a proof
+    that was run but not recorded does not exist for the next gate.
+
+    A red run records nothing: evidence of failure belongs to G12 (`fail`),
+    not to the stage every later gate reads as green.
+    """
+    stage, expect = "verify", None
+    while argv and argv[0].startswith("--") and argv[0] != "--":
+        if argv[0] == "--stage" and len(argv) > 1:
+            stage, argv = argv[1], argv[2:]
+        elif argv[0] == "--expect" and len(argv) > 1:
+            expect, argv = argv[1], argv[2:]
+        else:
+            sys.exit(f"ship: unknown option {argv[0]!r}")
+    if argv[:1] != ["--"] or len(argv) < 2:
+        sys.exit("usage: primeskills-run ship [--stage <s>] [--expect <text>] "
+                 "-- <command...>")
+    cmd = argv[1:]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    lines = (p.stdout + p.stderr).strip().splitlines()
+    summary = (lines[-1] if lines else "(no output)")[:160]
+    if p.returncode != 0 or (expect and expect not in p.stdout + p.stderr):
+        why = (f"exit {p.returncode}" if p.returncode
+               else f"--expect {expect!r} not found in the output")
+        print(f"ship: {why} — not recorded:\n{summary}")
+        return 1
+    e = append(path, {"kind": "note", "stage": stage,
+                      "text": f"{' '.join(cmd)} — tail: {summary}"})
+    print(f"{stage} recorded against {e['commit'][:8]}+{e['state']}")
+    print(f"{summary} (exit 0)")
+    code = cmd_check(path, [stage])
+    ladder = mandates(permission_entries(path))
+    open_now = [f"{r}: {ladder[r]['scope'][:60]}" for r in RUNGS if r in ladder]
+    print("open rungs: " + ("; ".join(open_now) if open_now else "none"))
+    return code
+
+
 def cmd_show(path):
     """Everything this branch recorded, plus the ladder as it stands.
 
@@ -772,6 +815,8 @@ def main(argv):
         return cmd_clear(path, rest)
     if action == "check":
         return cmd_check(path, rest)
+    if action == "ship":
+        return cmd_ship(path, rest)
     if action == "grant":
         return cmd_grant(path, rest)
     if action == "revoke":

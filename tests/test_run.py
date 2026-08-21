@@ -121,6 +121,24 @@ def main():
         if code != 0:
             failures.append(f"повторный verify не открыл land: {code}\n{out}")
 
+        # ship: one call proves, records and answers for the ladder. A red run
+        # records nothing -- evidence of failure is G12's job, not a green note.
+        checks += 1
+        code, out = run(repo, "ship", "--expect", "0 failed", "--",
+                        sys.executable, "-c", "print('3 checks, 0 failed')")
+        if code != 0 or "recorded against" not in out or "current" not in out \
+                or "open rungs" not in out:
+            failures.append(f"ship зелёного прогона не записал: exit {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "check", "verify")
+        if code != 0:
+            failures.append(f"после ship verify не current: {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "ship", "--expect", "0 failed", "--",
+                        sys.executable, "-c", "raise SystemExit(1)")
+        if code == 0 or "not recorded" not in out:
+            failures.append(f"ship красного прогона записал: exit {code}\n{out}")
+
         # G12: the counter belongs to the file, so a new process keeps counting
         for expected in (1, 2):
             code, out = run(repo, "fail", "flaky export")
