@@ -1,5 +1,3 @@
-import pytest
-
 from split_bill import split_bill
 
 

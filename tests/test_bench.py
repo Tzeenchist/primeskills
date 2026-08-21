@@ -31,9 +31,23 @@ def test_split_bill_pristine(failures):
         failures.append("split_bill.py содержит готовый ответ новой функции")
     if tests.count("def test_") != 3:
         failures.append(f"в тестах {tests.count('def test_')} функций, заявлено три")
-    p = run(["-m", "pytest", "-q", str(task)])
-    if p.returncode != 0:
-        failures.append(f"фикстура split-bill не зелёная:\n{p.stdout[-400:]}")
+    # the gate installs nothing (workflow rule), so the fixture is run by a
+    # ten-line collector here, not by pytest: green must not cost a dependency
+    sys.path.insert(0, str(task))
+    try:
+        mod = __import__("test_split_bill")
+        ran = 0
+        for name in dir(mod):
+            if name.startswith("test_"):
+                getattr(mod, name)()
+                ran += 1
+        if ran != 3:
+            failures.append(f"запущено {ran} тестов фикстуры, а не три")
+    except Exception as exc:
+        failures.append(f"фикстура split-bill не зелёная: {exc!r}")
+    finally:
+        sys.path.pop(0)
+        sys.modules.pop("test_split_bill", None)
 
 
 def test_grader_exit_code_means_fail(failures):
