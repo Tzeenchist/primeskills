@@ -18,13 +18,28 @@ RUN = ROOT / "bin" / "primeskills-run"
 
 
 def run(repo, *args, chain_state=False):
+    # HOME points inside the temporary repository: the journal also writes the
+    # register of trees (`~/.primeskills/trees.json`), and without this every
+    # temporary repository of this suite landed in the register of the machine
+    # running it -- 60 entries under /tmp on 2026-08-21. A test that writes
+    # into the real home is testing nothing and damaging something (G7).
     env = os.environ.copy()
+    env["HOME"] = str(repo)
     env.pop("PRIMESKILLS_CHAIN_STATE", None)
     if chain_state:
         env["PRIMESKILLS_CHAIN_STATE"] = "1"
     p = subprocess.run([sys.executable, str(RUN), *args],
                        capture_output=True, text=True, cwd=repo, env=env)
     return p.returncode, p.stdout + p.stderr
+
+
+def make_repo(repo):
+    """A git repository with one commit, for the isolation check below."""
+    subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-q", "-m", "init"], cwd=repo, check=True)
 
 
 def main():
@@ -559,6 +574,38 @@ def main():
         code, out = run(bare, "start")
         if code == 0:
             failures.append("start outside a git repository did not fail")
+
+    # and the register must never appear outside the HOME it was given
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        make_repo(repo)
+        real = Path(os.path.expanduser("~")) / ".primeskills" / "trees.json"
+        before = real.read_text(encoding="utf-8") if real.is_file() else None
+        run(repo, "note", "verify", "изоляция реестра")
+        after = real.read_text(encoding="utf-8") if real.is_file() else None
+        checks += 1
+        if before != after:
+            failures.append("реестр деревьев утёк из временного HOME в настоящий")
+        checks += 1
+        planted = repo / ".primeskills" / "trees.json"
+        if not planted.is_file() or str(repo) not in planted.read_text(encoding="utf-8"):
+            failures.append("реестр не записан в тот HOME, который дали")
+
+        # an entry whose tree is gone is dropped on the next write: the reader
+        # is read-only by role (G16), so pruning belongs to the writer.
+        # Guarded, because a register written to the wrong HOME must fail the
+        # check above rather than take the suite down with a FileNotFoundError
+        checks += 1
+        if not planted.is_file():
+            failures.append("нечего чистить: реестра в данном HOME нет")
+        else:
+            known = json.loads(planted.read_text(encoding="utf-8"))
+            known[str(Path(tmp) / "снесённое-дерево")] = "2026-01-01T00:00:00+00:00"
+            planted.write_text(json.dumps(known), encoding="utf-8")
+            run(repo, "note", "verify", "после сноса дерева")
+            if "снесённое-дерево" in planted.read_text(encoding="utf-8"):
+                failures.append("реестр не вычистил дерево, которого больше нет")
 
     for f in failures:
         print(f)

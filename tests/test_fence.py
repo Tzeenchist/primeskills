@@ -249,6 +249,10 @@ def main():
                         "commit", "-q", "-m", "init"], cwd=repo, check=True)
         env = os.environ.copy()
         env["PATH"] = str(ROOT / "bin") + os.pathsep + env.get("PATH", "")
+        # the guard calls `primeskills-run`, which writes the register of trees
+        # under HOME; without this the temporary repository of this test lands
+        # in the register of the machine running the suite (G7)
+        env["HOME"] = str(repo)
 
         for command, rung, _grant in AUTHORITY:
             payload = json.dumps({"tool_name": "Bash", "permission_mode": "default",

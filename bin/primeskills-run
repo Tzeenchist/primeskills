@@ -233,6 +233,11 @@ def remember_tree(top):
             known = {}
     except (OSError, ValueError):
         known = {}
+    # Prune while writing: the register is a convenience, and an entry whose
+    # tree is gone is a line the reader has to discount. The writer owns this,
+    # because the listing program is read-only by role (G16).
+    known = {p: when for p, when in known.items()
+             if p == str(top) or Path(p).is_dir()}
     known[str(top)] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     try:
         TREES.parent.mkdir(parents=True, exist_ok=True)

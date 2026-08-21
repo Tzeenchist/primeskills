@@ -77,11 +77,19 @@ def inside(path, top):
     return True
 
 
-def plural(n):
-    """слово / слова / слов — the number is printed, so it is read."""
+def plural(n, one, few, many):
+    """Russian agreement: the number is printed, so it is read."""
     if 11 <= n % 100 <= 14:
-        return "слов"
-    return {1: "слово", 2: "слова", 3: "слова", 4: "слова"}.get(n % 10, "слов")
+        return many
+    return {1: one, 2: few, 3: few, 4: few}.get(n % 10, many)
+
+
+def words_of(n):
+    return plural(n, "слово", "слова", "слов")
+
+
+def trees_of(n):
+    return plural(n, "дереве", "деревьях", "деревьях")
 
 
 def rows_of(top, here_branch):
@@ -115,7 +123,7 @@ def show(rows, width):
     for r in rows:
         when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
         line = (f"  {when}  {r['branch']:<{width}}  "
-                f"{r['words']:>5} {plural(r['words'])}")
+                f"{r['words']:>5} {words_of(r['words'])}")
         print(line + (f"  ← {r['mark']}" if r["mark"] else ""))
 
 
@@ -176,7 +184,8 @@ def main():
               f"({total}):")
         show(trees[0][1], width)
     else:
-        print(f"чекпоинтов {total} в {len(trees)} деревьях ({source}):")
+        print(f"чекпоинтов {total} в {len(trees)} {trees_of(len(trees))} "
+              f"({source}):")
         for top, rows in trees:
             print(f"{top}")
             show(rows, width)
