@@ -225,6 +225,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules. `TODOS.md` —
-the queue. Version 0.9.0: the set works, but it has not yet proved itself by
+the queue. Version 0.9.1: the set works, but it has not yet proved itself by
 measurement on live tasks, and `PS-009` says in advance at which numbers it
 gets folded back.

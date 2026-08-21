@@ -127,6 +127,55 @@ def main():
         if "missing: handoff" not in told:
             failures.append(f"доктор не назвал отсутствующий навык:\n{told}")
 
+    # the same installation, read from another tree. `--apply` builds a pinned
+    # worktree and runs from there, so everything installed live led out of the
+    # tree it was reading -- and 27 skills got a second copy under prime-<name>
+    # in three agents (2026-08-21). The manifest is what tells ours from a
+    # stranger's when the paths differ.
+    with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as other:
+        h = Path(home)
+        skills = h / ".claude" / "skills"
+        skills.mkdir(parents=True)
+        (h / ".codex").mkdir(exist_ok=True)
+
+        elsewhere = Path(other) / "skills" / "verify"
+        elsewhere.mkdir(parents=True)
+        (elsewhere / "SKILL.md").write_text("verify, installed from another tree\n",
+                                            encoding="utf-8")
+        dest = skills / "verify"
+        dest.mkdir()
+        (dest / "SKILL.md").symlink_to(elsewhere / "SKILL.md")
+        record = h / ".primeskills" / "installed.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(json.dumps({str(dest): str(elsewhere)}), encoding="utf-8")
+
+        run(home, "--apply")
+        checks += 1
+        if (skills / "prime-verify").exists():
+            failures.append("своя установка из другого дерева продублирована под префиксом")
+        checks += 1
+        if os.path.realpath(dest / "SKILL.md") != str(ROOT / "skills" / "verify" / "SKILL.md"):
+            failures.append("своя прежняя установка не обновлена на месте")
+
+    # the record only covers what still points where it was recorded to point
+    with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as other:
+        h = Path(home)
+        skills = h / ".claude" / "skills"
+        skills.mkdir(parents=True)
+        (h / ".codex").mkdir(exist_ok=True)
+        taken = skills / "verify"
+        taken.mkdir()
+        (taken / "SKILL.md").write_text("someone else took this name since\n",
+                                        encoding="utf-8")
+        record = h / ".primeskills" / "installed.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(json.dumps({str(taken): str(Path(other) / "skills" / "verify")}),
+                          encoding="utf-8")
+        run(home, "--apply")
+        checks += 1
+        if "someone else took this name" not in (taken / "SKILL.md").read_text(encoding="utf-8"):
+            failures.append("запись манифеста дала снести чужой каталог под тем же именем")
+
     # a foreign directory under the prefix is still not ours to clear
     with tempfile.TemporaryDirectory() as home:
         h = Path(home)

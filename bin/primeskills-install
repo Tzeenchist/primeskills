@@ -369,12 +369,44 @@ def under_root(path):
         return False
 
 
+_RECORD = None
+
+
+def recorded_src(dest):
+    """What the manifest says this installer put at that path, if anything."""
+    global _RECORD
+    if _RECORD is None:
+        _RECORD = manifest_read()
+    return _RECORD.get(str(dest))
+
+
 def is_ours(path):
-    """A link we created, so uninstall never removes someone else's skill."""
+    """A link we created, so uninstall never removes someone else's skill.
+
+    Two questions, not one. `under_root` answers "does this lead into the tree I
+    am running from", and that reads a single installation two ways depending on
+    which copy is running. On 2026-08-21 `--apply` from the pinned worktree saw
+    every directory installed live as a stranger's, took the prefixed name for
+    all 27 of them, and left three agents offering each skill twice. PS-048
+    fixed the same defect for hooks by naming both roots; a live checkout can
+    sit anywhere, so skills need the record instead. Ours if it leads into a
+    tree of ours **or** the manifest recorded it and it still points where it
+    was recorded to point — the second half is a record, not a guess, and the
+    "still points" is what keeps it from claiming a name someone else took
+    since.
+    """
     if path.is_symlink():
-        return under_root(path)
+        src = recorded_src(path)
+        return under_root(path) or (
+            src is not None
+            and os.path.realpath(path) == os.path.realpath(src))
     inner = path / "SKILL.md"
-    return inner.is_symlink() and under_root(inner)
+    if not inner.is_symlink():
+        return False
+    src = recorded_src(path)
+    return under_root(inner) or (
+        src is not None
+        and os.path.realpath(inner) == os.path.realpath(Path(src) / "SKILL.md"))
 
 
 def target_name(agent, skill_dir):
