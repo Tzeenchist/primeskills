@@ -86,6 +86,60 @@ def main():
         if not (squat / "SKILL.md").is_file() or not (first / "SKILL.md").is_file():
             failures.append("uninstall удалил чужой каталог")
 
+    # the collision that ended: ours under `prime-<name>` while the plain name
+    # came free. Two names for one skill is a host-visible defect -- the skill
+    # is offered twice -- and it made the doctor's count read full while a
+    # skill was missing (2026-08-21, `prime-autoplan`).
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        skills = h / ".claude" / "skills"
+        foreign = skills / "autoplan"
+        foreign.mkdir(parents=True)
+        (foreign / "SKILL.md").write_text("someone else's autoplan\n", encoding="utf-8")
+        (h / ".codex").mkdir(exist_ok=True)
+
+        run(home, "--apply")
+        checks += 1
+        if not (skills / "prime-autoplan").exists():
+            failures.append("коллизия: наш autoplan не встал под префиксным именем")
+
+        # the squatter leaves; the next install must take the plain name and
+        # take back what it left under the prefix
+        shutil.rmtree(foreign)
+        out = run(home, "--apply").stdout
+
+        checks += 1
+        if not (skills / "autoplan" / "SKILL.md").exists():
+            failures.append("плоское имя освободилось, а навык под него не встал")
+        checks += 1
+        if (skills / "prime-autoplan").exists():
+            failures.append("префиксная копия осталась: хост увидит навык дважды")
+        checks += 1
+        if "stale copy removed: prime-autoplan" not in out:
+            failures.append(f"про снятую копию не сказано в отчёте:\n{out}")
+
+        # the doctor names what is missing instead of printing a bare count
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        (skills / "handoff").exists() and shutil.rmtree(skills / "handoff")
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=dict(os.environ, HOME=home)).stdout
+        checks += 1
+        if "missing: handoff" not in told:
+            failures.append(f"доктор не назвал отсутствующий навык:\n{told}")
+
+    # a foreign directory under the prefix is still not ours to clear
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        skills = h / ".claude" / "skills"
+        squat = skills / "prime-autoplan"
+        squat.mkdir(parents=True)
+        (squat / "SKILL.md").write_text("someone else's skill\n", encoding="utf-8")
+        (h / ".codex").mkdir(exist_ok=True)
+        run(home, "--apply")
+        checks += 1
+        if "someone else's skill" not in (squat / "SKILL.md").read_text(encoding="utf-8"):
+            failures.append("чужой prime-autoplan снесён как устаревшая копия")
+
     # a damaged marker block must stop the rewrite, not be repaired blindly
     with tempfile.TemporaryDirectory() as home:
         h = Path(home)

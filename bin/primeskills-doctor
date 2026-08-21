@@ -31,6 +31,7 @@ def under_root(path):
         return False
 HOME = Path.home()
 SKILLS = ROOT / "skills"
+PREFIX = "prime-"  # the installer's collision prefix; same literal there
 FENCE = SKILLS / "fence" / "bin"
 
 OK, FAIL, WARN = "ok  ", "FAIL", "warn"
@@ -61,13 +62,37 @@ def installed_skills(root):
 
 
 def check_skills(r, agent, root):
-    have, want = installed_skills(root), len(list(SKILLS.glob("*/SKILL.md")))
+    """Which skills are missing, by name -- not how many are there.
+
+    A bare count hid two different states behind one number. On 2026-08-21
+    claude read "28 of 29" while only 27 of the set's names were installed: the
+    28th entry was `prime-autoplan`, a copy left under the collision name after
+    the plain one came free, and it filled the gap in the count for a skill
+    that was installed twice. The count was arithmetically right and said
+    nothing about what was wrong, which is the defect it exists to catch.
+    """
+    have = installed_skills(root)
+    want = sorted(p.parent.name for p in SKILLS.glob("*/SKILL.md"))
+    plain = {n[len(PREFIX):] if n.startswith(PREFIX) else n for n in have}
+    missing = [n for n in want if n not in plain]
+    twice = sorted({n[len(PREFIX):] for n in have if n.startswith(PREFIX)}
+                   & {n for n in have if not n.startswith(PREFIX)})
+
     if not have:
         r.line(FAIL, agent, "skills linked", f"none found in {root}")
-    elif len(have) < want:
-        r.line(FAIL, agent, "skills linked", f"{len(have)} of {want}")
+    elif missing:
+        shown = ", ".join(missing[:5]) + (" …" if len(missing) > 5 else "")
+        r.line(FAIL, agent, "skills linked",
+               f"{len(want) - len(missing)} of {len(want)} — missing: {shown}. "
+               f"Run primeskills-install --apply")
     else:
         r.line(OK, agent, "skills linked", f"{len(have)}")
+
+    if twice:
+        r.line(FAIL, agent, "installed twice",
+               f"{', '.join(twice)} — also under {PREFIX}<name>, so the host "
+               f"offers the same skill under two names. "
+               f"primeskills-install --apply removes the stale one")
 
 
 def check_core(r, agent, path, needle):

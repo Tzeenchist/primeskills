@@ -393,6 +393,15 @@ def target_name(agent, skill_dir):
 
 
 def plan_agent(agent):
+    """The steps for one agent, plus the copies of ours left under the other name.
+
+    `target_name` prefixes on a collision, and the collision can end: the
+    foreign `autoplan` goes away, the plain name comes free, and the next
+    install writes `autoplan` while `prime-autoplan` stays behind. Both then
+    point into this repository, so the host offers one skill twice and the
+    doctor's count reads full while a skill is missing. Ours to clean up,
+    because we are the ones who put it there.
+    """
     root = TARGETS[agent]
     steps = []
     for skill in ours():
@@ -401,10 +410,10 @@ def plan_agent(agent):
             steps.append(("blocked", root / skill.name, skill))
             continue
         dest = root / name
-        if agent == "claude":
-            steps.append(("dir", dest, skill))
-        else:
-            steps.append(("link", dest, skill))
+        other = root / (skill.name if name != skill.name else PREFIX + skill.name)
+        if (other.exists() or other.is_symlink()) and is_ours(other):
+            steps.append(("stale", other, skill))
+        steps.append((("dir" if agent == "claude" else "link"), dest, skill))
     return steps
 
 
@@ -673,10 +682,20 @@ def main():
         if not root.parent.exists():
             print(f"{agent}: not installed here, skipped")
             continue
-        renamed, refused = [], []
-        for kind, dest, src in plan_agent(agent):
+        renamed, refused, cleaned = [], [], []
+        steps = plan_agent(agent)
+        for kind, dest, src in steps:
             if kind == "blocked":
                 refused.append(f"{src.name} (both names taken)")
+                continue
+            if kind == "stale":
+                cleaned.append(dest.name)
+                if args.apply:
+                    root.mkdir(parents=True, exist_ok=True)
+                    if remove_ours(dest):
+                        refused.append(f"{dest.name} (kept: files not ours)")
+                    recorded.pop(str(dest), None)
+                    created.pop(str(dest), None)
                 continue
             if dest.name != src.name:
                 renamed.append(f"{src.name} -> {dest.name}")
@@ -705,9 +724,13 @@ def main():
             else:
                 created[str(dest)] = str(src)
         note = f"  (renamed on collision: {', '.join(renamed)})" if renamed else ""
+        if cleaned:
+            note += ("  (stale copy removed: " if args.apply else
+                     "  (stale copy to remove: ") + ", ".join(sorted(cleaned)) + ")"
         if refused:
             note += f"  (LEFT ALONE, not ours: {', '.join(sorted(refused))})"
-        print(f"{agent}: {verb} {len(plan_agent(agent))} skills in {root}{note}")
+        count = len([s for s in steps if s[0] != "stale"])
+        print(f"{agent}: {verb} {count} skills in {root}{note}")
         print(f"{agent}: {bootstrap(agent, args.apply, args.uninstall)}")
         note = profile(agent, args.apply, args.uninstall)
         if note:
