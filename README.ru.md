@@ -208,6 +208,7 @@ primeskills-help              руководство по набору
 primeskills-doctor            подключено ли всё у каждого агента
 primeskills-status            состав набора и его вес, из репозитория
 primeskills-run show          запись прогона текущей ветки
+primeskills-handoffs          какие чекпоинты сохранены в этом дереве
 primeskills-adherence --all   соблюдались ли инварианты вызванных навыков
 primeskills-lint              формат навыков: правила F и C
 primeskills-release           опубликовать описание релиза этой версии
