@@ -28,10 +28,13 @@ handed over.
    answer, not an inference
 3. Call `merge` → **verify:** base branch carries the change and is green on the
    base
-4. Ask whether to deploy, and to where → **verify:** the environment is named by
+4. Call the changed skills live in every host and record each with
+   `primeskills-run note livecall` → **verify:** `bin/primeskills-release`
+   finds no missing pair
+5. Ask whether to deploy, and to where → **verify:** the environment is named by
    the user, not chosen by you
-5. Call `deploy` → **verify:** health checked on the environment, rollback known
-6. Report the chain → **verify:** what went where, and what remains reversible
+6. Call `deploy` → **verify:** health checked on the environment, rollback known
+7. Report the chain → **verify:** what went where, and what remains reversible
 
 ## Stop conditions
 - Any stage stops: the flow stops there. Never skip forward to the next stage

@@ -9,15 +9,21 @@ with no answer to "should I take it".
 Refuses rather than guesses. `VERSION`, the top entry of `CHANGELOG.md` and the
 tag must agree, the tag must point at the commit being released, and the entry
 must have a body -- an empty release is the failure this program exists to
-prevent. Prints the plan and changes nothing until `--apply`.
+prevent. When skills or core changed since the last tag, every changed skill
+must have a recorded live call from each of the four hosts (`livecall` notes in
+the run record) -- PS-052: twice a skill was done until it was called from
+where it lives. Prints the plan and changes nothing until `--apply`.
 """
 import argparse
+import hashlib
+import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+HOSTS = ("claude", "codex", "kimi", "opencode")
 
 
 def git(*args):
@@ -86,6 +92,55 @@ def notes_for(body, date):
             f"Полный журнал изменений — `CHANGELOG.md`.")
 
 
+def changed_since(at):
+    """(skill names, core touched?) between the last tag and HEAD."""
+    out = git("diff", "--name-only", f"{at}..HEAD").stdout.split()
+    skills, core = set(), False
+    for path in out:
+        parts = Path(path).parts
+        if parts and parts[0] == "skills" and len(parts) > 1:
+            skills.add(parts[1])
+        elif parts and parts[0] == "core":
+            core = True
+    return sorted(skills), core
+
+
+def missing_livecalls(at):
+    """Changed skill × host pairs without a live-call note made since `at`.
+
+    The note is `primeskills-run note livecall "<name>: what happened (<host>)"`
+    recorded on the branch being released; its text must carry both the name
+    and the host, because a verdict nobody can attribute to a host is the
+    four-faces-of-one-defect again. Old notes do not count: the gate asks
+    about this release's changes, so a call recorded for the previous tag
+    must not satisfy this one.
+    """
+    since = git("show", "-s", "--format=%cI", at).stdout.strip()
+    skills, core_changed = changed_since(at)
+    if not skills and not core_changed:
+        return []
+    names = set(skills) | ({"core"} if core_changed else set())
+    plain = re.sub(r"[^a-zA-Z0-9._-]+", "-", "master").strip("-")
+    record = (ROOT / ".primeskills" / "run" /
+              f"{plain[:60]}-{hashlib.sha1(b'master').hexdigest()[:8]}.jsonl")
+    have = set()
+    if record.is_file():
+        for line in record.read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (e.get("kind") != "note" or e.get("stage") != "livecall"
+                    or str(e.get("ts", "")) < since):
+                continue
+            text = str(e.get("text", "")).lower()
+            for n in names:
+                for h in HOSTS:
+                    if n.lower() in text and h in text:
+                        have.add((n, h))
+    return sorted((n, h) for n in names for h in HOSTS if (n, h) not in have)
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("version", nargs="?", help="по умолчанию — файл VERSION")
@@ -110,6 +165,15 @@ def main(argv):
     if git("status", "--porcelain").stdout.strip():
         sys.exit("primeskills-release: дерево грязное — релиз описывает коммит, "
                  "а не рабочую копию")
+
+    missing = missing_livecalls(at)
+    if missing:
+        lines = "\n".join(f"- {n}: нет живого вызова от {h}" for n, h in missing)
+        sys.exit("primeskills-release: навыки/core менялись с прошлого тега, "
+                 f"а живых вызовов не хватает:\n{lines}\n"
+                 "Позовите навык в каждом хосте и запишите: "
+                 'primeskills-run note livecall "<имя>: что показал вызов '
+                 '(<host>)"')
 
     # A tag subject that only repeats the version says nothing the title
     # already carries, and it became the release title verbatim once.
