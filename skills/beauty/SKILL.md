@@ -16,6 +16,9 @@ backend-only work — this lens costs nothing when it does not run.
 - Five states are not a checklist item, they are the interface: loading, empty,
   error, partial, success. A design that only describes success is a mockup.
 - Accessibility is part of "works", not a later pass.
+- Visual authority runs in this order: the user's explicit instructions, then
+  the project's design system, then the subject and its audience, then your
+  taste. A later source never overrides an earlier one.
 - Report only. You do not write markup here.
 
 ## Procedure
@@ -32,7 +35,11 @@ backend-only work — this lens costs nothing when it does not run.
 5. Look for the tells of generated design: even spacing everywhere, no
    hierarchy, decorative gradients, three fonts → **verify:** you name specific
    places or state there are none
-6. Present findings one at a time, each decided by the means named in
+6. Run the swap test on the visual direction: replace the subject with a
+   neighbouring one — a concept that still fits equally well is generic
+   → **verify:** you name what ties the design to this subject, or flag the
+   direction as too generic
+7. Present findings one at a time, each decided by the means named in
    OUTPUT §Asking → **verify:** each accepted or declined
 
 ## Stop conditions

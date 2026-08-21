@@ -23,6 +23,10 @@ Work that produces markup, styles, or interaction. Reads `plan` output like
 - Keyboard and pointer are the same feature, not two.
 - Match the existing design system. A new colour or spacing value needs a reason
   a reviewer would accept.
+- Motion is explanation or feedback: if removing an animation loses neither,
+  remove it.
+- Every visible element carries real content. Placeholder copy, decorative
+  statistics, and controls that do nothing are unfinished work, not styling.
 
 ## Procedure
 1. Read `ref/ui-states.md` and name the five states for this component
