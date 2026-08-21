@@ -40,8 +40,10 @@ you to integrate. `land` prepared it; this puts it in.
    whichever the repository uses. Rewriting history anyone else has pulled is
    outside your authority whatever the style → **verify:** the history after
    matches the shape of the history before
-7. Confirm the result → **verify:** the base branch contains the change and its
-   tests are green on the base, not only on the branch
+7. Confirm the result and close the books: entries in `TODOS.md` that this
+   change resolved move to «Закрыто» with their anchors → **verify:** the base
+   branch contains the change, its tests are green on the
+   base, not only on the branch, and no resolved entry still reads as open
 8. Offer to delete the merged branch if the project does that, and delete it
    only on a yes and an open rung: `primeskills-run may delete --target <the
    branch>` right before deleting, and that call spends the one use. `--peek`
