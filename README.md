@@ -32,9 +32,9 @@ does. A skill's full text loads only when that skill is needed.
 > — Ilya Priymak, author
 
 ```
-always in context        457 words for all 28 skills
+always in context        466 words for all 29 skills
 shared rules             2 740 words, once per session
-one skill call           3 461 … 3 897 words
+one skill call           3 470 … 3 906 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
@@ -186,6 +186,7 @@ their place too — `/baby` and `/prose` are among the most used here:
 /merge        merge once CI is green
 /deploy       ship, with the way back ready first
 /handoff      save state the next session can resume from
+/handon       resume from a saved checkpoint, picked from the list
 
 # keep the session honest
 /fence        guards on destructive commands and stray edits
@@ -223,6 +224,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules. `TODOS.md` —
-the queue. Version 0.8.1: the set works, but it has not yet proved itself by
+the queue. Version 0.9.0: the set works, but it has not yet proved itself by
 measurement on live tasks, and `PS-009` says in advance at which numbers it
 gets folded back.

@@ -39,7 +39,7 @@ STAGES = [
     ("check", ["verify", "vet", "probe", "measure", "ui"]),
     ("hand over", ["land", "revise", "merge", "close"]),
     ("ship", ["deploy", "release"]),
-    ("keep", ["handoff", "fence", "prose", "primeskills"]),
+    ("keep", ["handoff", "handon", "fence", "prose", "primeskills"]),
 ]
 
 TITLES = {

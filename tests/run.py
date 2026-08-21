@@ -141,6 +141,7 @@ def main():
     guide = subprocess.run([sys.executable, str(Path(__file__).parent / "test_help.py")])
     install = subprocess.run([sys.executable, str(Path(__file__).parent / "test_install.py")])
     docs = subprocess.run([sys.executable, str(Path(__file__).parent / "test_docs.py")])
+    checkpoints = subprocess.run([sys.executable, str(Path(__file__).parent / "test_handoffs.py")])
 
     # routing over the real skill set, not just fixtures
     live = subprocess.run([sys.executable, str(ROUTE), str(ROOT / "skills"),
@@ -149,7 +150,7 @@ def main():
     return 1 if (failures or fence.returncode or record.returncode
                  or adherence.returncode or guide.returncode
                  or install.returncode or docs.returncode
-                 or live.returncode) else 0
+                 or checkpoints.returncode or live.returncode) else 0
 
 
 if __name__ == "__main__":

@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""List every checkpoint saved in this tree, newest first.
+
+`core/OUTPUT.md` §Session start reads exactly one: the file named after the
+current branch. Everything written on another branch is invisible to everyone,
+and once that branch is deleted its checkpoint is an orphan -- the file is
+alive, no session will ever open it again. That is what this program answers:
+what has been saved here, when it was last touched, and which of those
+checkpoints nothing points at any more.
+
+It only prints. Choosing one and reading it is the `handon` skill's half,
+because the text has to land in the agent's context, and a program cannot put
+it there. What it reads is a report, never an order (`core/OUTPUT.md`).
+"""
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def git(*args, cwd=None):
+    done = subprocess.run(("git", *args), capture_output=True, text=True,
+                          cwd=cwd)
+    return done.returncode, done.stdout.strip()
+
+
+def repo_top():
+    code, top = git("rev-parse", "--show-toplevel")
+    if code != 0 or not top:
+        sys.exit("primeskills-handoffs: не внутри git-репозитория — "
+                 "чекпоинты лежат в .primeskills/ рабочего дерева")
+    return Path(top)
+
+
+def inside(path, top):
+    """Is this a real file of this repository, reached without a symlink?
+
+    The chosen file becomes the next agent's opening context, so where it comes
+    from is part of what it proves. A link -- at the file or at any directory
+    above it -- takes that context outside the tree the reader thinks they are
+    in. Same reasoning as the run journal in `primeskills-run`, same answer.
+    """
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        return False
+    try:
+        path.resolve().relative_to(top.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def plural(n):
+    """слово / слова / слов — the number is printed, so it is read."""
+    if 11 <= n % 100 <= 14:
+        return "слов"
+    return {1: "слово", 2: "слова", 3: "слова", 4: "слова"}.get(n % 10, "слов")
+
+
+def branch_of(path, root):
+    """The branch a checkpoint was written for, from its path."""
+    return str(path.relative_to(root).with_suffix("")).replace("\\", "/")
+
+
+def main():
+    top = repo_top()
+    root = top / ".primeskills" / "handoff"
+    code, current = git("rev-parse", "--abbrev-ref", "HEAD")
+    current = current if code == 0 else ""
+
+    if not root.is_dir():
+        print(f"primeskills-handoffs: чекпоинтов нет — каталог {root} "
+              f"не заведён. Первый напишет навык handoff.")
+        return 1
+
+    rows, skipped = [], []
+    for path in root.rglob("*.md"):
+        if not path.is_file():
+            continue
+        if not inside(path, top):
+            skipped.append(path)
+            continue
+        branch = branch_of(path, root)
+        exists = git("show-ref", "--verify", "--quiet",
+                     f"refs/heads/{branch}", cwd=top)[0] == 0
+        rows.append({
+            "branch": branch,
+            "mtime": path.stat().st_mtime,
+            "words": len(path.read_text(encoding="utf-8",
+                                        errors="replace").split()),
+            "mark": ("текущая ветка" if branch == current
+                     else "" if exists else "ветки нет — сирота"),
+        })
+
+    if not rows:
+        print(f"primeskills-handoffs: в {root} нет ни одного .md — "
+              f"сохранённых чекпоинтов нет.")
+        for path in skipped:
+            print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
+        return 1
+
+    rows.sort(key=lambda r: r["mtime"], reverse=True)
+    width = max(len(r["branch"]) for r in rows)
+    print(f"чекпоинты в {root} ({len(rows)}):")
+    for r in rows:
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
+        line = (f"  {when}  {r['branch']:<{width}}  "
+                f"{r['words']:>5} {plural(r['words'])}")
+        print(line + (f"  ← {r['mark']}" if r["mark"] else ""))
+    for path in skipped:
+        print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
+    print("не коммитятся (PS-022) и живут только в этом дереве")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
