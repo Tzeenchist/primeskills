@@ -205,10 +205,11 @@ primeskills-help              the guide to the set
 primeskills-doctor            is everything connected, per agent
 primeskills-status            what is in the set and what it weighs
 primeskills-run show          the run record of the current branch
+primeskills-run ship          run + record + open rungs in one call
 primeskills-handoffs          which checkpoints are saved in this tree
 primeskills-adherence --all   were the invariants of called skills followed
-primeskills-lint              skill format: rules F and C
-primeskills-release           publish the release notes for this version
+primeskills-lint              skill format: rules F and C — including G16 (F16) and the asking means (F17)
+primeskills-release           release notes; changed skills must have been called live in all four hosts
 python3 tests/run.py          the whole suite
 ```
 
@@ -224,7 +225,8 @@ line by line in `docs/SKILL-SOURCES.md`.
 ## Documents
 
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
-`docs/SKILL-FORMAT.md` — the skill format and the linter rules. `TODOS.md` —
-the queue. Version 0.9.7: the set works, but it has not yet proved itself by
-measurement on live tasks, and `PS-009` says in advance at which numbers it
-gets folded back.
+`docs/SKILL-FORMAT.md` — the skill format and the linter rules.
+`docs/RULE-COVERAGE.md` — which rule is held by what: a machine check or an
+honestly-named insurance policy. `TODOS.md` — the queue. Version 0.9.7: the set
+works, but it has not yet proved itself by measurement on live tasks, and
+`PS-009` says in advance at which numbers it gets folded back.
