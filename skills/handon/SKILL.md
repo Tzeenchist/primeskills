@@ -34,9 +34,11 @@ repository.
 2. Non-zero: say what it said — nothing saved, or an empty register — and offer
    the path form rather than searching → **verify:** you never scanned the
    filesystem for checkpoints
-3. Show the list — newest first, current branch and orphans marked, tree named
-   when there is more than one — and ask which → **verify:** the user named one;
-   you did not pick for them
+3. Offer the choice with the selection affordance the host has — a menu or
+   picker where one exists, the numbered list where none does — and take a
+   number as a complete answer. More checkpoints than the picker holds: put the
+   whole numbered list in the message beside it → **verify:** the user named
+   one; you did not pick for them, and every checkpoint was offered
 4. Read that file whole → **verify:** you can say when it was last updated
 5. Check its open items against the repository before repeating any: the record
    beats the file (G6) → **verify:** every item you carry has an anchor you

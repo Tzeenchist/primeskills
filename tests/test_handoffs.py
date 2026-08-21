@@ -168,6 +168,27 @@ def main():
         want("текущая ветка" in done.stdout,
              f"чекпоинт текущей ветки не помечен:\n{done.stdout}")
 
+    # 5b. Numbered, in print order and across trees: the four hosts draw a list
+    #     four ways — a menu in Kimi, prose in Claude and Codex, a table in
+    #     OpenCode — so the number is what makes "3" an answer anywhere.
+    with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as other, \
+            tempfile.TemporaryDirectory() as home:
+        one, two = Path(tmp), Path(other)
+        repo(one); repo(two)
+        now = time.time()
+        checkpoint(one, "master", "первый\n", when=now)
+        checkpoint(one, "вторая-ветка", "второй\n", when=now - 10)
+        checkpoint(two, "master", "третий\n", when=now - 20)
+        register(home, one, two)
+        done = run(Path(home), home=home)
+        numbered = [l for l in done.stdout.splitlines() if l.startswith("  [")]
+        want(len(numbered) == 3,
+             f"ждали три пронумерованные строки:\n{done.stdout}")
+        want([l.split("]")[0] for l in numbered] == ["  [1", "  [2", "  [3"],
+             f"нумерация не сквозная по деревьям:\n{done.stdout}")
+        want("выбор по номеру" in done.stdout,
+             f"не сказано, что выбор делается номером:\n{done.stdout}")
+
     # 6. The orphan. A checkpoint whose branch was deleted is still a file, and
     #    without a mark it is indistinguishable from a live one.
     with tempfile.TemporaryDirectory() as tmp:

@@ -119,12 +119,20 @@ def rows_of(top, here_branch):
     return rows, skipped
 
 
-def show(rows, width):
-    for r in rows:
+def show(rows, width, first=1):
+    """Numbered in print order, so a number is a complete answer.
+
+    The four hosts render a list four ways -- a menu in Kimi, prose in Claude
+    and Codex, a table in OpenCode -- because the skill asked for "a list" and
+    each host has its own affordance (2026-08-21). Numbers cost one column and
+    make "3" an unambiguous choice everywhere, whatever the host draws.
+    """
+    for n, r in enumerate(rows, first):
         when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
-        line = (f"  {when}  {r['branch']:<{width}}  "
+        line = (f"  [{n}] {when}  {r['branch']:<{width}}  "
                 f"{r['words']:>5} {words_of(r['words'])}")
         print(line + (f"  ← {r['mark']}" if r["mark"] else ""))
+    return first + len(rows)
 
 
 def sources(args, here, known):
@@ -181,14 +189,15 @@ def main():
     width = max(len(r["branch"]) for _, rows in trees for r in rows)
     if len(trees) == 1 and not source:
         print(f"чекпоинты в {trees[0][0] / '.primeskills' / 'handoff'} "
-              f"({total}):")
+              f"({total}), выбор по номеру:")
         show(trees[0][1], width)
     else:
         print(f"чекпоинтов {total} в {len(trees)} {trees_of(len(trees))} "
-              f"({source}):")
+              f"({source}), выбор по номеру:")
+        n = 1
         for top, rows in trees:
             print(f"{top}")
-            show(rows, width)
+            n = show(rows, width, n)
     for path in skipped:
         print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
     if forgotten:
