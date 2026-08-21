@@ -39,6 +39,7 @@ EXPECT = {
     "c2-core-missing": "C2",
     "f10-role-tools": "F10",
     "f11-ref-missing": "F11",
+    "f16-readonly-mutates": "F16",
 }
 
 

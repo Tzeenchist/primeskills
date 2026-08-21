@@ -19,6 +19,19 @@ DEFAULT_BUDGET = 920
 REF_BUDGET = 805             # one reference file
 REF_TOTAL_BUDGET = 1380      # all references of one skill
 PARAPHRASE = 0.34            # share of a core rule's words an invariant may echo
+# G16 as patterns: a read-only or reports skill must not run mutating commands,
+# and prose is where the violation hides ("then commit the result"). The list
+# is deliberately short and unambiguous; a pattern that fires on ordinary
+# prose trains people to ignore the rule (see the note on C4).
+MUTATING_PATTERNS = [
+    (r"\bsed\s+-{1,2}[a-zA-Z]*i", "sed -i edits files in place"),
+    (r"\btee\b", "tee writes to a file"),
+    (r"\brm\s+-{1,2}[a-zA-Z]*", "rm deletes"),
+    (r">>", "append redirection writes to a file"),
+    (r"\bgit\s+(add|cherry-pick|clean|commit|merge|pull|push|rebase|reset|"
+     r"revert|stash|switch|tag|branch|checkout)\b",
+     "state-changing git"),
+]
 CORE_BUDGET = 3220          # always-loaded files; a ceiling, not a target
 # What one skill call actually costs: core, every description, the pointer the
 # installer writes, and the body. This is the number that matters -- C1 and F4
@@ -177,6 +190,15 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
     # environment is indistinguishable from one pointed at production.
     if meta.get("role") == "exercises" and not str(meta.get("environment", "")).strip():
         bad("F15", "role 'exercises' without an 'environment' declaration")
+
+    # F16: G16 enforced, not exhorted. The shell counts as much as the editor,
+    # and hosts block only the editor -- so a read-only skill whose own body
+    # instructs a mutating command teaches the violation on every reading.
+    if meta.get("role") in ("read-only", "reports"):
+        for pattern, why in MUTATING_PATTERNS:
+            m = re.search(pattern, body)
+            if m:
+                bad("F16", f"{why} in a {meta['role']} skill: ...{m.group(0)}...")
 
     desc = str(meta.get("description", ""))
     if len(desc) > DESC_MAX:
