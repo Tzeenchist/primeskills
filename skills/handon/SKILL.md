@@ -1,7 +1,7 @@
 ---
 name: handon
 description: Use on request to resume from a saved checkpoint
-budget: 500
+budget: 600
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, AskUserQuestion]
 ---
@@ -34,11 +34,13 @@ repository.
 2. Non-zero: say what it said — nothing saved, or an empty register — and offer
    the path form rather than searching → **verify:** you never scanned the
    filesystem for checkpoints
-3. Offer the choice with the selection affordance the host has — a menu or
-   picker where one exists, the numbered list where none does — and take a
-   number as a complete answer. More checkpoints than the picker holds: put the
-   whole numbered list in the message beside it → **verify:** the user named
-   one; you did not pick for them, and every checkpoint was offered
+3. Offer the choice with the host's own picker, and take a number as a complete
+   answer either way. All four have one: `AskUserQuestion` (Claude Code, Kimi),
+   `question` (OpenCode), `request_user_input` (Codex — interactive terminal
+   only). Not listed among this turn's tools: the numbered list is the answer,
+   not a fallback you apologise for. More checkpoints than the picker holds: the
+   whole numbered list goes in the message beside it → **verify:** the user
+   named one; you did not pick for them, and every checkpoint was offered
 4. Read that file whole → **verify:** you can say when it was last updated
 5. Check its open items against the repository before repeating any: the record
    beats the file (G6) → **verify:** every item you carry has an anchor you
