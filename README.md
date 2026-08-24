@@ -83,6 +83,7 @@ declared in the open: the analytical ones are allowed `WebFetch` and
 | Codex | skills + a pointer in `~/.codex/AGENTS.md` |
 | Kimi Code | `extra_skill_dirs` in the config + a pointer + the `prime-analyst` profile |
 | OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile |
+| Cline | skills + a pointer in `~/.agents/AGENTS.md` (the cross-tool agents.md standard) |
 
 Analytical skills have their editing tools taken away, and the hosts honour
 that. The shell is a separate channel that nobody intercepts, so role isolation
@@ -227,6 +228,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules.
 `docs/RULE-COVERAGE.md` — which rule is held by what: a machine check or an
-honestly-named insurance policy. `TODOS.md` — the queue. Version 0.9.14: the set
+honestly-named insurance policy. `TODOS.md` — the queue. Version 0.9.15: the set
 works, but it has not yet proved itself by measurement on live tasks, and
 `PS-009` says in advance at which numbers it gets folded back.

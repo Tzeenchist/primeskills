@@ -222,6 +222,32 @@ def main():
         if "someone else's skill" not in (squat / "SKILL.md").read_text(encoding="utf-8"):
             failures.append("чужой prime-autoplan снесён как устаревшая копия")
 
+    # cline discovers ~/.cline/skills and reads the cross-tool AGENTS.md.
+    # Same shape as codex: one symlink per skill, core reachable through a
+    # managed block with exact markers. The file at ~/.agents/AGENTS.md is
+    # shared with every other tool speaking the agents.md standard, so
+    # uninstall must take back our block and nothing else.
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        (h / ".cline").mkdir()
+        out = run(home, "--apply")
+        skills = h / ".cline" / "skills"
+        want = len(list(ROOT.glob("skills/*/SKILL.md")))
+        linked = list(skills.glob("*")) if skills.is_dir() else []
+        checks += 1
+        if len(linked) < want:
+            failures.append(f"cline: слинковано {len(linked)} из {want} навыков")
+        agents = h / ".agents" / "AGENTS.md"
+        text = agents.read_text(encoding="utf-8") if agents.is_file() else ""
+        checks += 1
+        if ("<!-- primeskills:begin -->" not in text
+                or "core/PRINCIPLES.md" not in text):
+            failures.append("cline: указателя на core нет в ~/.agents/AGENTS.md")
+        run(home, "--apply", "--uninstall", "cline")
+        checks += 1
+        if agents.is_file() and "primeskills:begin" in agents.read_text(encoding="utf-8"):
+            failures.append("cline: uninstall не снял блок из ~/.agents/AGENTS.md")
+
     # a damaged marker block must stop the rewrite, not be repaired blindly
     with tempfile.TemporaryDirectory() as home:
         h = Path(home)

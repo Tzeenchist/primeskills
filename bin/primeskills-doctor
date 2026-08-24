@@ -265,6 +265,9 @@ def main():
     else:
         r.line(WARN, "kimi", "skills linked", "no config")
 
+    check_skills(r, "cline", HOME / ".cline" / "skills")
+    check_core(r, "cline", HOME / ".agents" / "AGENTS.md", "primeskills:begin")
+
     check_command(r)
 
     print(f"\n{r.failed} failed")
