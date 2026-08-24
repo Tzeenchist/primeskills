@@ -268,6 +268,28 @@ def main():
     check_skills(r, "cline", HOME / ".cline" / "skills")
     check_core(r, "cline", HOME / ".agents" / "AGENTS.md", "primeskills:begin")
 
+    check_skills(r, "kilo", HOME / ".config" / "kilo" / "skills")
+    # Kilo accepts four config names and reads the one that exists; checking
+    # only the canonical `kilo.json` would report "no config" on a machine
+    # whose config is one of the other three accepted names.
+    kilo_cfg = next((HOME / ".config" / "kilo" / n
+                     for n in ("kilo.json", "kilo.jsonc",
+                               "opencode.json", "opencode.jsonc")
+                     if (HOME / ".config" / "kilo" / n).is_file()), None)
+    if kilo_cfg is None:
+        r.line(WARN, "kilo", "core reachable", "no config")
+    else:
+        try:
+            instructions = json.loads(kilo_cfg.read_text(encoding="utf-8")).get("instructions", [])
+        except ValueError:
+            r.line(WARN, "kilo", "core reachable", f"{kilo_cfg.name} is not valid JSON")
+        else:
+            hit = any("primeskills" in i for i in instructions)
+            r.line(OK if hit else FAIL, "kilo", "core reachable",
+                   f"in instructions ({kilo_cfg.name})" if hit else "not in instructions")
+
+    check_profile(r, "kilo", HOME / ".config" / "kilo" / "agent" / "prime-analyst.md")
+
     check_command(r)
 
     print(f"\n{r.failed} failed")

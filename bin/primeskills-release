@@ -10,7 +10,7 @@ Refuses rather than guesses. `VERSION`, the top entry of `CHANGELOG.md` and the
 tag must agree, the tag must point at the commit being released, and the entry
 must have a body -- an empty release is the failure this program exists to
 prevent. When skills or core changed since the last tag, every changed skill
-must have a recorded live call from each of the five hosts (`livecall` notes in
+must have a recorded live call from each of the six hosts (`livecall` notes in
 the run record) -- PS-052: twice a skill was done until it was called from
 where it lives. Prints the plan and changes nothing until `--apply`.
 """
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HOSTS = ("claude", "codex", "kimi", "opencode", "cline")
+HOSTS = ("claude", "codex", "kimi", "opencode", "cline", "kilo")
 
 
 def git(*args):
