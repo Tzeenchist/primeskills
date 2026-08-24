@@ -41,6 +41,7 @@ TARGETS = {
     "claude": HOME / ".claude" / "skills",
     "codex": HOME / ".codex" / "skills",
     "opencode": HOME / ".config" / "opencode" / "skills",
+    "cline": HOME / ".cline" / "skills",
 }
 KIMI_CONFIG = HOME / ".kimi-code" / "config.toml"
 OPENCODE_CONFIG = HOME / ".config" / "opencode" / "opencode.json"
@@ -64,6 +65,11 @@ ALWAYS_LOADED = {
     "claude": HOME / ".claude" / "CLAUDE.md",
     "codex": HOME / ".codex" / "AGENTS.md",
     "kimi": HOME / ".kimi-code" / "AGENTS.md",
+    # Cline reads the cross-tool agents.md standard from ~/.agents (its docs
+    # list it beside the native rules). The file is shared with every other
+    # tool that speaks the standard, so the managed markers do the exactness
+    # work uninstall relies on everywhere else.
+    "cline": HOME / ".agents" / "AGENTS.md",
 }
 
 
@@ -654,7 +660,8 @@ def unpin(agents, force=False):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("agents", nargs="*", default=[], help="claude codex opencode kimi; empty = all")
+    ap.add_argument("agents", nargs="*", default=[],
+                    help="claude codex opencode kimi cline; empty = all")
     ap.add_argument("--apply", action="store_true", help="do it (default: print the plan)")
     ap.add_argument("--uninstall", action="store_true")
     ap.add_argument("--pin", metavar="COMMIT",

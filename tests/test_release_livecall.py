@@ -66,6 +66,11 @@ def main():
 
         mod = load(repo)
 
+        # the gate speaks for every host the set supports; a new agent that is
+        # installed but not asked for live calls would ship unverified there
+        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "cline"}:
+            failures.append(f"HOSTS не покрывает пять хостов: {mod.HOSTS}")
+
         # nothing changed since the tag: the gate has nothing to ask
         if mod.missing_livecalls(at) != []:
             failures.append("без изменений с тега гейт требовать ничего не должен")
