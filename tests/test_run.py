@@ -497,6 +497,102 @@ def main():
         if code != 1 or "истёк" not in out:
             failures.append(f"истёкший мандат не назвал причину: {code}\n{out}")
 
+    # PS-064: several mandates of one rung can be open at once, and they were
+    # not. `open_grants` kept `rung -> entry` and the last grant won, so a
+    # mandate that had not expired became invisible the moment a second one was
+    # written for another target. Two branches in flight is ordinary -- a
+    # finding from one PR moving into the next -- and the workaround was to
+    # grant again, which teaches writing mandates to get past a check.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+
+        run(repo, "grant", "push", "--target", "branch-a", "первая ветка")
+        run(repo, "grant", "push", "--target", "branch-b", "вторая ветка")
+        for target in ("branch-a", "branch-b"):
+            checks += 1
+            code, out = run(repo, "may", "push", "--target", target)
+            if code != 0:
+                failures.append(f"живой мандат на {target} невидим: {code}\n{out}")
+        checks += 1
+        code, out = run(repo, "may", "push", "--target", "branch-c")
+        if code != 1 or "branch-a" not in out or "branch-b" not in out:
+            failures.append(f"отказ не назвал все открытые цели: {code}\n{out}")
+
+        # a peek with no target reports every open target, because the caller
+        # -- the fence hook -- compares them against the command itself
+        checks += 1
+        code, out = run(repo, "may", "push", "--peek")
+        if code != 0 or "branch-a" not in out or "branch-b" not in out:
+            failures.append(f"peek не перечислил открытые цели: {code}\n{out}")
+
+        # A re-grant for a target already open is one permission, not two: the
+        # peek names it once. Repeats came straight from the workaround this
+        # entry removes, so the list would have been mostly duplicates.
+        run(repo, "grant", "push", "--target", "branch-a", "та же ветка снова")
+        checks += 1
+        code, out = run(repo, "may", "push", "--peek")
+        if out.count("target=branch-a") != 1:
+            failures.append(f"peek повторил цель: {out}")
+        # ... and while several stand at once, the line says so, or the scope of
+        # one mandate reads as the permission for all of them
+        checks += 1
+        if "мандата" not in out and "мандатов" not in out:
+            failures.append(f"peek не сказал, что мандатов несколько: {out}")
+
+        # an expired mandate beside a live one must not shadow it
+        run(repo, "grant", "merge", "--for", "0", "--target", "old", "истёкший")
+        run(repo, "grant", "merge", "--target", "new", "живой")
+        checks += 1
+        code, out = run(repo, "may", "merge", "--target", "new")
+        if code != 0:
+            failures.append(f"истёкший мандат заслонил живой: {code}\n{out}")
+
+        # a mandate with no target covers any target, and a later named one
+        # does not narrow it: each grant is its own yes with its own lifetime
+        run(repo, "grant", "commit", "любая ветка")
+        run(repo, "grant", "commit", "--target", "branch-a", "и эта тоже")
+        for target in (None, "branch-z"):
+            checks += 1
+            args = ("may", "commit") + (("--target", target) if target else ())
+            code, out = run(repo, *args)
+            if code != 0:
+                failures.append(f"общий мандат не покрыл {target}: {code}\n{out}")
+        # ... and while one is open for anything, a peek names no target at all,
+        # or the hook would demand a match the mandate does not require
+        checks += 1
+        code, out = run(repo, "may", "commit", "--peek")
+        if code != 0 or "target=" in out:
+            failures.append(f"peek назвал цель при открытом общем мандате:\n{out}")
+
+        # single use spends its own mandate, not the neighbour's
+        run(repo, "grant", "deploy", "--target", "staging", "выкатить staging")
+        run(repo, "grant", "deploy", "--target", "canary", "выкатить canary")
+        run(repo, "may", "deploy", "--target", "staging")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "staging")
+        if code != 1:
+            failures.append("одноразовый мандат сработал дважды")
+        checks += 1
+        code, out = run(repo, "may", "deploy", "--target", "canary")
+        if code != 0:
+            failures.append(f"трата одного мандата погасила соседний: {code}\n{out}")
+
+        # the journal is append-only text and gets hand-edited. One unreadable
+        # timestamp used to be judged only when it was the last entry; read as a
+        # list it would take down every mandate of the rung -- a failing check
+        # closes the rung, so one bad line would revoke the lot.
+        ledger = repo / ".primeskills" / "run" / "repo.jsonl"
+        with ledger.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"kind": "grant", "rung": "pr", "scope": "битая",
+                                 "ts": "не дата", "lifetime": 480}) + "\n")
+        run(repo, "grant", "pr", "--target", "branch-a", "живой рядом с битым")
+        checks += 1
+        code, out = run(repo, "may", "pr", "--target", "branch-a")
+        if code != 0:
+            failures.append(f"нечитаемая метка времени уронила рунг: {code}\n{out}")
+
     # grants live in one record per repository (PS-047): written on one branch,
     # visible from another — land and merge cross branches by design. Evidence
     # journals stay per branch: slug() alone used to map feature/a and

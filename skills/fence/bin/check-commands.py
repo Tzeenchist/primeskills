@@ -487,7 +487,8 @@ def why_not(rung, code, said, named):
                 "the rung was never checked: run this from the repository "
                 "whose journal holds the mandate.")
     if code == 0 and named:
-        return (f"The open {rung} names {named.group(1)}, which this command "
+        which = " or ".join(named)
+        return (f"The open {rung} names {which}, which this command "
                 f"does not mention. Matching is literal: grant the target the "
                 f"command itself names.")
     return f"Open the {rung} rung first: `{grant_command(rung)}`."
@@ -760,9 +761,14 @@ def decide(raw):
         # is a database or a path they meant.
         where = journal_cwd(command, cwd)
         code, said = run_tool(["may", rung, "--peek"], where)
-        named = re.search(r"target=(\S+)", said or "")
+        # Every target the peek names, not the first: two mandates of one rung
+        # stand at once whenever two branches are in flight, and reading one of
+        # them refused the other one's own command (PS-064). No target at all
+        # means a mandate covers anything.
+        named = re.findall(r"target=(\S+)", said or "")
         where_named = (segment or command).lower()
-        covered = code == 0 and (not named or named.group(1).lower() in where_named)
+        covered = code == 0 and (not named
+                                 or any(n.lower() in where_named for n in named))
         if covered:
             run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"],
                      where)

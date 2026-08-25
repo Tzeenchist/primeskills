@@ -584,6 +584,31 @@ def main():
             if got is not None:
                 failures.append(f"authority read-only: {command!r} -> {got}")
 
+        # PS-064: two mandates of one rung stand at once whenever two branches
+        # are in flight. The hook read a single `target=` out of the peek, so
+        # the older mandate went invisible and its own push was refused.
+        # The untargeted `push` granted above covers every target by design, so
+        # it is revoked first: otherwise this checks nothing.
+        subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
+                        "revoke", "push"], cwd=repo, env=env,
+                       capture_output=True, check=True)
+        subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
+                        "grant", "push", "--target", "branch-a", "первая"],
+                       cwd=repo, env=env, capture_output=True, check=True)
+        subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
+                        "grant", "push", "--target", "branch-b", "вторая"],
+                       cwd=repo, env=env, capture_output=True, check=True)
+        for branch, expected in (("branch-a", None), ("branch-b", None),
+                                 ("branch-c", "ask")):
+            payload = json.dumps({"tool_name": "Bash", "permission_mode": "default",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": f"git push origin {branch}"}})
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            authority_checks += 1
+            if got != expected:
+                failures.append(f"два мандата: push {branch} -> {got}, "
+                                f"ожидалось {expected}")
+
         records = list((repo / ".primeskills" / "run").glob("work-*.jsonl"))
         journal = records[0].read_text(encoding="utf-8") if records else ""
         for _command, rung, _grant in AUTHORITY:
