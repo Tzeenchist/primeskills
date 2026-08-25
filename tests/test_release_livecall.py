@@ -40,11 +40,14 @@ def git(repo, *args):
     return p.stdout.strip()
 
 
-def commit(repo, message):
+def commit(repo, message, when=None):
     subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    env = dict(os.environ)
+    if when:
+        env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = when
     subprocess.run(["git", "-C", str(repo), "-c", "user.name=t",
                     "-c", "user.email=t@t", "commit", "-q", "-m", message],
-                   check=True)
+                   check=True, env=env)
 
 
 def main():
@@ -135,6 +138,78 @@ def main():
             failures.append(
                 f"запись {utc} сделана позже тега {tag_at}, а гейт счёл её "
                 f"протухшей — время сравнивается строками")
+
+        # PS-059, first facet. Matching was a substring search over the whole
+        # note, so a note about one host closed another host's pair merely by
+        # naming it -- and explaining a call in one host by reference to
+        # another is the natural thing to write. Structured fields settle it.
+        checks += 1
+        one = [json.dumps({"kind": "note", "stage": "livecall",
+                           "text": "new: checked in kilo; only Claude Code arms hooks",
+                           "ts": "2099-01-01T00:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(one) + "\n", encoding="utf-8")
+        missing = mod.missing_livecalls(at)
+        if ("new", "claude") not in missing:
+            failures.append("заметка про kilo закрыла пару (new, claude), "
+                            "просто упомянув Claude Code")
+        # a note naming two hosts is ambiguous and closes neither: which one
+        # it is about is exactly what the text cannot say
+        checks += 1
+        if ("new", "kilo") not in missing:
+            failures.append("двусмысленная заметка закрыла пару по первому "
+                            "попавшемуся имени хоста")
+
+        # a fieldless note naming one host still counts: the notes written
+        # before the fields existed were not ambiguous
+        checks += 1
+        plain = [json.dumps({"kind": "note", "stage": "livecall",
+                             "text": "new: menu opened in kimi, choice lands",
+                             "ts": "2099-01-01T00:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(plain) + "\n", encoding="utf-8")
+        if ("new", "kimi") in mod.missing_livecalls(at):
+            failures.append("однозначная старая заметка перестала считаться")
+
+        # fields win over text: the same note, addressed properly
+        checks += 1
+        field = [json.dumps({"kind": "note", "stage": "livecall",
+                             "skill": "new", "host": "claude",
+                             "text": "only Claude Code arms hooks",
+                             "ts": "2099-01-01T00:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(field) + "\n", encoding="utf-8")
+        missing = mod.missing_livecalls(at)
+        if ("new", "claude") in missing:
+            failures.append("запись с полями skill/host не закрыла свою пару")
+        checks += 1
+        if ("new", "kilo") not in missing:
+            failures.append("запись с полями закрыла чужую пару")
+
+        # PS-059, second facet. `since` came from the tag, so a call made
+        # after the tag but before the change counted as proof of the change.
+        # It happened for real on 2026-08-25: the checkpoint written early in
+        # the session covered a pair while testing the text as it stood before
+        # two later fixes.
+        tag_at = git(repo, "show", "-s", "--format=%cI", at)
+        later = (repo / "skills" / "new" / "SKILL.md")
+        later.write_text("v3\n", encoding="utf-8")
+        commit(repo, "change new again, an hour after the tag",
+               when="2099-06-01T12:00:00+00:00")
+        stale_note = [json.dumps({"kind": "note", "stage": "livecall",
+                                  "skill": "new", "host": "claude",
+                                  "text": "called before the change landed",
+                                  "ts": "2099-06-01T11:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(stale_note) + "\n", encoding="utf-8")
+        checks += 1
+        if ("new", "claude") not in mod.missing_livecalls(at):
+            failures.append(f"вызов до правки (11:00) закрыл пару, хотя скилл "
+                            f"менялся в 12:00; тег стоит на {tag_at}")
+        fresh_note = [json.dumps({"kind": "note", "stage": "livecall",
+                                  "skill": "new", "host": "claude",
+                                  "text": "called after the change landed",
+                                  "ts": "2099-06-01T13:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(fresh_note) + "\n", encoding="utf-8")
+        checks += 1
+        if ("new", "claude") in mod.missing_livecalls(at):
+            failures.append("вызов после правки (13:00) не закрыл пару")
 
         print(f"{checks + 2} checks, {len(failures)} failed")
     for f in failures:

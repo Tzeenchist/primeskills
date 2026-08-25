@@ -132,11 +132,21 @@ def missing_livecalls(at):
     about this release's changes, so a call recorded for the previous tag
     must not satisfy this one.
     """
-    since = instant(git("show", "-s", "--format=%cI", at).stdout.strip())
+    tagged = instant(git("show", "-s", "--format=%cI", at).stdout.strip())
     skills, core_changed = changed_since(at)
     if not skills and not core_changed:
         return []
     names = set(skills) | ({"core"} if core_changed else set())
+    # Each name is proved against its own change, not against the tag. Anchored
+    # to the tag, a call made after it but before the change counted as proof of
+    # the change -- which happened on 2026-08-25, when a checkpoint written
+    # early in a session covered a pair while exercising the text as it stood
+    # before two later fixes.
+    since = {}
+    for name_ in names:
+        where = "core" if name_ == "core" else f"skills/{name_}"
+        moved = git("log", "-1", "--format=%cI", f"{at}..HEAD", "--", where).stdout.strip()
+        since[name_] = instant(moved) if moved else tagged
     plain = re.sub(r"[^a-zA-Z0-9._-]+", "-", "master").strip("-")
     record = (ROOT / ".primeskills" / "run" /
               f"{plain[:60]}-{hashlib.sha1(b'master').hexdigest()[:8]}.jsonl")
@@ -149,13 +159,31 @@ def missing_livecalls(at):
                 continue
             when = instant(str(e.get("ts", "")))
             if (e.get("kind") != "note" or e.get("stage") != "livecall"
-                    or when is None or (since is not None and when < since)):
+                    or when is None):
                 continue
+            fresh = lambda k: since.get(k) is None or when >= since[k]
+            # A note that addresses itself is believed and nothing else is
+            # read from it. Falling back to the text keeps notes written before
+            # the fields existed, but a fielded note must not also close pairs
+            # it never claimed: that is the hole this closes.
+            skill, host = e.get("skill"), e.get("host")
+            if skill or host:
+                if skill in names and host in HOSTS and fresh(skill):
+                    have.add((skill, host))
+                continue
+            # Text is read only where it can answer. A note naming two hosts
+            # cannot say which one it is about, and explaining a call in one
+            # host by reference to another is the natural thing to write --
+            # that is how a note about kilo closed claude's pair. One host
+            # named, no ambiguity, still counts: the notes written before the
+            # fields existed were not ambiguous.
             text = str(e.get("text", "")).lower()
+            named = [h for h in HOSTS if h in text]
+            if len(named) != 1:
+                continue
             for n in names:
-                for h in HOSTS:
-                    if n.lower() in text and h in text:
-                        have.add((n, h))
+                if n.lower() in text and fresh(n):
+                    have.add((n, named[0]))
     return sorted((n, h) for n in names for h in HOSTS if (n, h) not in have)
 
 
