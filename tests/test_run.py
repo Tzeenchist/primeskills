@@ -527,6 +527,20 @@ def main():
         if code != 0 or "branch-a" not in out or "branch-b" not in out:
             failures.append(f"peek не перечислил открытые цели: {code}\n{out}")
 
+        # A re-grant for a target already open is one permission, not two: the
+        # peek names it once. Repeats came straight from the workaround this
+        # entry removes, so the list would have been mostly duplicates.
+        run(repo, "grant", "push", "--target", "branch-a", "та же ветка снова")
+        checks += 1
+        code, out = run(repo, "may", "push", "--peek")
+        if out.count("target=branch-a") != 1:
+            failures.append(f"peek повторил цель: {out}")
+        # ... and while several stand at once, the line says so, or the scope of
+        # one mandate reads as the permission for all of them
+        checks += 1
+        if "мандата" not in out and "мандатов" not in out:
+            failures.append(f"peek не сказал, что мандатов несколько: {out}")
+
         # an expired mandate beside a live one must not shadow it
         run(repo, "grant", "merge", "--for", "0", "--target", "old", "истёкший")
         run(repo, "grant", "merge", "--target", "new", "живой")

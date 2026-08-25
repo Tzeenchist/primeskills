@@ -733,16 +733,24 @@ def rung_state(path, rung, target, spend=True, peek=False):
         append(ledger_path(path), {"kind": "spent", "rung": rung,
                                    "target": hit.get("target")})
         spent = ", spent by this check"
+    also = ""
     if peek and target is None:
         # Every open target, because the caller weighs them against the command
         # itself. None at all while a mandate covers anything, or the hook would
-        # demand a match the mandate does not require.
-        named = "" if general else "".join(f" target={g['target']}"
-                                           for g in named_live)
+        # demand a match the mandate does not require. A target granted twice is
+        # still one permission — the repeats came from the very workaround this
+        # fix removes — so it is named once.
+        seen = list(dict.fromkeys(g["target"] for g in named_live))
+        named = "" if general else "".join(f" target={s}" for s in seen)
+        if len(live) > 1:
+            # The scope below belongs to one mandate. Saying how many stand
+            # keeps it from reading as the permission for all of them.
+            hit = live[-1]
+            also = f", всего мандатов: {len(live)}"
     else:
         named = f" target={hit['target']}" if peek and hit.get("target") else ""
     return 0, (f"{rung}: granted{named} — {hit['scope']} "
-               f"(выдан {int(age_minutes(hit))} мин назад{spent})")
+               f"(выдан {int(age_minutes(hit))} мин назад{spent}{also})")
 
 
 def cmd_may(path, argv):
