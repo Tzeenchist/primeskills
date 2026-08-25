@@ -294,6 +294,33 @@ def main():
                 failures.append(f"глобальная опция: {command!r} -> {got}, "
                                 f"ожидалось {expected}")
 
+        # PS-056. Three different things make a rung check fail, and the guard
+        # said the same sentence for all three. Outside a repository the ladder
+        # cannot be read at all, and the advice "record the grant" is advice the
+        # user has often already followed -- twice on 2026-08-25, with the rung
+        # open in a journal the command's directory could not see.
+        with tempfile.TemporaryDirectory() as bare, \
+                tempfile.TemporaryDirectory() as away:
+            # the target has to sit outside the session's own tree: deleting
+            # inside your working directory is ordinary work and passes
+            payload = json.dumps({"tool_name": "Bash",
+                                  "permission_mode": "bypassPermissions",
+                                  "cwd": bare,
+                                  "tool_input": {"command": f"rm -rf {away}/x"}})
+            out = run(CMD, payload, cwd=bare, env=env)
+            said = reason(out)
+            authority_checks += 1
+            if decision(out) != "deny":
+                failures.append(f"вне репозитория разрушительное не отклонено: {out}")
+            authority_checks += 1
+            if "primeskills-run grant" in said:
+                failures.append(
+                    "вне репозитория сторож советует выдать грант, хотя журнал "
+                    f"недоступен и грант мог быть выдан: {said!r}")
+            authority_checks += 1
+            if "repositor" not in said.lower():
+                failures.append(f"отказ не назвал настоящую причину: {said!r}")
+
         for command, rung, grant in AUTHORITY:
             p = subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
                                 "grant", *grant], cwd=repo, env=env,
