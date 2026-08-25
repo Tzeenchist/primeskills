@@ -46,10 +46,10 @@ the task to another agent. Also on request: "save state", "checkpoint".
    does not travel
 6. Reconcile the queue with this session, checkpoint first so a spent budget
    costs one file, not two. `merge` closes what landed; finish the rest — a
-   commit and date on anything closed, an entry for what was found, and on work still
-   moving a stage line named for the chain: `**Этап:** vet — green, waiting on
-   land (<anchor>)`. No queue file: create one → **verify:** nothing closed
-   without a commit, every stage line anchored
+   commit and date on anything closed, an entry for what was found, and on
+   work still moving a stage line named for the chain:
+   `**Этап:** vet — green, waiting on land (<anchor>)`. No queue file: create
+   one → **verify:** nothing closed without a commit, every stage line anchored
 
 ## Stop conditions
 - Tests are red: say so in the notes and do not imply the work is resumable
