@@ -285,7 +285,55 @@ def check_crashed(failures):
         out = json.loads(guard.main(raw) or "{}")
         if decision(out) not in (None, "ask", "deny"):
             failures.append(f"crashed: unreadable payload {raw!r} -> {out}")
-    return len(CRASHED) + 4
+
+    # The journal line is the whole compensating control for letting an
+    # unjudged command through: without it the allow is invisible, and nothing
+    # here went red when `run_tool` was never called. Checked against a real
+    # journal in a disposable repository, with HOME moved so the register of
+    # trees on the machine running the suite is left alone (G7).
+    checks = len(CRASHED) + 4
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+        (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+        subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-q", "-m", "init"], cwd=repo, check=True)
+        before = {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}
+        os.environ["PATH"] = str(ROOT / "bin") + os.pathsep + before["PATH"]
+        os.environ["HOME"] = str(repo)
+        try:
+            payload = json.dumps({"tool_name": "Bash",
+                                  "permission_mode": "bypassPermissions",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": "git commit -q -m x"}})
+            got = decision(json.loads(guard.main(payload)))
+        finally:
+            os.environ.update(before)
+        checks += 1
+        if got is not None:
+            failures.append(f"crashed journal: expected allow, got {got}")
+        records = list((repo / ".primeskills" / "run").glob("*.jsonl"))
+        journal = "".join(r.read_text(encoding="utf-8") for r in records)
+        checks += 1
+        if "allowed unchecked" not in journal:
+            failures.append("crashed journal: no `allowed unchecked` line written")
+
+    # The wording of the refusal in the unreadable branch is interpolated from
+    # here, so the contract is pinned where it can be reached. Today only the
+    # `rm` arm is reachable through the guard -- the destructive list is
+    # matched against the whole line further up -- and a message hard-coded to
+    # `rm` would lie the day that order changes.
+    drop = "DR" + "OP DATABASE prod"
+    for text, expected in ((f"psql -c '{drop}'", "destroys database contents"),
+                           ("rm -" + "rf /srv/data", "names a recursive delete"),
+                           ("ls -la", None)):
+        checks += 1
+        if guard.text_only_verdict(text) != expected:
+            failures.append(f"text_only_verdict: {text!r} -> "
+                            f"{guard.text_only_verdict(text)!r}, expected {expected!r}")
+    return checks
 
 
 def run(script, payload, cwd=None, env=None):
