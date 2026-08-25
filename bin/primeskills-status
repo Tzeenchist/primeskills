@@ -32,6 +32,10 @@ SUPPORT = [
      "edit/write denied; shell is a separate channel — advisory"),
     ("Kimi", "extra_skill_dirs + core pointer + prime-analyst profile",
      "Edit/Write/NotebookEdit denied; shell not covered — advisory"),
+    ("Cline", "skills + core pointer in ~/.agents/AGENTS.md",
+     "no profile mechanism; nothing declared — advisory"),
+    ("Kilo", "skills + core in instructions + prime-analyst profile",
+     "edit/write denied; shell is a separate channel — advisory"),
 ]
 
 

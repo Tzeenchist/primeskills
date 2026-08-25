@@ -248,6 +248,65 @@ def main():
         if agents.is_file() and "primeskills:begin" in agents.read_text(encoding="utf-8"):
             failures.append("cline: uninstall не снял блок из ~/.agents/AGENTS.md")
 
+    # kilo is an OpenCode fork: skills under its config dir, core through the
+    # `instructions` field, prime-analyst in agent/. Two things are its own.
+    # It accepts four config names and reads the one that exists, so the
+    # installer must write into that one rather than create a canonical
+    # `kilo.json` the host may load second or not at all. And a `.jsonc` may
+    # carry comments: unreadable JSON is reported, never rewritten.
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        cfg = h / ".config" / "kilo" / "kilo.jsonc"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text('{"$schema": "https://app.kilo.ai/config.json"}\n', encoding="utf-8")
+        run(home, "--apply")
+
+        skills = h / ".config" / "kilo" / "skills"
+        want = len(list(ROOT.glob("skills/*/SKILL.md")))
+        linked = list(skills.glob("*")) if skills.is_dir() else []
+        checks += 1
+        if len(linked) < want:
+            failures.append(f"kilo: слинковано {len(linked)} из {want} навыков")
+
+        checks += 1
+        if (h / ".config" / "kilo" / "kilo.json").exists():
+            failures.append("kilo: создан kilo.json рядом с живым kilo.jsonc")
+
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        checks += 1
+        if not any("core/PRINCIPLES.md" in i for i in data.get("instructions", [])):
+            failures.append("kilo: core не попал в instructions живого конфига")
+        checks += 1
+        if data.get("$schema") != "https://app.kilo.ai/config.json":
+            failures.append("kilo: чужие ключи конфига потеряны при записи")
+
+        prof = h / ".config" / "kilo" / "agent" / "prime-analyst.md"
+        checks += 1
+        if not prof.is_symlink():
+            failures.append("kilo: профиль prime-analyst не слинкован в agent/")
+
+        run(home, "--apply", "--uninstall", "kilo")
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+        checks += 1
+        if any("primeskills" in i for i in data.get("instructions", [])):
+            failures.append("kilo: uninstall не убрал core из instructions")
+
+    # a config with comments is valid JSONC and unreadable as JSON: rewriting
+    # it would delete the user's own notes, so the installer says so and stops
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        cfg = h / ".config" / "kilo" / "kilo.jsonc"
+        cfg.parent.mkdir(parents=True)
+        before = '// my notes\n{"$schema": "https://app.kilo.ai/config.json"}\n'
+        cfg.write_text(before, encoding="utf-8")
+        out = run(home, "--apply").stdout
+        checks += 1
+        if cfg.read_text(encoding="utf-8") != before:
+            failures.append("kilo: конфиг с комментариями переписан")
+        checks += 1
+        if "not valid JSON" not in out:
+            failures.append("kilo: про нечитаемый конфиг ничего не сказано")
+
     # a damaged marker block must stop the rewrite, not be repaired blindly
     with tempfile.TemporaryDirectory() as home:
         h = Path(home)

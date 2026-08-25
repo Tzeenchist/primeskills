@@ -42,9 +42,20 @@ TARGETS = {
     "codex": HOME / ".codex" / "skills",
     "opencode": HOME / ".config" / "opencode" / "skills",
     "cline": HOME / ".cline" / "skills",
+    "kilo": HOME / ".config" / "kilo" / "skills",
 }
 KIMI_CONFIG = HOME / ".kimi-code" / "config.toml"
 OPENCODE_CONFIG = HOME / ".config" / "opencode" / "opencode.json"
+# Kilo is an OpenCode fork -- same CLI surface, same discovery rules, and its
+# own log line still says `opencode`. Its embedded documentation gives the
+# paths verbatim: skills at `{skill,skills}/<name>/SKILL.md` inside any config
+# directory, instructions from the `instructions` config field. So it takes the
+# OpenCode route, not the agents.md one cline needed.
+#
+# The config file has several accepted names and the installed one wins; a
+# second file created beside it would be a config the host may never read.
+KILO_DIR = HOME / ".config" / "kilo"
+KILO_CONFIG_NAMES = ("kilo.json", "kilo.jsonc", "opencode.json", "opencode.jsonc")
 PREFIX = "prime-"
 
 # Skills reference core by number (PRINCIPLES §3, GUARDRAILS G8). Linking
@@ -60,6 +71,10 @@ PROFILES = {
                  ROOT / "adapters" / "opencode" / "prime-analyst.md"),
     "kimi": (HOME / ".kimi-code" / "agents" / "prime-analyst.md",
              ROOT / "adapters" / "kimi" / "prime-analyst.md"),
+    # Kilo scans `{agent,agents}/**/*.md`; `agent/` matches its own singular
+    # convention for `command/`, and the frontmatter is OpenCode's.
+    "kilo": (HOME / ".config" / "kilo" / "agent" / "prime-analyst.md",
+             ROOT / "adapters" / "kilo" / "prime-analyst.md"),
 }
 ALWAYS_LOADED = {
     "claude": HOME / ".claude" / "CLAUDE.md",
@@ -146,13 +161,45 @@ def profile(agent, apply_it, remove):
             f"prime-analyst linked into {dest.parent.name}/")
 
 
+def kilo_config():
+    """The config file kilo actually reads here, or where to create one.
+
+    Returns the first accepted name that exists; with none present, the
+    canonical `kilo.json`. Writing to the canonical name while `kilo.jsonc`
+    sits beside it would put core in a file the host loads second, or not at
+    all.
+    """
+    for name in KILO_CONFIG_NAMES:
+        candidate = KILO_DIR / name
+        if candidate.is_file():
+            return candidate
+    return KILO_DIR / KILO_CONFIG_NAMES[0]
+
+
+def instructions_config(agent):
+    """The JSON config whose `instructions` list carries core, or None."""
+    if agent == "opencode":
+        return OPENCODE_CONFIG
+    if agent == "kilo":
+        return kilo_config()
+    return None
+
+
 def bootstrap(agent, apply_it, remove):
     """Returns a one-line status."""
-    if agent == "opencode":
-        if not OPENCODE_CONFIG.is_file():
+    config = instructions_config(agent)
+    if config is not None:
+        if not config.is_file():
             return "no config, skipped"
         import json
-        data = json.loads(OPENCODE_CONFIG.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(config.read_text(encoding="utf-8"))
+        except ValueError:
+            # A .jsonc may legitimately carry comments, and rewriting it as
+            # plain JSON would delete the user's own notes. Say so and stop:
+            # a config we cannot read back is a config we must not write.
+            return (f"{config.name} is not valid JSON — left alone, "
+                    f"add core to `instructions` by hand")
         instructions = data.get("instructions", [])
         want = [str(ROOT / "core" / f) for f in CORE_FILES]
         present = all(w in instructions for w in want)
@@ -161,8 +208,8 @@ def bootstrap(agent, apply_it, remove):
             if not remove:
                 instructions += want
             data["instructions"] = instructions
-            backup_once(OPENCODE_CONFIG)
-            write_atomic(OPENCODE_CONFIG, json.dumps(data, indent=2) + "\n",
+            backup_once(config)
+            write_atomic(config, json.dumps(data, indent=2) + "\n",
                          check=json.loads)
         return ("core already in instructions" if present and not remove
                 else "core removed from instructions" if remove
@@ -661,7 +708,7 @@ def unpin(agents, force=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("agents", nargs="*", default=[],
-                    help="claude codex opencode kimi cline; empty = all")
+                    help="claude codex opencode kimi cline kilo; empty = all")
     ap.add_argument("--apply", action="store_true", help="do it (default: print the plan)")
     ap.add_argument("--uninstall", action="store_true")
     ap.add_argument("--pin", metavar="COMMIT",
