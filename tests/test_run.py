@@ -692,6 +692,42 @@ def main():
             if "снесённое-дерево" in planted.read_text(encoding="utf-8"):
                 failures.append("реестр не вычистил дерево, которого больше нет")
 
+    # PS-056. A mandate names a thing, not a pattern, and a refusal has to say
+    # which of three things went wrong. Both halves cost two refusals in a row
+    # on 2026-08-25 with the rung open the whole time.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        make_repo(repo)
+
+        # a glob in --target used to be accepted and then never match anything,
+        # so the mandate was inert and the refusal blamed the rung
+        checks += 1
+        code, out = run(repo, "grant", "delete", "--target", "/tmp/probe.*",
+                        "уборка", "--for", "10")
+        if code == 0:
+            failures.append(f"grant принял цель с метасимволом: {out.strip()!r}")
+        checks += 1
+        if "probe.*" not in out or "--target" not in out:
+            failures.append(f"отказ не назвал ни цель, ни флаг: {out.strip()!r}")
+
+        # a literal target is still fine
+        checks += 1
+        code, out = run(repo, "grant", "delete", "--target", "/tmp/probe.6JD9",
+                        "уборка", "--for", "10")
+        if code != 0:
+            failures.append(f"grant отверг буквальную цель: {out.strip()!r}")
+
+        # `may` without --target against a target-bound mandate said
+        # "asked for None", which names the bug in the caller and not the fix
+        checks += 1
+        code, out = run(repo, "may", "delete")
+        if "None" in out:
+            failures.append(f"may без --target печатает None: {out.strip()!r}")
+        checks += 1
+        if "--target" not in out:
+            failures.append(f"may без --target не назвал нужный флаг: {out.strip()!r}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

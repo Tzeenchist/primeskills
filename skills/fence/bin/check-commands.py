@@ -432,6 +432,27 @@ def command_rung(tokens):
     return None
 
 
+def why_not(rung, code, said, named):
+    """Which of three things stopped the rung check — they need different fixes.
+
+    One sentence covered all three, and the one it chose ("record the grant")
+    is wrong advice for two of them. On 2026-08-25 it was printed twice to
+    someone who had recorded the grant both times: once because the journal was
+    not readable from the command's directory, once because the mandate named a
+    pattern the command could not match.
+    """
+    text = said or ""
+    if code is None or "not inside a git repository" in text:
+        return ("The mandate journal is not readable from this directory, so "
+                "the rung was never checked: run this from the repository "
+                "whose journal holds the mandate.")
+    if code == 0 and named:
+        return (f"The open {rung} names {named.group(1)}, which this command "
+                f"does not mention. Matching is literal: grant the target the "
+                f"command itself names.")
+    return f"Open the {rung} rung first: `{grant_command(rung)}`."
+
+
 def grant_command(rung):
     if rung in {"deploy", "delete"}:
         return (f"primeskills-run grant {rung} --target <the path or environment> "
@@ -628,24 +649,21 @@ def decide(raw):
         # words settle it: a mandate counts when what they named appears in the
         # command. The guard's guess at "the target" is a first operand; theirs
         # is a database or a path they meant.
-        code, said = run_tool(["may", rung, "--peek"], journal_cwd(command, cwd))
+        where = journal_cwd(command, cwd)
+        code, said = run_tool(["may", rung, "--peek"], where)
         named = re.search(r"target=(\S+)", said or "")
         covered = code == 0 and (not named or named.group(1).lower() in command.lower())
         if covered:
             run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"],
-                     journal_cwd(command, cwd))
+                     where)
             return ALLOW
-        instruction = grant_command(rung)
+        advice = why_not(rung, code, said, named)
         if mode not in SILENT_MODES:
-            return ask(
-                f"{reason}. Open the {rung} rung before running it: "
-                f"`{instruction}`.")
-        run_tool(["note", "guard", f"refused, no {rung}: {command[:120]}"],
-                 journal_cwd(command, cwd))
+            return ask(f"{reason}. {advice}")
+        run_tool(["note", "guard", f"refused, no {rung}: {command[:120]}"], where)
         return deny(
             f"{reason}. Confirmations are off, so this is refused rather than "
-            f"asked: tell the user what it will do, and when they agree record "
-            f"it: `{instruction}`.")
+            f"asked: tell the user what it will do. {advice}")
     if mode not in SILENT_MODES:
         return ask(reason)
 

@@ -583,6 +583,15 @@ def cmd_grant(path, argv):
     if rung in SENSITIVE and not target:
         sys.exit(f"{rung} needs --target: the environment, host or database this "
                  f"covers. 'deploy staging' must not open the door to production.")
+    # A mandate names a thing, not a pattern. A glob was accepted here and then
+    # matched nothing at check time, so the permission was inert and the refusal
+    # blamed the rung -- on 2026-08-25 that cost two refusals in a row with the
+    # rung open. Refusing at the moment of the grant fails loudly instead.
+    if target and any(c in target for c in "*?["):
+        sys.exit(f"{rung}: --target {target!r} looks like a pattern, and a "
+                 f"mandate names one thing. Matching is literal, so a glob "
+                 f"would never match and the refusal would blame the rung. "
+                 f"Name the target itself, or grant once per target.")
     try:
         lifetime = int(minutes) if minutes else LIFETIME[
             "sensitive" if rung in SENSITIVE else "ordinary"]
@@ -635,6 +644,10 @@ def rung_state(path, rung, target, spend=True, peek=False):
     # on its own terms -- the `fence` hook knows the command, not the wording
     # the user chose.
     if hit.get("target") and not (peek and target is None) and hit["target"] != target:
+        if target is None:
+            return 1, (f"{rung}: the mandate is bound to {hit['target']!r}. "
+                       f"Ask for it by name: "
+                       f"`may {rung} --target {hit['target']}`.")
         return 1, (f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "
                    f"A permission for one target is not a permission for another.")
     if rung in SENSITIVE and not target and not peek:
