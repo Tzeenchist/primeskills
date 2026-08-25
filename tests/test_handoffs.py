@@ -222,6 +222,36 @@ def main():
         want(len(rows) == 1,
              f"в списке должен остаться один свой чекпоинт:\n{done.stdout}")
 
+    # PS-061. One checkpoint per tree, branches as sections inside it. A file
+    # per branch multiplied: 5 of the 11 checkpoints on this machine named
+    # branches that no longer existed, and a tree with several live branches
+    # scattered its state across as many files.
+    with tempfile.TemporaryDirectory() as tmp:
+        top = Path(tmp)
+        repo(top)
+        git(top, "branch", "feat-a")
+        single = top / ".primeskills" / "handoff" / "checkpoint.md"
+        single.parent.mkdir(parents=True, exist_ok=True)
+        single.write_text("# checkpoint\n\n## master\nстоим тут\n\n"
+                          "## feat-a\nполовина\n\n## feat-gone\nветки нет\n",
+                          encoding="utf-8")
+        out = run(top).stdout
+        want("master" in out and "feat-a" in out and "feat-gone" in out,
+             f"разделы одного файла не перечислены:\n{out}")
+        want(out.count("checkpoint.md") == 0 or "master" in out,
+             f"перечислен файл вместо разделов:\n{out}")
+        want("сирота" in out,
+             f"раздел без ветки не помечен сиротой:\n{out}")
+        want(len([l for l in out.splitlines() if l.strip().startswith("[")]) == 3,
+             f"ожидали три пронумерованных раздела:\n{out}")
+
+        # a legacy per-branch file is still listed, so nothing written before
+        # this change disappears from the picker
+        checkpoint(top, "feat-legacy", "старый формат")
+        out = run(top).stdout
+        want("feat-legacy" in out,
+             f"старый файл-на-ветку перестал показываться:\n{out}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")
