@@ -464,10 +464,31 @@ def counters(entries):
 
 
 def cmd_note(path, argv):
+    """`--skill` and `--host` address a note instead of describing it.
+
+    The live-call gate used to look for both names anywhere in the text, so a
+    note about one host closed another host's pair by naming it -- and a call
+    in one host is naturally explained by reference to another ("only Claude
+    Code arms hooks"). Fields say who the note is about; the text stays for
+    people.
+    """
     if len(argv) < 2:
-        sys.exit("usage: primeskills-run note <stage> <text>")
-    e = append(path, {"kind": "note", "stage": argv[0], "text": " ".join(argv[1:])})
-    print(f"{argv[0]} recorded against {e['commit'][:8]}+{e['state']}")
+        sys.exit("usage: primeskills-run note <stage> [--skill <name>] "
+                 "[--host <host>] <text>")
+    stage, rest = argv[0], argv[1:]
+    fields, words, i = {}, [], 0
+    while i < len(rest):
+        if rest[i] in ("--skill", "--host") and i + 1 < len(rest):
+            fields[rest[i][2:]] = rest[i + 1]
+            i += 2
+        else:
+            words.append(rest[i])
+            i += 1
+    text = " ".join(words).strip()
+    if not text:
+        sys.exit("note needs text: the fields address it, they do not describe it")
+    e = append(path, {"kind": "note", "stage": stage, "text": text, **fields})
+    print(f"{stage} recorded against {e['commit'][:8]}+{e['state']}")
     return 0
 
 

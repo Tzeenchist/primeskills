@@ -305,6 +305,17 @@ def main():
         checks += 1
         failures.append(f"{name} в SHARED_TOOLS, но ни один скилл его не зовёт")
 
+    # A bullet above the first version header belongs to no release: it prints
+    # nowhere and ships nowhere. It happens when a branch is cut from an older
+    # version than the one the entry is written into — twice on 2026-08-25 —
+    # and nothing caught it, because VERSION still matched the top header.
+    head = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split("\n## ", 1)[0]
+    checks += 1
+    if re.search(r"^- ", head, re.M):
+        stray = re.search(r"^- .*", head, re.M).group(0)
+        failures.append(f"CHANGELOG.md: «{stray[:60]}» стоит выше первой версии "
+                        f"— эта строка не попадёт ни в один релиз")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")
