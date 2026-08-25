@@ -259,7 +259,12 @@ LOCAL_BIN = HOME / ".local" / "bin"
 # `primeskills-handoffs` and Codex answered 127, command not found
 # (2026-08-21). A skill that names a command the shell cannot find is an
 # instruction that fails silently.
-SHARED_TOOLS = ("primeskills-run", "primeskills-help", "primeskills-handoffs")
+# Every command a skill names by name belongs here: one it cannot resolve is an
+# instruction that fails silently. The list stood two names short until `cline`
+# ran `fence` live on 2026-08-25 and got exit 127 from the very command that
+# skill's step 1 verifies with. `tests/test_docs.py` now keeps the two in step.
+SHARED_TOOLS = ("primeskills-run", "primeskills-help", "primeskills-handoffs",
+                "primeskills-doctor", "primeskills-release")
 
 
 def hook_command(script):
