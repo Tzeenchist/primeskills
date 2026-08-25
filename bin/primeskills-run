@@ -728,12 +728,12 @@ def rung_state(path, rung, target, spend=True, peek=False):
 
     if rung in SENSITIVE and not target and not peek:
         return 1, f"{rung}: name the target — `may {rung} --target <what>`."
-    spent = ""
-    if hit.get("once") and spend:
-        append(ledger_path(path), {"kind": "spent", "rung": rung,
-                                   "target": hit.get("target")})
-        spent = ", spent by this check"
-    also = ""
+    # What is answered and what is shown are two different mandates when the
+    # question names no target, so they are decided before anything is spent.
+    # Computed after the spend, `shown` reassigned `hit` and the entry written
+    # to the journal would have named a mandate other than the line printed —
+    # harmless only for as long as `cmd_may` keeps passing `spend=not peek`.
+    shown, also = hit, ""
     if peek and target is None:
         # Every open target, because the caller weighs them against the command
         # itself. None at all while a mandate covers anything, or the hook would
@@ -745,12 +745,17 @@ def rung_state(path, rung, target, spend=True, peek=False):
         if len(live) > 1:
             # The scope below belongs to one mandate. Saying how many stand
             # keeps it from reading as the permission for all of them.
-            hit = live[-1]
+            shown = live[-1]
             also = f", всего мандатов: {len(live)}"
     else:
         named = f" target={hit['target']}" if peek and hit.get("target") else ""
-    return 0, (f"{rung}: granted{named} — {hit['scope']} "
-               f"(выдан {int(age_minutes(hit))} мин назад{spent}{also})")
+    spent = ""
+    if hit.get("once") and spend:
+        append(ledger_path(path), {"kind": "spent", "rung": rung,
+                                   "target": hit.get("target")})
+        spent = ", spent by this check"
+    return 0, (f"{rung}: granted{named} — {shown['scope']} "
+               f"(выдан {int(age_minutes(shown))} мин назад{spent}{also})")
 
 
 def cmd_may(path, argv):
