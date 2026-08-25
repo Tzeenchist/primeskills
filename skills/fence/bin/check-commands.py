@@ -177,6 +177,49 @@ INTERPRETERS = {"sh", "bash", "zsh", "dash", "ksh", "python", "python2",
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 
 
+def head_words(head):
+    """The words before `<<`, read even when the quoting does not close.
+
+    A heredoc opened inside a quoted command substitution -- the ordinary
+    `git commit -m "$(cat <<'EOF'` -- leaves an unbalanced double quote in
+    front of it. shlex raises there, and the exception used to travel to the
+    top-level handler, which answers every crash with `ask`: twelve prompts in
+    one session on 2026-08-25, all approved unread. Quoting is decoration here;
+    the only word that matters is the program at the front, so on a raise the
+    words are taken without it.
+    """
+    if not head.strip():
+        return []
+    try:
+        return shlex.split(head, comments=False)
+    except ValueError:
+        return re.findall(r"[^\s|&;<>()]+", head)
+
+
+COMMAND_BREAK = re.compile(r"\|\||&&|[|;&]|\$\(|`|\(")
+
+
+def head_executes(head):
+    """Does anything in front of `<<` run what the document says?
+
+    The consumer is the command the heredoc hangs off, and that is neither
+    always the first word of the line nor always the last. `echo x | bash
+    <<'SH'` read `echo`, called a shell script a document and dropped it -- in
+    every mode, not only where confirmations are off. `psql -c "$(cat <<'SQL'`
+    hands its text to psql through cat, so the last word is wrong too. Every
+    word standing in command position is checked, and only those: a head that
+    merely mentions an interpreter -- `echo 'run bash later' > notes.md` --
+    still writes a document.
+    """
+    for chunk in COMMAND_BREAK.split(head):
+        words = head_words(chunk)
+        while words and (words[0] in ("sudo", "time", "nohup") or "=" in words[0]):
+            words = words[1:]
+        if words and Path(words[0]).name in INTERPRETERS:
+            return True
+    return False
+
+
 def without_inert_heredocs(command):
     """The command text to judge, with document bodies taken out of it.
 
@@ -197,10 +240,7 @@ def without_inert_heredocs(command):
         if not hit:
             continue
         marker = hit.group(2)
-        head = shlex.split(line.split("<<")[0], comments=False) if line.split("<<")[0].strip() else []
-        while head and (head[0] in ("sudo", "time", "nohup") or "=" in head[0]):
-            head = head[1:]
-        executes = bool(head) and Path(head[0]).name in INTERPRETERS
+        executes = head_executes(line.split("<<")[0])
         body = []
         while i < len(lines) and lines[i].strip() != marker:
             body.append(lines[i])
@@ -515,6 +555,59 @@ def output_verdict(command, parsed, cwd):
     return None
 
 
+def text_only_verdict(command):
+    """What can still be said about a line nobody could tokenise.
+
+    Two callers reach this: the branch below, where the quoting does not close,
+    and the crash handler, where the guard fell over before judging anything.
+    They ask the same question and must not answer it twice in two places.
+    """
+    hit = next((why for pat, _rung, why in CATASTROPHIC if pat.search(command)),
+               None)
+    if hit:
+        return hit
+    if any(re.search(pat, command) for pat, _ in RULES if pat.startswith("rm")):
+        return "names a recursive delete"
+    return None
+
+
+def crashed(raw, exc):
+    """The verdict when the guard itself fell over.
+
+    A crash answered `ask` in every mode, because the handler ran before the
+    payload -- and the mode inside it -- had been read. Where confirmations are
+    off, `ask` is the one verdict the guard may not give: it renders as a prompt
+    approved unread, and it trains the reflex that answers the one that
+    mattered. On 2026-08-25 a single parsing bug spent twelve of those prompts
+    in one session. So a crash is now held to the rules that can be read off
+    the text, and what survives passes with a line in the journal saying it
+    went unchecked.
+    """
+    detail = (f"the guard itself failed ({type(exc).__name__}), so this "
+              f"command was not checked.")
+    try:
+        payload = json.loads(raw) if raw and raw.strip() else None
+        if not isinstance(payload, dict):
+            return ask(detail)
+        if payload.get("permission_mode") not in SILENT_MODES:
+            return ask(detail)
+        tool_input = payload.get("tool_input")
+        command = tool_input.get("command") if isinstance(tool_input, dict) else None
+        if not isinstance(command, str) or not command:
+            return ALLOW
+        why = text_only_verdict(command)
+        if why:
+            return deny(f"{detail} Read as text it {why}, and confirmations "
+                        f"are off, so it is refused rather than asked. Say "
+                        f"what it will do, or fix the guard.")
+        run_tool(["note", "guard",
+                  f"allowed unchecked ({type(exc).__name__}): {command[:120]}"],
+                 payload.get("cwd") or "")
+        return ALLOW
+    except Exception:  # noqa: BLE001 -- see main(): silence is consent
+        return ask(detail)
+
+
 def decide(raw):
     if not raw.strip():
         return ALLOW
@@ -635,8 +728,7 @@ def decide(raw):
                 # over: the text is held to the `rm` rules the tokens would
                 # have answered, and what survives passes with a journal line
                 # saying it went unread.
-                if any(re.search(pat, command) for pat, _ in RULES
-                       if pat.startswith("rm")):
+                if text_only_verdict(command):
                     return deny("part of this line could not be parsed and it "
                                 "names a recursive delete, so it is refused "
                                 "rather than asked. Rewrite it so the quoting "
@@ -686,9 +778,18 @@ def decide(raw):
     return ALLOW
 
 
-if __name__ == "__main__":
+def main(raw):
+    """Decide, and answer for the guard when deciding raises.
+
+    The catch lives here rather than under `__main__` so a test can inject a
+    failure and read the verdict: the crash path is the one the user meets on a
+    bad day, and it went four months without a test.
+    """
     try:
-        print(decide(sys.stdin.read()))
+        return decide(raw)
     except Exception as exc:  # noqa: BLE001 -- a crash must not become consent
-        print(ask(f"the guard itself failed ({type(exc).__name__}), so this "
-                  f"command was not checked."))
+        return crashed(raw, exc)
+
+
+if __name__ == "__main__":
+    print(main(sys.stdin.read()))

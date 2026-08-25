@@ -140,6 +140,47 @@ HEREDOCS = [
     (f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", "ask"),
     (f"bash <<'SH'\n{WIPE}\nSH", "ask"),
     (f"{WIPE} && cat > f <<'EOF'\nhi\nEOF", "ask"),
+    # PS-062: a heredoc opened inside a quoted command substitution leaves the
+    # head with an unbalanced quote -- `git commit -m "$(cat <<'EOF'`. shlex
+    # raised from there, nothing caught it, and the top-level handler turns any
+    # crash into `ask`. On 2026-08-25 that fired twelve times in one session on
+    # the ordinary way of writing a commit message, and every prompt was
+    # approved unread. The body is a document: `git` is not an interpreter.
+    ('git commit -q -m "$(cat <<\'EOF\'\n'
+     'fix: \u00abquoted\u00bb and don\'t\n'
+     f"{WIPE}\nEOF\n)\"", None),
+    # asks, but for the pr rung -- the crash used to answer first and hide it
+    ('gh pr create --body "$(cat <<\'EOF\'\n'
+     f"{WIPE}\nEOF\n)\"", "ask"),
+    # ... and still a command where the consumer executes what it reads
+    ('psql -c "$(cat <<\'SQL\'\nDROP DATABASE prod;\nSQL\n)"', "ask"),
+    # PS-063: the consumer of a heredoc is the command it hangs off, not the
+    # first word of the line. `head[0]` read `echo` here and threw a shell
+    # script away as a document -- open in *both* modes, not only under
+    # confirmations-off.
+    (f"echo x | bash <<'SH'\n{WIPE}\nSH", "ask"),
+    (f"true && bash <<'SH'\n{WIPE}\nSH", "ask"),
+    # ... while a head that merely mentions an interpreter still writes a
+    # document: only a word in command position counts.
+    (f"echo 'run bash later' > notes.md <<'EOF'\n{WIPE}\nEOF", None),
+]
+
+
+# PS-063, and the line it stops at. A body after a pipe is now judged like the
+# same command one level up. What the guard deliberately does NOT do is tell
+# code from data inside a body that is not shell: a delete quoted in a python
+# body reads as text, matches a rule carrying no rung, and a rungless verdict
+# passes where confirmations are off. Attaching a rung there was tried and
+# dropped -- it refused ordinary prose about deletes, twice while the entry for
+# it was being written. In `default` it still asks. Pinned so the boundary
+# moves on purpose.
+BODIES = [
+    ("bypassPermissions", f"echo x | bash <<'SH'\n{WIPE}\nSH", "deny"),
+    ("default", f"echo x | bash <<'SH'\n{WIPE}\nSH", "ask"),
+    ("default", f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", "ask"),
+    ("bypassPermissions", f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", None),
+    ("bypassPermissions", "python3 - <<'PY'\nimport os\nos.system('rm -rf build')\nPY", None),
+    ("bypassPermissions", f"cat > notes.md <<'EOF'\n{WIPE}\nEOF", None),
 ]
 
 
@@ -192,6 +233,61 @@ READ_ONLY = ["git status", "git log -1", "git diff", "gh pr view 12",
              "gh run list"]
 
 
+# PS-062, the second half. Fixing the parse above removes today's crash and
+# not the next one: any exception inside the guard is answered by the top-level
+# handler, and it answered `ask` in every mode. Where confirmations are off,
+# `ask` is the one verdict the guard may not give (SKILL.md), so a crash is
+# held to what can be read off the text and journalled instead. The crash is
+# injected rather than provoked -- a test that needs a live parser bug to raise
+# would go green the day that bug is fixed.
+CRASHED = [
+    ("bypassPermissions", "git commit -q -m x", None),
+    ("bypassPermissions", "rm -" + "rf /srv/data", "deny"),
+    ("bypassPermissions", "dropdb prod", "deny"),
+    ("bypassPermissions", "git push --force origin main", "deny"),
+    ("dontAsk", "git commit -q -m x", None),
+    ("default", "git commit -q -m x", "ask"),
+    ("acceptEdits", "rm -" + "rf /srv/data", "ask"),
+    (None, "git commit -q -m x", "ask"),
+]
+
+
+def guard_module():
+    """The guard as a module, so a crash can be injected into it."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("check_commands", CMD)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def check_crashed(failures):
+    guard = guard_module()
+
+    def explode(*_args, **_kwargs):
+        raise ValueError("injected")
+
+    guard.segments = explode
+    for mode, command, expected in CRASHED:
+        payload = {"tool_name": "Bash", "cwd": "/nonexistent",
+                   "tool_input": {"command": command}}
+        if mode is not None:
+            payload["permission_mode"] = mode
+        out = json.loads(guard.main(json.dumps(payload)))
+        got = decision(out)
+        if got != expected:
+            failures.append(f"crashed: {mode} {command!r} -> {got}, "
+                            f"expected {expected}")
+    # and the handler must survive a payload it cannot read at all: a crash
+    # inside the crash handler prints nothing, and a hook that prints nothing
+    # is a hook that permits
+    for raw in ("not json", "", "[]", '{"tool_input":null}'):
+        out = json.loads(guard.main(raw) or "{}")
+        if decision(out) not in (None, "ask", "deny"):
+            failures.append(f"crashed: unreadable payload {raw!r} -> {out}")
+    return len(CRASHED) + 4
+
+
 def run(script, payload, cwd=None, env=None):
     p = subprocess.run([sys.executable, str(script)], input=payload,
                        capture_output=True, text=True, cwd=cwd, env=env)
@@ -217,10 +313,16 @@ def main():
 
     for command, expected in HEREDOCS:
         payload = json.dumps({"tool_input": {"command": command}})
-        got = decision(run(CMD, payload))
+        out = run(CMD, payload)
+        got = decision(out)
         if got != expected:
             failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
                             f"expected {expected}")
+        # An `ask` that came from the guard falling over is not the verdict the
+        # case is testing, and it matches half of these expectations by
+        # accident. Naming it keeps a crash from passing as a decision.
+        if "guard itself failed" in reason(out):
+            failures.append(f"heredoc: {command.splitlines()[0]!r} crashed the guard")
 
     with tempfile.TemporaryDirectory() as tree:
         redirects = REDIRECTS + [(f"printf x > {tree}/absolute.txt", None)]
@@ -229,6 +331,14 @@ def main():
             got = decision(run(CMD, payload, cwd=tree))
             if got != expected:
                 failures.append(f"redirect: {command!r} -> {got}, expected {expected}")
+
+    for mode, command, expected in BODIES:
+        payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
+                              "tool_input": {"command": command}})
+        got = decision(run(CMD, payload))
+        if got != expected:
+            failures.append(f"body: {mode} {command.splitlines()[0]!r} -> {got}, "
+                            f"expected {expected}")
 
     for mode, command, expected in SHADOWED:
         payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
@@ -481,9 +591,12 @@ def main():
             if got != expected:
                 failures.append(f"boundary: {payload[:50]!r} -> {got}, expected {expected}")
 
+    crash_checks = check_crashed(failures)
+
     for f in failures:
         print(f)
-    total = (len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
+    total = (crash_checks + len(BODIES)
+             + len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
              + len(SHADOWED) + len(MODES) + len(QUOTED)
              + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1
              + authority_checks)
