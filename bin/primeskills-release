@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -105,6 +106,22 @@ def changed_since(at):
     return sorted(skills), core
 
 
+def instant(text):
+    """An ISO timestamp as a moment, or None if it will not parse.
+
+    Ordering these as strings was wrong in a way that only showed once the
+    gate had real work to do: `primeskills-run` records UTC and git records
+    the committer's own offset, so 06:45+00:00 sorts before 09:21+03:00 while
+    being 24 minutes later. A naive stamp is read as UTC, which is what the
+    recorder writes.
+    """
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
 def missing_livecalls(at):
     """Changed skill × host pairs without a live-call note made since `at`.
 
@@ -115,7 +132,7 @@ def missing_livecalls(at):
     about this release's changes, so a call recorded for the previous tag
     must not satisfy this one.
     """
-    since = git("show", "-s", "--format=%cI", at).stdout.strip()
+    since = instant(git("show", "-s", "--format=%cI", at).stdout.strip())
     skills, core_changed = changed_since(at)
     if not skills and not core_changed:
         return []
@@ -130,8 +147,9 @@ def missing_livecalls(at):
                 e = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            when = instant(str(e.get("ts", "")))
             if (e.get("kind") != "note" or e.get("stage") != "livecall"
-                    or str(e.get("ts", "")) < since):
+                    or when is None or (since is not None and when < since)):
                 continue
             text = str(e.get("text", "")).lower()
             for n in names:
