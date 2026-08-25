@@ -49,7 +49,9 @@ the task to another agent. Also on request: "save state", "checkpoint".
    commit and date on anything closed, an entry for what was found, and on
    work still moving a stage line named for the chain:
    `**Этап:** vet — green, waiting on land (<anchor>)`. No queue file: create
-   one → **verify:** nothing closed without a commit, every stage line anchored
+   one. Then `primeskills-run may commit` and commit the queue file by itself;
+   a closed rung leaves it in the tree and says so → **verify:** the rung was
+   checked, nothing closed without a commit, every stage line anchored
 
 ## Stop conditions
 - Tests are red: say so in the notes and do not imply the work is resumable
