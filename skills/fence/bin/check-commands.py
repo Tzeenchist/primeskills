@@ -196,6 +196,30 @@ def head_words(head):
         return re.findall(r"[^\s|&;<>()]+", head)
 
 
+COMMAND_BREAK = re.compile(r"\|\||&&|[|;&]|\$\(|`|\(")
+
+
+def head_executes(head):
+    """Does anything in front of `<<` run what the document says?
+
+    The consumer is the command the heredoc hangs off, and that is neither
+    always the first word of the line nor always the last. `echo x | bash
+    <<'SH'` read `echo`, called a shell script a document and dropped it -- in
+    every mode, not only where confirmations are off. `psql -c "$(cat <<'SQL'`
+    hands its text to psql through cat, so the last word is wrong too. Every
+    word standing in command position is checked, and only those: a head that
+    merely mentions an interpreter -- `echo 'run bash later' > notes.md` --
+    still writes a document.
+    """
+    for chunk in COMMAND_BREAK.split(head):
+        words = head_words(chunk)
+        while words and (words[0] in ("sudo", "time", "nohup") or "=" in words[0]):
+            words = words[1:]
+        if words and Path(words[0]).name in INTERPRETERS:
+            return True
+    return False
+
+
 def without_inert_heredocs(command):
     """The command text to judge, with document bodies taken out of it.
 
@@ -216,10 +240,7 @@ def without_inert_heredocs(command):
         if not hit:
             continue
         marker = hit.group(2)
-        head = head_words(line.split("<<")[0])
-        while head and (head[0] in ("sudo", "time", "nohup") or "=" in head[0]):
-            head = head[1:]
-        executes = bool(head) and Path(head[0]).name in INTERPRETERS
+        executes = head_executes(line.split("<<")[0])
         body = []
         while i < len(lines) and lines[i].strip() != marker:
             body.append(lines[i])

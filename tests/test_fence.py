@@ -154,6 +154,33 @@ HEREDOCS = [
      f"{WIPE}\nEOF\n)\"", "ask"),
     # ... and still a command where the consumer executes what it reads
     ('psql -c "$(cat <<\'SQL\'\nDROP DATABASE prod;\nSQL\n)"', "ask"),
+    # PS-063: the consumer of a heredoc is the command it hangs off, not the
+    # first word of the line. `head[0]` read `echo` here and threw a shell
+    # script away as a document -- open in *both* modes, not only under
+    # confirmations-off.
+    (f"echo x | bash <<'SH'\n{WIPE}\nSH", "ask"),
+    (f"true && bash <<'SH'\n{WIPE}\nSH", "ask"),
+    # ... while a head that merely mentions an interpreter still writes a
+    # document: only a word in command position counts.
+    (f"echo 'run bash later' > notes.md <<'EOF'\n{WIPE}\nEOF", None),
+]
+
+
+# PS-063, and the line it stops at. A body after a pipe is now judged like the
+# same command one level up. What the guard deliberately does NOT do is tell
+# code from data inside a body that is not shell: a delete quoted in a python
+# body reads as text, matches a rule carrying no rung, and a rungless verdict
+# passes where confirmations are off. Attaching a rung there was tried and
+# dropped -- it refused ordinary prose about deletes, twice while the entry for
+# it was being written. In `default` it still asks. Pinned so the boundary
+# moves on purpose.
+BODIES = [
+    ("bypassPermissions", f"echo x | bash <<'SH'\n{WIPE}\nSH", "deny"),
+    ("default", f"echo x | bash <<'SH'\n{WIPE}\nSH", "ask"),
+    ("default", f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", "ask"),
+    ("bypassPermissions", f"python3 - <<'PY'\nimport os\nos.system('{WIPE}')\nPY", None),
+    ("bypassPermissions", "python3 - <<'PY'\nimport os\nos.system('rm -rf build')\nPY", None),
+    ("bypassPermissions", f"cat > notes.md <<'EOF'\n{WIPE}\nEOF", None),
 ]
 
 
@@ -304,6 +331,14 @@ def main():
             got = decision(run(CMD, payload, cwd=tree))
             if got != expected:
                 failures.append(f"redirect: {command!r} -> {got}, expected {expected}")
+
+    for mode, command, expected in BODIES:
+        payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
+                              "tool_input": {"command": command}})
+        got = decision(run(CMD, payload))
+        if got != expected:
+            failures.append(f"body: {mode} {command.splitlines()[0]!r} -> {got}, "
+                            f"expected {expected}")
 
     for mode, command, expected in SHADOWED:
         payload = json.dumps({"tool_name": "Bash", "permission_mode": mode,
@@ -560,7 +595,7 @@ def main():
 
     for f in failures:
         print(f)
-    total = (crash_checks
+    total = (crash_checks + len(BODIES)
              + len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
              + len(SHADOWED) + len(MODES) + len(QUOTED)
              + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1
