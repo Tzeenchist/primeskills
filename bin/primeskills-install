@@ -749,7 +749,8 @@ def main():
               f"installs from {ROOT}. Use --pin/--unpin to move the pin.")
 
     agents = args.agents or list(TARGETS) + ["kimi"]
-    verb = "remove" if args.uninstall else ("link" if args.apply else "would link")
+    verb = ("remove" if args.apply else "would remove") if args.uninstall \
+        else ("link" if args.apply else "would link")
     recorded = manifest_read()
     created = {}
 

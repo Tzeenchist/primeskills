@@ -582,6 +582,15 @@ def main():
         if "core would be removed from instructions" not in dry:
             failures.append(f"сухое удаление не сказало would:\n{dry}")
 
+        checks += 1
+        # "would remove 29 skills" contains "remove 29 skills", so the bare
+        # verb has to be anchored to where the line actually starts it
+        if ": remove 29 skills" in dry:
+            failures.append(f"сухое удаление отчиталось о снятии скиллов:\n{dry}")
+        checks += 1
+        if "would remove 29 skills" not in dry:
+            failures.append(f"сухое удаление не сказало would про скиллы:\n{dry}")
+
         # the point of all of the above: nothing was created
         checks += 1
         stray = [p for p in ((h / ".config" / "opencode" / "agents" / "prime-analyst.md"),
