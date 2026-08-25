@@ -118,6 +118,24 @@ def main():
         if ("new", "codex") not in missing:
             failures.append("протухшая запись закрыла гейту глаза")
 
+        # PS-054. Timestamps are instants, not strings. `primeskills-run` writes
+        # UTC and git writes the committer's local offset, so a note made after
+        # the tag can still sort before it character by character -- 06:45+00:00
+        # against 09:21+03:00 is 24 minutes later and lexicographically earlier.
+        # The fixture above never caught it: year 2099 is far enough ahead that
+        # string order and time order happen to agree.
+        checks += 1
+        tag_at = git(repo, "show", "-s", "--format=%cI", at)
+        from datetime import datetime, timedelta
+        later = (datetime.fromisoformat(tag_at) + timedelta(minutes=25))
+        utc = later.astimezone(__import__("datetime").timezone.utc).isoformat()
+        fresh = [json.dumps({**note("new", "codex"), "ts": utc})]
+        (run_dir / name).write_text("\n".join(fresh) + "\n", encoding="utf-8")
+        if ("new", "codex") in mod.missing_livecalls(at):
+            failures.append(
+                f"запись {utc} сделана позже тега {tag_at}, а гейт счёл её "
+                f"протухшей — время сравнивается строками")
+
         print(f"{checks + 2} checks, {len(failures)} failed")
     for f in failures:
         print(f)
