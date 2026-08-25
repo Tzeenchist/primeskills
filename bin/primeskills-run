@@ -534,12 +534,34 @@ def cmd_clear(path, argv):
 
 
 def age_minutes(entry):
-    then = datetime.fromisoformat(entry["ts"])
+    """Minutes since the entry was written, or None when the stamp is unreadable.
+
+    The journal is append-only text and gets hand-edited. Judged one entry at a
+    time this raised only when the bad line was the last one; read as a list it
+    would take down every mandate of the rung -- and a check that raises closes
+    the rung, so a single mistyped line would revoke the lot.
+    """
+    try:
+        then = datetime.fromisoformat(entry["ts"])
+    except (KeyError, TypeError, ValueError):
+        return None
     return (datetime.now(timezone.utc) - then).total_seconds() / 60
 
 
+def unexpired(entry):
+    """Is this mandate still within the lifetime it was given?"""
+    age = age_minutes(entry)
+    return age is not None and age <= entry.get("lifetime", LIFETIME["ordinary"])
+
+
 def open_grants(entries):
-    """rung -> the entry that opened it: not revoked, not spent.
+    """rung -> the entries that opened it, oldest first: not revoked, not spent.
+
+    A list, not one entry. Several mandates of one rung stand at once whenever
+    two branches are in flight -- a finding from one PR moving into the next --
+    and keeping only the newest made a mandate that had not expired invisible.
+    The workaround was to grant again, which is how a journal of permission
+    turns into a habit of writing permission to get past a check (PS-064).
 
     Expiry is answered by the caller on purpose: an expired mandate must say
     it expired, not read as never granted — «not granted» sends the user
@@ -549,22 +571,34 @@ def open_grants(entries):
     for e in entries:
         kind, rung = e.get("kind"), e.get("rung")
         if kind == "grant":
-            out[rung] = e
-        elif kind in ("revoke", "spent"):
+            out.setdefault(rung, []).append(e)
+        elif kind == "revoke":
             out.pop(rung, None)
+        elif kind == "spent":
+            if rung not in out:
+                continue
+            if "target" in e:
+                out[rung] = [g for g in out[rung] if g.get("target") != e["target"]]
+                if not out[rung]:
+                    out.pop(rung)
+            else:
+                # written before PS-064, when a spend named no target: the only
+                # safe reading is that it closed whatever was open
+                out.pop(rung, None)
     return out
 
 
 def mandates(entries, at=None):
-    """rung -> the entry that opened it: not revoked, not spent, not expired.
+    """rung -> the entries that opened it: not revoked, not spent, not expired.
 
     A permission with no end is a switch wearing a ladder's clothes. The first
     version stored one and answered `granted` a month later, which sat badly
     next to deploy's own invariant that prior permission for one deploy is not
     permission for the next.
     """
-    return {rung: e for rung, e in open_grants(entries).items()
-            if age_minutes(e) <= e.get("lifetime", LIFETIME["ordinary"])}
+    out = {rung: [e for e in es if unexpired(e)]
+           for rung, es in open_grants(entries).items()}
+    return {rung: es for rung, es in out.items() if es}
 
 
 def cmd_grant(path, argv):
@@ -650,36 +684,65 @@ def rung_state(path, rung, target, spend=True, peek=False):
     the breaker. One path also means one place where a single-use mandate is
     spent, instead of two that can disagree about whether it was.
     """
-    hit = open_grants(permission_entries(path)).get(rung)
-    if not hit:
+    grants = open_grants(permission_entries(path)).get(rung, [])
+    if not grants:
         return 1, (f"{rung}: not granted. Ask, then "
                    f"`primeskills-run grant {rung} \"<what the user allowed>\"`.")
-    lifetime = hit.get("lifetime", LIFETIME["ordinary"])
-    age = age_minutes(hit)
-    if age > lifetime:
-        return 1, (f"{rung}: истёк {int(age)} мин назад (мандат был выдан на "
+    live = [g for g in grants if unexpired(g)]
+    if not live:
+        newest = grants[-1]
+        lifetime = newest.get("lifetime", LIFETIME["ordinary"])
+        age = age_minutes(newest)
+        when = f"{int(age)} мин назад" if age is not None else "неизвестно когда"
+        return 1, (f"{rung}: истёк {when} (мандат был выдан на "
                    f"{lifetime} мин). Ask, then `primeskills-run grant {rung} "
                    f"\"<what the user allowed>\"`.")
-    # A peek with no target of its own asks a different question: "is anything
-    # open here, and for what?" It gets the mandate's target back and compares
-    # on its own terms -- the `fence` hook knows the command, not the wording
-    # the user chose.
-    if hit.get("target") and not (peek and target is None) and hit["target"] != target:
-        if target is None:
-            return 1, (f"{rung}: the mandate is bound to {hit['target']!r}. "
+
+    # A mandate with no target covers any target: it is the broader yes, and a
+    # later named one does not narrow it — each grant is its own yes with its
+    # own lifetime. The named one is preferred where it matches, so asking for
+    # a target does not spend the broader mandate.
+    general = [g for g in live if not g.get("target")]
+    exact = [g for g in live if target and g.get("target") == target]
+    named_live = [g for g in live if g.get("target")]
+
+    if exact:
+        hit = exact[0]
+    elif general:
+        hit = general[0]
+    elif target is None:
+        # A peek with no target of its own asks a different question: "is
+        # anything open here, and for what?" It gets the targets back and
+        # compares on its own terms -- the `fence` hook knows the command, not
+        # the wording the user chose.
+        if not peek:
+            bound = ", ".join(repr(g["target"]) for g in named_live)
+            return 1, (f"{rung}: the mandate is bound to {bound}. "
                        f"Ask for it by name: "
-                       f"`may {rung} --target {hit['target']}`.")
-        return 1, (f"{rung}: granted for {hit['target']!r}, asked for {target!r}. "
+                       f"`may {rung} --target {named_live[0]['target']}`.")
+        hit = named_live[0]
+    else:
+        bound = ", ".join(repr(g["target"]) for g in named_live)
+        return 1, (f"{rung}: granted for {bound}, asked for {target!r}. "
                    f"A permission for one target is not a permission for another.")
+
     if rung in SENSITIVE and not target and not peek:
         return 1, f"{rung}: name the target — `may {rung} --target <what>`."
     spent = ""
     if hit.get("once") and spend:
-        append(ledger_path(path), {"kind": "spent", "rung": rung})
+        append(ledger_path(path), {"kind": "spent", "rung": rung,
+                                   "target": hit.get("target")})
         spent = ", spent by this check"
-    named = f" target={hit['target']}" if peek and hit.get("target") else ""
+    if peek and target is None:
+        # Every open target, because the caller weighs them against the command
+        # itself. None at all while a mandate covers anything, or the hook would
+        # demand a match the mandate does not require.
+        named = "" if general else "".join(f" target={g['target']}"
+                                           for g in named_live)
+    else:
+        named = f" target={hit['target']}" if peek and hit.get("target") else ""
     return 0, (f"{rung}: granted{named} — {hit['scope']} "
-               f"(выдан {int(age)} мин назад{spent})")
+               f"(выдан {int(age_minutes(hit))} мин назад{spent})")
 
 
 def cmd_may(path, argv):
@@ -847,7 +910,8 @@ def cmd_ship(path, argv):
             return 1
     code = cmd_check(path, [stage])
     ladder = mandates(permission_entries(path))
-    open_now = [f"{r}: {ladder[r]['scope'][:60]}" for r in RUNGS if r in ladder]
+    open_now = [f"{r}: {e['scope'][:60]}" for r in RUNGS
+                for e in ladder.get(r, [])]
     print("open rungs: " + ("; ".join(open_now) if open_now else "none"))
     return code
 
@@ -875,8 +939,9 @@ def cmd_show(path):
     print("## Заявленные полномочия (журнал, не гейт)\n")
     if open_rungs:
         for rung in RUNGS:
-            if rung in open_rungs:
-                print(f"- **{rung}** — {open_rungs[rung]['scope']}")
+            for e in open_rungs.get(rung, []):
+                at = f" ({e['target']})" if e.get("target") else ""
+                print(f"- **{rung}**{at} — {e['scope']}")
     else:
         print("- nothing granted: every rung of the ladder still asks")
     print()
