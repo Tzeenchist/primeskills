@@ -552,6 +552,13 @@ def decide(raw):
     parsed, unreadable = segments(command)
 
     verdict = None                     # (reason, rung or None, target or None)
+    # The segment that produced the verdict, not the whole line. Matching a
+    # mandate's target against the line let anything else in it satisfy the
+    # permission: on 2026-08-25 every push passed because the diagnostic
+    # `may push --target X` stood to the left of it, never because the push
+    # named X. Where no single segment produced the verdict, this stays None
+    # and the line is used, as before.
+    segment = None
     authority_verdict = False
     for tokens, text in parsed:
         if tokens[0] == "rm":
@@ -560,6 +567,7 @@ def decide(raw):
                 targets = [t for t in tokens[1:] if not t.startswith("-")]
                 out = [t for t in targets if escapes(t, cwd)]
                 verdict = (reason, "delete" if out else None, out[0] if out else None)
+                segment = text
                 break
         if tokens[0] == "git":
             reason = git_verdict(tokens)
@@ -571,6 +579,7 @@ def decide(raw):
         if hit:
             rung, why = hit
             verdict = (why, rung, first_target(tokens))
+            segment = text
             break
         rule = next((r for pat, r in RULES
                      if not (pat.startswith("rm") and tokens[0] == "rm")
@@ -605,6 +614,7 @@ def decide(raw):
             rung = command_rung(tokens)
             if rung:
                 verdict = (f"this command requires the {rung} rung", rung, None)
+                segment = _text
                 authority_verdict = True
                 break
 
@@ -652,7 +662,8 @@ def decide(raw):
         where = journal_cwd(command, cwd)
         code, said = run_tool(["may", rung, "--peek"], where)
         named = re.search(r"target=(\S+)", said or "")
-        covered = code == 0 and (not named or named.group(1).lower() in command.lower())
+        where_named = (segment or command).lower()
+        covered = code == 0 and (not named or named.group(1).lower() in where_named)
         if covered:
             run_tool(["note", "guard", f"allowed under an open {rung}: {command[:120]}"],
                      where)

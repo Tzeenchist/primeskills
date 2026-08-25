@@ -321,6 +321,33 @@ def main():
             if "repositor" not in said.lower():
                 failures.append(f"отказ не назвал настоящую причину: {said!r}")
 
+        # PS-057. The target was matched against the whole line, so a mandate
+        # was satisfied by any mention of its target anywhere — including the
+        # diagnostic call people put to the left of the real command. Every
+        # push of 2026-08-25 passed that way: `may push --target X && git push`
+        # named X in the left half, never in the push.
+        subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
+                        "grant", "push", "--target", "example/repo",
+                        "проба сверки цели"], cwd=repo, env=env,
+                       capture_output=True, text=True)
+        for command, expected, why in [
+                ("echo example/repo && git push origin work", "deny",
+                 "цель названа в соседнем звене, а не в самом push"),
+                ("git push --repo example/repo origin work", None,
+                 "цель названа в самой команде — мандат покрывает")]:
+            payload = json.dumps({"tool_name": "Bash",
+                                  "permission_mode": "bypassPermissions",
+                                  "cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            authority_checks += 1
+            if got != expected:
+                failures.append(f"звено цели: {command!r} -> {got}, "
+                                f"ожидалось {expected} ({why})")
+        subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
+                        "revoke", "push"], cwd=repo, env=env,
+                       capture_output=True, text=True)
+
         for command, rung, grant in AUTHORITY:
             p = subprocess.run([sys.executable, str(ROOT / "bin" / "primeskills-run"),
                                 "grant", *grant], cwd=repo, env=env,
