@@ -525,6 +525,94 @@ def main():
     if not mod.under_root(str(mod.ROOT / "skills")):
         failures.append("собственный каталог не опознан как наш")
 
+    # PS-053. A dry run described writes it never made: three status lines were
+    # built from `remove`/`present` alone and never consulted `apply_it`, so
+    # `primeskills-install kilo` printed "core added to instructions" beside
+    # "would link 29 skills" -- one run, one output block, two tenses. The
+    # last check here is the one that matters: it asks the filesystem whether
+    # the dry run stayed dry, not the wording whether it claims it did.
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+
+        # config branch: a config must exist, or bootstrap() returns
+        # "no config, skipped" and never reaches the line under test
+        kilo_cfg = h / ".config" / "kilo" / "kilo.json"
+        kilo_cfg.parent.mkdir(parents=True)
+        kilo_cfg.write_text("{}\n", encoding="utf-8")
+        # a host whose directory is absent is skipped before the line under
+        # test is ever reached (bin/primeskills-install:772)
+        (h / ".claude").mkdir()
+        (h / ".config" / "opencode").mkdir(parents=True)
+
+        dry = run(tmp, "kilo").stdout
+        checks += 1
+        if "core added to instructions" in dry:
+            failures.append("сухой ход отчитался о записи core в instructions")
+        checks += 1
+        if "core would be added to instructions" not in dry:
+            failures.append(f"сухой ход не сказал would про instructions:\n{dry}")
+        checks += 1
+        if json.loads(kilo_cfg.read_text(encoding="utf-8")) != {}:
+            failures.append("сухой ход всё-таки записал конфиг")
+
+        # always-loaded branch
+        dry = run(tmp, "claude").stdout
+        checks += 1
+        if "core pointer added to CLAUDE.md" in dry:
+            failures.append("сухой ход отчитался о записи указателя core")
+        checks += 1
+        if "core pointer would be added to CLAUDE.md" not in dry:
+            failures.append(f"сухой ход не сказал would про указатель:\n{dry}")
+
+        # profile branch
+        dry = run(tmp, "opencode").stdout
+        checks += 1
+        if "prime-analyst linked into" in dry:
+            failures.append("сухой ход отчитался о создании профиля")
+        checks += 1
+        if "prime-analyst would be linked into" not in dry:
+            failures.append(f"сухой ход не сказал would про профиль:\n{dry}")
+
+        # removal is dry too
+        dry = run(tmp, "kilo", "--uninstall").stdout
+        checks += 1
+        if "core removed from instructions" in dry:
+            failures.append("сухое удаление отчиталось о снятии core")
+        checks += 1
+        if "core would be removed from instructions" not in dry:
+            failures.append(f"сухое удаление не сказало would:\n{dry}")
+
+        checks += 1
+        # "would remove 29 skills" contains "remove 29 skills", so the bare
+        # verb has to be anchored to where the line actually starts it
+        if ": remove 29 skills" in dry:
+            failures.append(f"сухое удаление отчиталось о снятии скиллов:\n{dry}")
+        checks += 1
+        if "would remove 29 skills" not in dry:
+            failures.append(f"сухое удаление не сказало would про скиллы:\n{dry}")
+
+        # the point of all of the above: nothing was created
+        checks += 1
+        stray = [p for p in ((h / ".config" / "opencode" / "agents" / "prime-analyst.md"),
+                             (h / ".claude" / "CLAUDE.md"))
+                 if p.exists()]
+        if stray:
+            failures.append(f"сухой ход создал файлы: {stray}")
+
+    # and the wording survives a real run: --apply still speaks in the past
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+        kilo_cfg = h / ".config" / "kilo" / "kilo.json"
+        kilo_cfg.parent.mkdir(parents=True)
+        kilo_cfg.write_text("{}\n", encoding="utf-8")
+        wet = run(tmp, "kilo", "--apply").stdout
+        checks += 1
+        if "core added to instructions" not in wet:
+            failures.append(f"боевой прогон потерял прежнюю строку:\n{wet}")
+        checks += 1
+        if "would" in wet:
+            failures.append(f"боевой прогон заговорил сослагательно:\n{wet}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

@@ -151,12 +151,14 @@ def profile(agent, apply_it, remove):
     ours = dest.is_symlink() and os.path.realpath(dest) == str(src)
     if exists and not ours:
         return f"prime-analyst: {dest} exists and is not ours, left alone"
-    if apply_it:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if exists:
-            dest.unlink()
-        if not remove:
-            dest.symlink_to(src)
+    if not apply_it:
+        return ("prime-analyst would be removed" if remove else
+                f"prime-analyst would be linked into {dest.parent.name}/")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if exists:
+        dest.unlink()
+    if not remove:
+        dest.symlink_to(src)
     return ("prime-analyst removed" if remove else
             f"prime-analyst linked into {dest.parent.name}/")
 
@@ -203,14 +205,17 @@ def bootstrap(agent, apply_it, remove):
         instructions = data.get("instructions", [])
         want = [str(ROOT / "core" / f) for f in CORE_FILES]
         present = all(w in instructions for w in want)
-        if apply_it:
-            instructions = [i for i in instructions if i not in want]
-            if not remove:
-                instructions += want
-            data["instructions"] = instructions
-            backup_once(config)
-            write_atomic(config, json.dumps(data, indent=2) + "\n",
-                         check=json.loads)
+        if not apply_it:
+            return ("core already in instructions" if present and not remove
+                    else "core would be removed from instructions" if remove
+                    else "core would be added to instructions")
+        instructions = [i for i in instructions if i not in want]
+        if not remove:
+            instructions += want
+        data["instructions"] = instructions
+        backup_once(config)
+        write_atomic(config, json.dumps(data, indent=2) + "\n",
+                     check=json.loads)
         return ("core already in instructions" if present and not remove
                 else "core removed from instructions" if remove
                 else "core added to instructions")
@@ -223,11 +228,14 @@ def bootstrap(agent, apply_it, remove):
         return (f"{target.name}: primeskills markers are damaged "
                 f"({text.count(BEGIN)} begin, {text.count(END)} end) — fix by hand, left alone")
     cleaned, had = strip_block(text)
-    if apply_it:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        backup_once(target)
-        write_atomic(target,
-                     cleaned if remove else (cleaned.rstrip() + "\n\n" + bootstrap_text() + "\n"))
+    if not apply_it:
+        return (f"core pointer would be removed from {target.name}" if remove
+                else f"core pointer would be "
+                     f"{'refreshed in' if had else 'added to'} {target.name}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    backup_once(target)
+    write_atomic(target,
+                 cleaned if remove else (cleaned.rstrip() + "\n\n" + bootstrap_text() + "\n"))
     return (f"core pointer removed from {target.name}" if remove
             else f"core pointer {'refreshed in' if had else 'added to'} {target.name}")
 
@@ -741,7 +749,8 @@ def main():
               f"installs from {ROOT}. Use --pin/--unpin to move the pin.")
 
     agents = args.agents or list(TARGETS) + ["kimi"]
-    verb = "remove" if args.uninstall else ("link" if args.apply else "would link")
+    verb = ("remove" if args.apply else "would remove") if args.uninstall else \
+           ("link" if args.apply else "would link")
     recorded = manifest_read()
     created = {}
 
