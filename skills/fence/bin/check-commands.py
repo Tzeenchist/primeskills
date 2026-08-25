@@ -728,11 +728,18 @@ def decide(raw):
                 # over: the text is held to the `rm` rules the tokens would
                 # have answered, and what survives passes with a journal line
                 # saying it went unread.
-                if text_only_verdict(command):
-                    return deny("part of this line could not be parsed and it "
-                                "names a recursive delete, so it is refused "
-                                "rather than asked. Rewrite it so the quoting "
-                                "balances, or say what it should remove.")
+                why = text_only_verdict(command)
+                if why:
+                    # The reason comes from the rule that matched, not from a
+                    # sentence written next to one of them. Only the `rm` arm is
+                    # reachable here today -- the destructive list is matched
+                    # against the whole line further up -- so a message spelled
+                    # `recursive delete` would start lying the day that order
+                    # changes rather than fail.
+                    return deny(f"part of this line could not be parsed and it "
+                                f"{why}, so it is refused rather than asked. "
+                                f"Rewrite it so the quoting balances, or say "
+                                f"what it should remove.")
                 run_tool(["note", "guard",
                           f"allowed unread (unbalanced quotes): {command[:120]}"], cwd)
                 return ALLOW
