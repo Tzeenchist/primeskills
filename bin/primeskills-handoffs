@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """List every checkpoint saved on this machine, newest first.
 
-`core/OUTPUT.md` §Session start reads exactly one: the file named after the
-current branch. Everything written on another branch is invisible to everyone,
-and once that branch is deleted its checkpoint is an orphan -- the file is
-alive, no session will ever open it again. That is what this program answers:
-what has been saved, when it was last touched, and which of those checkpoints
-nothing points at any more.
+`core/OUTPUT.md` §Session start reads exactly one: the section of
+`checkpoint.md` named for the current branch. Everything written for another
+branch is invisible to everyone, and once that branch is deleted its section is
+an orphan -- the text is alive, no session will ever open it again. That is what
+this program answers: what has been saved, when it was last touched, and which
+of those checkpoints nothing points at any more. Files written under the older
+one-per-branch scheme are listed too, so nothing already saved drops out.
 
 Three sources, in this order: the trees named on the command line, the tree the
 caller stands in, or the register of trees the set has worked in
@@ -23,6 +24,7 @@ the program it runs.
 """
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -92,6 +94,22 @@ def trees_of(n):
     return plural(n, "дереве", "деревьях", "деревьях")
 
 
+def entries(stem, body):
+    """Branches this checkpoint file speaks for, and the words each one gets.
+
+    One file per tree with a `## <branch>` section each replaced one file per
+    branch: with several live branches the state scattered, and merged branches
+    left files behind — 5 of 11 checkpoints on this machine were orphans. Files
+    written under the old name still answer for the branch they are named
+    after, so nothing already saved drops out of the picker.
+    """
+    heads = re.findall(r"^## +(\S.*?)\s*$", body, re.M)
+    if stem != "checkpoint" or not heads:
+        return [(stem, len(body.split()))]
+    parts = re.split(r"^## +\S.*?\s*$", body, flags=re.M)[1:]
+    return [(h, len(part.split())) for h, part in zip(heads, parts)]
+
+
 def rows_of(top, here_branch):
     """Every checkpoint of one tree, plus what only that tree can answer."""
     root = top / ".primeskills" / "handoff"
@@ -104,17 +122,18 @@ def rows_of(top, here_branch):
         if not inside(path, top):
             skipped.append(path)
             continue
-        branch = str(path.relative_to(root).with_suffix("")).replace("\\", "/")
-        exists = git("show-ref", "--verify", "--quiet",
-                     f"refs/heads/{branch}", cwd=top)[0] == 0
-        rows.append({
-            "branch": branch,
-            "mtime": path.stat().st_mtime,
-            "words": len(path.read_text(encoding="utf-8",
-                                        errors="replace").split()),
-            "mark": ("текущая ветка" if branch == here_branch
-                     else "" if exists else "ветки нет — сирота"),
-        })
+        body = path.read_text(encoding="utf-8", errors="replace")
+        stem = str(path.relative_to(root).with_suffix("")).replace("\\", "/")
+        for branch, words in entries(stem, body):
+            exists = git("show-ref", "--verify", "--quiet",
+                         f"refs/heads/{branch}", cwd=top)[0] == 0
+            rows.append({
+                "branch": branch,
+                "mtime": path.stat().st_mtime,
+                "words": words,
+                "mark": ("текущая ветка" if branch == here_branch
+                         else "" if exists else "ветки нет — сирота"),
+            })
     rows.sort(key=lambda r: r["mtime"], reverse=True)
     return rows, skipped
 

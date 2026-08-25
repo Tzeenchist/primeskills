@@ -12,6 +12,8 @@ Approaching a usage limit, ending a session with work unfinished, or passing
 the task to another agent. Also on request: "save state", "checkpoint".
 
 ## Invariants
+- One checkpoint a tree, branches as sections in it. A file per branch scatters
+  a tree's state and leaves one behind whenever a branch is deleted.
 - The checkpoint lives beside the work, in the repository's `.primeskills/`,
   not in a home directory: it has to survive a cleared context and a different
   agent on this machine. It does not travel — it is not committed (PS-022) —
@@ -33,17 +35,15 @@ the task to another agent. Also on request: "save state", "checkpoint".
    message that raised it
 3. Drop items the record shows as resolved → **verify:** nothing carried over
    contradicts a decision already written down
-4. Write `.primeskills/handoff/<branch>.md` with: what is being worked on,
+4. Write `.primeskills/handoff/checkpoint.md`, one `## <branch>` section per
+   branch, replacing this branch's and marking any whose branch is gone, with:
+   what is being worked on,
    1–3 sentences of summary, decisions and why, remaining work in priority
    order, and notes — gotchas, blockers, open questions, approaches tried that
    did not work → **verify:** a reader who was not here could act on it
-5. Record it: `primeskills-run note handoff "<branch>.md written"` → **verify:**
-   `.primeskills/.gitignore` exists and `git status` does not offer the file.
-   The checkpoint stays in this tree. It is read automatically at the start of
-   the next session, so committing it would let anyone who can push to the
-   branch write that opening context — and it carries blockers and dead ends
-   that were never meant for a pull request. Say where the file is and that it
-   does not travel
+5. Record it: `primeskills-run note handoff "<branch> section written"`
+   → **verify:** `.primeskills/.gitignore` exists and `git status` does not
+   offer the file. Say where it is and that it does not travel
 6. Reconcile the queue with this session, checkpoint first so a spent budget
    costs one file, not two. `merge` closes what landed; finish the rest — a
    commit and date on anything closed, an entry for what was found, and on
