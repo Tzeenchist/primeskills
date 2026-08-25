@@ -286,6 +286,25 @@ def main():
             checks += 1
             failures.append(f"{skill.parent.name}: role write, но писать нечем")
 
+    # A skill that names a command the host cannot resolve is an instruction
+    # that fails silently -- the installer says so itself, and then shipped a
+    # list two names short: `fence` verifies with `primeskills-doctor` and
+    # `release` calls `primeskills-release`, neither of which reached PATH.
+    # Found 2026-08-25 by `cline` running fence live: exit 127.
+    named = set()
+    for doc in list((ROOT / "skills").glob("*/SKILL.md")) + list((ROOT / "core").glob("*.md")):
+        named.update(re.findall(r"primeskills-[a-z]+", doc.read_text(encoding="utf-8")))
+    installer = (ROOT / "bin" / "primeskills-install").read_text(encoding="utf-8")
+    listed = set(re.findall(r"primeskills-[a-z]+",
+                            re.search(r"SHARED_TOOLS = \(([^)]*)\)", installer).group(1)))
+    for name in sorted(named - listed):
+        checks += 1
+        failures.append(f"{name} назван в скиллах, но не в SHARED_TOOLS — "
+                        f"на PATH его не будет")
+    for name in sorted(listed - named):
+        checks += 1
+        failures.append(f"{name} в SHARED_TOOLS, но ни один скилл его не зовёт")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")
