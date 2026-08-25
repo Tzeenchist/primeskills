@@ -1,7 +1,7 @@
 ---
 name: handoff
 description: Use to save working state so another session or agent can resume without losing the thread
-budget: 500
+budget: 550
 role: write
 ---
 
@@ -21,6 +21,8 @@ the task to another agent. Also on request: "save state", "checkpoint".
   from the previous checkpoint. Copying is how finished work stays open (G6).
 - What was tried and failed is the most valuable section. It is the part the
   next reader cannot reconstruct.
+- The queue is committed and the checkpoint is not. Done in one beside open in
+  the other makes the next reader trust the wrong file.
 
 ## Procedure
 1. Gather state: `git status --short`, `git diff --cached --stat`,
@@ -42,6 +44,12 @@ the task to another agent. Also on request: "save state", "checkpoint".
    branch write that opening context — and it carries blockers and dead ends
    that were never meant for a pull request. Say where the file is and that it
    does not travel
+6. Reconcile the queue with this session, checkpoint first so a spent budget
+   costs one file, not two. `merge` closes what landed; finish the rest — a
+   commit and date on anything closed, an entry for what was found, and on
+   work still moving a stage line named for the chain:
+   `**Этап:** vet — green, waiting on land (<anchor>)`. No queue file: create
+   one → **verify:** nothing closed without a commit, every stage line anchored
 
 ## Stop conditions
 - Tests are red: say so in the notes and do not imply the work is resumable
@@ -49,8 +57,8 @@ the task to another agent. Also on request: "save state", "checkpoint".
 - Uncommitted work you did not write: leave it, name it in the notes.
 
 ## Output
-The path to the checkpoint file and a two-sentence statement of where the work
-stands.
+The checkpoint's path, two sentences on where the work stands, and which queue
+entries changed.
 
 ## References
 `core/OUTPUT.md` covers reading a checkpoint back at session start.
