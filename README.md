@@ -143,8 +143,8 @@ permissions do — tell the agent what you allow, and it records your answer.
 ## Skills and chains
 
 You can call a skill yourself — `/debug` — but usually you do not have to: the
-agent picks by the description. Five skills call others in order and stop where
-the decision is yours.
+agent picks by the description. Six skills call others in order and stop where
+the decision is yours; `/lazy` is the whole pipeline with one stop in it.
 
 ```
 /autoplan   idea → brief → plan → review by three roles
