@@ -583,12 +583,15 @@ def main():
             failures.append(f"сухое удаление не сказало would:\n{dry}")
 
         checks += 1
-        # "would remove 29 skills" contains "remove 29 skills", so the bare
-        # verb has to be anchored to where the line actually starts it
-        if ": remove 29 skills" in dry:
+        # "would remove 30 skills" contains "remove 30 skills", so the bare
+        # verb has to be anchored to where the line actually starts it. The
+        # count is read from the set: written by hand it went stale the first
+        # time a skill was added.
+        want = len(list(ROOT.glob("skills/*/SKILL.md")))
+        if f": remove {want} skills" in dry:
             failures.append(f"сухое удаление отчиталось о снятии скиллов:\n{dry}")
         checks += 1
-        if "would remove 29 skills" not in dry:
+        if f"would remove {want} skills" not in dry:
             failures.append(f"сухое удаление не сказало would про скиллы:\n{dry}")
 
         # the point of all of the above: nothing was created

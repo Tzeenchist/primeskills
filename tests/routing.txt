@@ -24,6 +24,7 @@ get this reviewed and into a pull request -> close
 merge the approved branch into main -> merge
 put this on the staging server -> deploy
 take it all the way out to production -> release
+carry this idea through to a deployed change -> lazy
 the reviewer asked for changes, rework the branch -> revise
 answer the review comments and rework -> revise
 this endpoint got slower, where is the time going -> measure

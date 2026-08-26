@@ -32,15 +32,15 @@ does. A skill's full text loads only when that skill is needed.
 > — Ilya Priymak, author
 
 ```
-always in context        466 words for all 29 skills
+always in context        482 words for all 30 skills
 shared rules             2 816 words, once per session
-one skill call           3 564 … 3 982 words
+one skill call           3 580 … 3 998 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
 it rather than a promise: the linter refuses a skill that pushes a call over the
 ceiling. A sequence pays for the chain it calls and is deliberately outside that
-ceiling — `primeskills-status` prints what each one costs, up to about 6 250. For comparison, one pass of the gstack set costs about 92 000 words —
+ceiling — `primeskills-status` prints what each one costs, up to about 12 400. For comparison, one pass of the gstack set costs about 92 000 words —
 measured in `bench/RESULT.md`.
 
 ## Discipline and evidence
@@ -151,6 +151,7 @@ the decision is yours.
 /cycle      implement → verify → debug, until it is green
 /close      verify → review the diff → exercise the app → pull request
 /release    pull request → merge → deploy
+/lazy       idea → plan → build → review → merge → deploy, one stop
 /teams      review a plan: product, engineering, interface
 ```
 
@@ -229,6 +230,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules.
 `docs/RULE-COVERAGE.md` — which rule is held by what: a machine check or an
-honestly-named insurance policy. `TODOS.md` — the queue. Version 0.9.22: the set
+honestly-named insurance policy. `TODOS.md` — the queue. Version 0.10.0: the set
 works, but it has not yet proved itself by measurement on live tasks, and
 `PS-009` says in advance at which numbers it gets folded back.
