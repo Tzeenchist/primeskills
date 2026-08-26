@@ -38,7 +38,7 @@ STAGES = [
     ("make", ["build", "debug", "cycle"]),
     ("check", ["verify", "vet", "probe", "measure", "ui"]),
     ("hand over", ["land", "revise", "merge", "close"]),
-    ("ship", ["deploy", "release"]),
+    ("ship", ["deploy", "release", "lazy"]),
     ("keep", ["handoff", "handon", "fence", "prose", "primeskills"]),
 ]
 
