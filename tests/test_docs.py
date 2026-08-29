@@ -305,6 +305,28 @@ def main():
         checks += 1
         failures.append(f"{name} в SHARED_TOOLS, но ни один скилл его не зовёт")
 
+    # The picker is named in one place or it drifts. `handon` carried its own
+    # copy of the four host tool names, and when the register outgrew the
+    # picker's four slots the copy had no rule for it — the menu failed open
+    # and printed a numbered list instead (2026-08-29, owner). One statement
+    # in §Asking, referenced from the skills, and the overflow rule lives with
+    # the names it belongs to.
+    asking = (ROOT / "core" / "OUTPUT.md").read_text(encoding="utf-8")
+    checks += 1
+    if not re.search(r"picker holds", asking):
+        failures.append("core/OUTPUT.md §Asking не говорит, что делать, когда "
+                        "вариантов больше, чем держит пикер — без этого "
+                        "длинный список молча становится набором номера")
+    for skill in sorted((ROOT / "skills").glob("*/SKILL.md")):
+        body = skill.read_text(encoding="utf-8").split("---", 2)[-1]
+        copied = [name for name in ("AskUserQuestion", "request_user_input")
+                  if name in body]
+        checks += 1
+        if copied:
+            failures.append(f"{skill.parent.name}: {', '.join(copied)} названы "
+                            f"в теле скилла — вторая копия §Asking, которая "
+                            f"разойдётся с ней; ссылаться на OUTPUT §Asking")
+
     # A bullet above the first version header belongs to no release: it prints
     # nowhere and ships nowhere. It happens when a branch is cut from an older
     # version than the one the entry is written into — twice on 2026-08-25 —

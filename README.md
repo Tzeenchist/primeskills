@@ -33,8 +33,8 @@ does. A skill's full text loads only when that skill is needed.
 
 ```
 always in context        482 words for all 30 skills
-shared rules             2 840 words, once per session
-one skill call           3 604 … 4 022 words
+shared rules             2 894 words, once per session
+one skill call           3 658 … 4 076 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
@@ -230,6 +230,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules.
 `docs/RULE-COVERAGE.md` — which rule is held by what: a machine check or an
-honestly-named insurance policy. `TODOS.md` — the queue. Version 0.10.1: the set
+honestly-named insurance policy. `TODOS.md` — the queue. Version 0.10.2: the set
 works, but it has not yet proved itself by measurement on live tasks, and
 `PS-009` says in advance at which numbers it gets folded back.

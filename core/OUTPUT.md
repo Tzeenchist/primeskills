@@ -53,6 +53,11 @@ A choice among enumerable options goes to the host's picker, named by name:
 instead of opening a menu. Not among this turn's tools, or the options are
 open-ended: numbered list or plain question.
 
+More options than the picker holds — four in Claude Code — is not one of those
+cases. Batch them: offer the likeliest, spend the last slot on "ещё →", re-ask
+with the next batch. A long list is the set's bookkeeping, and dropping to
+"type a number" makes the user pay for it.
+
 ## Deliver in readable pieces
 When something needs the user's approval, hand it over in chunks short enough
 to actually read. A wall of text is not a review.
