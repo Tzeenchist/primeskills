@@ -159,8 +159,9 @@ SKILL_FILE = re.compile(r"(?:^|/)skills/([a-z0-9-]+)/SKILL\.md")
 
 
 def call(calls, tool, skill=None, path="", cmd="", raw=None, inferred=False,
-         call_id=None, returncode=None):
+         call_id=None, returncode=None, skills=None):
     calls.append({"n": len(calls) + 1, "tool": tool, "skill": skill,
+                  "skills": list(skills) if skills else ([skill] if skill else []),
                   "path": str(path or ""), "cmd": str(cmd or ""),
                   "inferred": inferred and bool(skill),
                   "raw": raw if raw is not None else str(cmd or path or ""),
@@ -205,17 +206,75 @@ def output_exits(value):
     return [found] if found is not None else []
 
 
+SLASH = re.compile(r"<command-name>\s*/([a-z0-9-]+)\s*</command-name>")
+SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
+_OUR_SKILLS = None
+
+
+def our_skills():
+    """Names of the set, read once from the checkout this program lives in."""
+    global _OUR_SKILLS
+    if _OUR_SKILLS is None:
+        _OUR_SKILLS = ({d.name for d in SKILLS_DIR.iterdir()
+                        if (d / "SKILL.md").is_file()}
+                       if SKILLS_DIR.is_dir() else set())
+    return _OUR_SKILLS
+
+
+def message_text(content):
+    """Claude Code writes a user turn as a string or as a list of blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(i.get("text", "") for i in content
+                        if isinstance(i, dict) and i.get("type") == "text")
+    return ""
+
+
+def flow_closure(name, seen=None):
+    """A flow plus every skill it declares it can call, transitively."""
+    seen = seen if seen is not None else set()
+    if name in seen:
+        return seen
+    seen.add(name)
+    for nxt in calls_of(name, SKILLS_DIR):
+        flow_closure(nxt, seen)
+    return seen
+
+
+def named_skills(path, cmd):
+    """Every skill a single action loaded, in the order it named them.
+
+    PS-073: this used to return the first match only. In Codex a flow arrives
+    as one `exec_command` chaining the core files and the chain of skills with
+    `&&`, so four bodies read together counted as one invocation -- the first
+    name in the string -- and the other three vanished. Owner's ruling
+    2026-08-30: four bodies read is four invocations.
+    """
+    seen = []
+    for text in (path, cmd):
+        for hit in SKILL_FILE.finditer(text or ""):
+            if hit.group(1) not in seen:
+                seen.append(hit.group(1))
+    return seen
+
+
 def named_skill(path, cmd):
-    """Outside Claude Code a skill has no invocation event: the host hands the
-    agent a directory and the agent reads SKILL.md. Reading that file is the
-    only trace, so it counts as the invocation -- weaker evidence than an
-    explicit event, and it is the evidence those hosts leave."""
-    hit = SKILL_FILE.search(path) or SKILL_FILE.search(cmd)
-    return hit.group(1) if hit else None
+    """The first skill of an action, which is the one its span is keyed on."""
+    names = named_skills(path, cmd)
+    return names[0] if names else None
 
 
 def load_claude(path):
-    """Claude Code: one JSON object per line, tool_use inside message content."""
+    """Claude Code: one JSON object per line, tool_use inside message content.
+
+    PS-073: a skill typed as `/lazy` is not a `tool_use` at all -- it arrives as
+    a user turn carrying `<command-name>`. Counting only `tool_use` meant the
+    way a person actually reaches for the set was worth nothing: a session with
+    `/handon`, `/moderate` twice and `/close` twice reported two calls, the two
+    made through the `Skill` tool. That is a bias against deliberate use, in a
+    number the adoption criterion is read from.
+    """
     calls = []
     by_id = {}
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -224,7 +283,14 @@ def load_claude(path):
                 event = json.loads(line)
             except ValueError:
                 continue
-            content = (event.get("message") or {}).get("content")
+            message = event.get("message") or {}
+            content = message.get("content")
+            if message.get("role") == "user":
+                # a slash command is stated, not inferred: never dropped later
+                for name in SLASH.findall(message_text(content)):
+                    if name in our_skills():
+                        call(calls, "SlashCommand", name, "", "",
+                             f"/{name}")
             if not isinstance(content, list):
                 continue
             for item in content:
@@ -284,7 +350,9 @@ def load_codex(path):
                     cmd = json.loads('"' + piece + '"') if piece else ""
                 except ValueError:
                     cmd = piece
-                call(calls, "Bash", named_skill("", cmd), "", cmd, raw[:400], inferred=True)
+                names = named_skills("", cmd)
+                call(calls, "Bash", names[0] if names else None, "", cmd,
+                     raw[:400], inferred=True, skills=names)
                 indexes.append(len(calls) - 1)
             if payload.get("call_id"):
                 pending[payload["call_id"]] = indexes
@@ -314,10 +382,10 @@ def load_kimi(path):
             target = args.get("file_path") or args.get("filePath") or args.get("path") or ""
             cmd = args.get("command") or args.get("cmd") or ""
             name = inner.get("name", "?")
-            found = None if name in WRITING_TOOLS else named_skill(str(target), str(cmd))
-            call(calls, name, found, target, cmd,
+            names = [] if name in WRITING_TOOLS else named_skills(str(target), str(cmd))
+            call(calls, name, names[0] if names else None, target, cmd,
                  json.dumps(args, ensure_ascii=False)[:400], inferred=True,
-                 call_id=inner.get("toolCallId"))
+                 call_id=inner.get("toolCallId"), skills=names)
             if inner.get("toolCallId"):
                 by_id[inner["toolCallId"]] = calls[-1]
     return calls
@@ -348,10 +416,10 @@ def load_opencode(db, session_id):
         name = TOOL_ALIASES.get(str(part.get("tool", "")).lower(), part.get("tool", "?"))
         target = args.get("filePath") or args.get("file_path") or args.get("path") or ""
         cmd = args.get("command") or ""
-        found = None if name in WRITING_TOOLS else named_skill(str(target), str(cmd))
-        call(calls, name, found, target, cmd,
+        names = [] if name in WRITING_TOOLS else named_skills(str(target), str(cmd))
+        call(calls, name, names[0] if names else None, target, cmd,
              json.dumps(args, ensure_ascii=False)[:400], inferred=True,
-             returncode=explicit_exit(state))
+             returncode=explicit_exit(state), skills=names)
     con.close()
     return calls
 
@@ -375,12 +443,22 @@ def drop_non_invocations(calls):
     """
     editing = any(c["tool"] in WRITING_TOOLS and SKILL_FILE.search(c["path"] + c["cmd"])
                   for c in calls)
-    distinct = {c["skill"] for c in calls if c.get("inferred") and c["skill"]}
+    distinct = {n for c in calls if c.get("inferred") for n in c.get("skills", [])}
     if not editing and len(distinct) < STUDY_THRESHOLD:
         return calls
+    # PS-073: a flow explains its own reads. `lazy` declares a chain of about
+    # nineteen bodies, so every honest run of it crossed this threshold and was
+    # thrown away as study -- the rule punished exactly the sessions that used
+    # the most of the set. Reads that stay inside one flow's declared closure
+    # are that flow running, not somebody paging through the directory.
+    if not editing:
+        for name in sorted(distinct):
+            if calls_of(name, SKILLS_DIR) and distinct <= flow_closure(name):
+                return calls
     for c in calls:
         if c.get("inferred"):
             c["skill"] = None
+            c["skills"] = []
     return calls
 
 
@@ -668,6 +746,10 @@ def check_target_resolved(calls):
 def report(path, skills_dir, quiet=False):
     calls = load_calls(path)
     found = spans(calls)
+    # One action can load several bodies (PS-073). Each is an invocation and is
+    # counted; the stretch of work that follows is still one stretch, so it is
+    # judged once, under the first name the action gave.
+    invocations = [n for c in calls for n in c.get("skills", [])]
     core_at = next((c["n"] for c in calls
                     if any(f in c["raw"] for f in CORE_FILES)), None)
     # Two questions, two tallies. Mixing them produced one number that answered
@@ -680,7 +762,8 @@ def report(path, skills_dir, quiet=False):
 
     if not quiet:
         print(f"\n{path}")
-        print(f"  вызовов инструментов: {len(calls)}   вызовов скиллов: {len(found)}")
+        print(f"  вызовов инструментов: {len(calls)}   "
+              f"вызовов скиллов: {len(invocations)}")
         print(f"  core/ прочитан: {'действие #' + str(core_at) if core_at else 'нет'}")
 
     order = [s["skill"] for s in found]
@@ -723,7 +806,7 @@ def report(path, skills_dir, quiet=False):
             mark = "ok  " if verdict == "ok" else "НАРУШЕН"
             print(f"  [{mark}] цель разрешена до разрушения (G8) — #{n}: {safe(cmd)}")
 
-    return {"skills": [s["skill"] for s in found], "core_at": core_at,
+    return {"skills": invocations, "core_at": core_at,
             "tally": tally, "guard": guard, "by_rule": by_rule,
             "on_set": wrote_into_the_set(calls)}
 
