@@ -116,6 +116,33 @@ def sections_of(top, body, here_branch):
     return marks
 
 
+STAMP = re.compile(r"<!--\s*handoff:\s*([0-9T:+\-]{10,32})\s*-->")
+
+
+def written_at(body):
+    """When the newest section says it was written, or None.
+
+    PS-068: the row used to be dated by `st_mtime`, which any touch moves --
+    a `sed` over the file, a copy, this program's own reader on some systems.
+    Caught on 2026-08-29 lying by three days in the fresher direction, which
+    is the worse one: freshness is what the reader picks a tree by. `handoff`
+    now stamps each section it writes, so the row can say when the record was
+    made instead of when the file was last poked. Files written before the
+    stamp existed have none, and those rows say which clock they are on rather
+    than pretending.
+    """
+    best = None
+    for hit in STAMP.findall(body):
+        try:
+            when = time.strptime(hit[:16], "%Y-%m-%dT%H:%M")
+        except ValueError:
+            continue
+        stamped = time.mktime(when)
+        if best is None or stamped > best:
+            best = stamped
+    return best
+
+
 def rows_of(top, here_branch):
     """One row per checkpoint file of the tree, newest first.
 
@@ -146,7 +173,10 @@ def rows_of(top, here_branch):
             what = f"{stem}.md (сирота)"
         else:
             what = f"{stem}.md"
-        rows.append({"what": what, "mtime": path.stat().st_mtime})
+        stamped = written_at(body)
+        rows.append({"what": what if stamped else what + "  [время файла]",
+                     "mtime": stamped if stamped else path.stat().st_mtime,
+                     "stamped": stamped is not None})
     rows.sort(key=lambda r: r["mtime"], reverse=True)
     return rows, skipped
 

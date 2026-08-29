@@ -1,7 +1,7 @@
 ---
 name: handoff
 description: Use to save working state so another session or agent can resume without losing the thread
-budget: 550
+budget: 580
 role: write
 ---
 
@@ -13,51 +13,53 @@ the task to another agent. Also on request: "save state", "checkpoint".
 
 ## Invariants
 - One checkpoint a tree, branches as sections in it. A file per branch scatters
-  a tree's state and leaves one behind whenever a branch is deleted.
+  a tree's state and orphans one whenever a branch is deleted.
 - The checkpoint lives beside the work, in the repository's `.primeskills/`,
-  not in a home directory: it has to survive a cleared context and a different
-  agent on this machine. It does not travel — it is not committed (PS-022) —
-  so a hand-off to another machine needs the text itself, not a promise that
-  the file will be there.
+  not a home directory: it must survive a cleared context and another agent on
+  this machine. It does not travel — it is not committed (PS-022) — so a
+  hand-off to another machine needs the text itself, not a promise that the
+  file will be there.
 - Remaining work is assembled from the repository and the record, never copied
   from the previous checkpoint. Copying is how finished work stays open (G6).
-- What was tried and failed is the most valuable section. It is the part the
-  next reader cannot reconstruct.
+- What was tried and failed is the most valuable section: the part the next
+  reader cannot reconstruct.
 - The queue is committed and the checkpoint is not. Done in one beside open in
   the other makes the next reader trust the wrong file.
 
 ## Procedure
 1. Gather state: `git status --short`, `git diff --cached --stat`,
-   `git log --oneline -10` → **verify:** the branch and the modified files are
+   `git log --oneline -10` → **verify:** the branch and modified files are
    what you expect
 2. Rebuild remaining work from that state and from the decisions recorded this
    session → **verify:** every item names an anchor — a file, a commit, or the
    message that raised it
 3. Drop items the record shows as resolved → **verify:** nothing carried over
-   contradicts a decision already written down
+   contradicts a decision already written
 4. Write `.primeskills/handoff/checkpoint.md`, one `## <branch>` section per
-   branch, replacing this branch's. A section whose branch is gone collapses
-   to one italic line: the branch, where its work landed, the date —
-   remaining work moved to a surviving section or the queue first. Keep, with:
-   the work,
-   1–3 sentences of summary, decisions, remaining work in priority
-   order, and notes — gotchas, blockers, open questions, approaches that
-   failed → **verify:** a reader who was not here could act on it
+   branch, replacing this branch's. Open each section with
+   `<!-- handoff: <ISO 8601 local> -->` — the date `primeskills-handoffs` sorts
+   by; without it a row falls back to the file's mtime and says so (PS-068).
+   A section whose branch is gone collapses to one italic line: the branch,
+   where its work landed, the date — remaining work moved to a surviving
+   section or the queue first. Keep, with: the work, 1–3 sentences of summary,
+   decisions, remaining work in priority order, and notes — gotchas, blockers,
+   open questions, approaches that failed
+   → **verify:** a reader who was not here could act on it
 5. Record it: `primeskills-run note handoff "<branch> section written"`
    → **verify:** `.primeskills/.gitignore` exists and `git status` does not
    offer the file. Say where it is
 6. Reconcile the queue with this session, checkpoint first so a spent budget
    costs one file, not two. `merge` closes what landed; finish the rest — a
    commit and date on anything closed, an entry for what was found, and on
-   work still moving a stage line named for the chain:
+   work still moving a stage line named for the chain step:
    `**Этап:** vet — green, waiting on land (<anchor>)`. No queue file: create
-   one. Then `primeskills-run may commit` and commit the queue file by itself.
-   A closed rung leaves it in the tree and says so — never grant yourself the
-   rung to get past it → **verify:** the rung was checked and not written,
+   one. Then `primeskills-run may commit` and commit the queue alone. A closed
+   rung leaves it in the tree and says so — never grant yourself the rung
+   → **verify:** the rung was checked and not written,
    nothing closed without a commit, every stage line anchored
 
 ## Stop conditions
-- Tests are red: say so in the notes and do not imply the work is resumable
+- Tests are red: say so in the notes and never imply the work is resumable
   without a fix.
 - Uncommitted work you did not write: leave it, name it in the notes.
 

@@ -293,6 +293,43 @@ def main():
         want("←текущая" in rows[0] and "←текущая" not in rows[1],
              f"метка текущей не только у дерева, где стоишь:\n{done.stdout}")
 
+    # PS-068. The row used to be dated by st_mtime, which any touch moves: on
+    # 2026-08-29 a list claimed a checkpoint was three days fresher than the
+    # record inside it, and freshness is what a reader picks a tree by. The
+    # date now comes from the stamp `handoff` writes, and a file without one
+    # says which clock it is on instead of pretending.
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp) / "home"
+        home.mkdir()
+        top = Path(tmp) / "tree"
+        top.mkdir()
+        repo(top)
+        # stamped in the past, touched just now: the stamp must win
+        checkpoint(top, "stamped",
+                   "# checkpoint\n\n## stamped\n\n"
+                   "<!-- handoff: 2026-01-02T03:04 -->\n\nтут\n",
+                   when=time.time())
+        # no stamp at all, and touched longer ago
+        checkpoint(top, "plain", "# checkpoint\n\n## plain\nтут\n",
+                   when=time.time() - 86400 * 30)
+        register(home, top)
+        out = run(top, home=home).stdout
+        rows = [l for l in out.splitlines() if l.startswith("  [")]
+        want(len(rows) == 2, f"ждали две строки, вышло {len(rows)}:\n{out}")
+
+        stamped = [l for l in rows if "stamped" in l]
+        plain = [l for l in rows if "plain" in l]
+        want(len(stamped) == 1 and "2026-01-02 03:04" in stamped[0],
+             f"дата взята не из записи, а из mtime:\n{out}")
+        want(len(stamped) == 1 and "[время файла]" not in stamped[0],
+             f"запись со штампом помечена как время файла:\n{out}")
+        want(len(plain) == 1 and "[время файла]" in plain[0],
+             f"запись без штампа не сказала, что показывает время файла:\n{out}")
+        # and the order follows the same date, not the touch
+        want(rows.index(plain[0]) < rows.index(stamped[0]),
+             f"сортировка всё ещё идёт по mtime:\n{out}")
+
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")
