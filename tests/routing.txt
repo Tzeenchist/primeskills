@@ -35,3 +35,5 @@ strip machine tells before this text is published -> prose
 clean up the draft so it does not read as machine written -> prose
 print the guide to this set of skills -> primeskills
 which skill do I use for that -> primeskills
+what order should we work the queue in -> moderate
+reorder the backlog so nothing starts blocked -> moderate

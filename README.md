@@ -32,9 +32,9 @@ does. A skill's full text loads only when that skill is needed.
 > — Ilya Priymak, author
 
 ```
-always in context        482 words for all 30 skills
+always in context        499 words for all 31 skills
 shared rules             2 894 words, once per session
-one skill call           3 658 … 4 076 words
+one skill call           3 675 … 4 093 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
@@ -143,7 +143,7 @@ permissions do — tell the agent what you allow, and it records your answer.
 ## Skills and chains
 
 You can call a skill yourself — `/debug` — but usually you do not have to: the
-agent picks by the description. Six skills call others in order and stop where
+agent picks by the description. Seven skills call others in order and stop where
 the decision is yours; `/lazy` is the whole pipeline with one stop in it.
 
 ```
@@ -153,6 +153,7 @@ the decision is yours; `/lazy` is the whole pipeline with one stop in it.
 /release    pull request → merge → deploy
 /lazy       idea → plan → build → review → merge → deploy, one stop
 /teams      review a plan: product, engineering, interface
+/moderate   order a queue: check it, unblock the head, review it
 ```
 
 The rest are called one at a time. All of them, because the small ones earn
@@ -230,6 +231,6 @@ line by line in `docs/SKILL-SOURCES.md`.
 `CHANGELOG.md` — what changed. `PLAN.md` — the intent and the principles.
 `docs/SKILL-FORMAT.md` — the skill format and the linter rules.
 `docs/RULE-COVERAGE.md` — which rule is held by what: a machine check or an
-honestly-named insurance policy. `TODOS.md` — the queue. Version 0.10.2: the set
+honestly-named insurance policy. `TODOS.md` — the queue. Version 0.11.0: the set
 works, but it has not yet proved itself by measurement on live tasks, and
 `PS-009` says in advance at which numbers it gets folded back.
