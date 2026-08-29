@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """The checkpoint list must show what nothing else shows: the orphans.
 
-`core/OUTPUT.md` opens one checkpoint, the one named after the current branch.
-Everything here is about the rest of them -- a file written on a branch that is
-gone reads as an ordinary row unless the program says the branch is gone, and
-that row is exactly the one PS-050 was raised for.
+One checkpoint a tree: the file `checkpoint.md`, branches as sections inside
+it, and the row is the file -- the reader opens it whole and finds their
+branch among the sections. Everything here is about what that row must still
+reveal: which branch is the one this session opens by itself, and which
+section (or legacy file) names a branch that is gone -- the one PS-050 was
+raised for.
 """
 import json
 import os
@@ -139,8 +141,8 @@ def main():
         want("заметка" not in done.stdout,
              "в список попал файл, который не чекпоинт")
 
-    # 5. The list itself: every checkpoint, newest first, with the date it was
-    #    last touched and the branch it belongs to.
+    # 5. The list itself: one row per checkpoint file, newest first, with the
+    #    date it was last touched. Legacy per-branch files are rows too.
     with tempfile.TemporaryDirectory() as tmp:
         top = Path(tmp)
         repo(top)
@@ -165,7 +167,7 @@ def main():
 
         # the current branch is named, so the reader can see which one the
         # session would have opened by itself
-        want("текущая ветка" in done.stdout,
+        want("←текущая" in lines[1],
              f"чекпоинт текущей ветки не помечен:\n{done.stdout}")
 
     # 5b. Numbered, in print order and across trees: the four hosts draw a list
@@ -199,8 +201,8 @@ def main():
         done = run(top)
         want("сирота" in done.stdout,
              f"чекпоинт без ветки не помечен как сирота:\n{done.stdout}")
-        want(done.stdout.count("←") == 2,
-             f"пометок должно быть две — текущая и сирота:\n{done.stdout}")
+        want(done.stdout.count("←") == 1,
+             f"пометка ←текущая должна быть одна, у живого:\n{done.stdout}")
 
     # 7. A checkpoint reached through a link out of the tree is not this tree's
     #    checkpoint. It becomes the next agent's opening context, so it is
@@ -222,10 +224,9 @@ def main():
         want(len(rows) == 1,
              f"в списке должен остаться один свой чекпоинт:\n{done.stdout}")
 
-    # PS-061. One checkpoint per tree, branches as sections inside it. A file
-    # per branch multiplied: 5 of the 11 checkpoints on this machine named
-    # branches that no longer existed, and a tree with several live branches
-    # scattered its state across as many files.
+    # PS-061. One checkpoint per tree, branches as sections inside it -- and
+    # one row per tree, whatever the section count: the file is what the
+    # reader opens, so the file is what the menu offers.
     with tempfile.TemporaryDirectory() as tmp:
         top = Path(tmp)
         repo(top)
@@ -236,21 +237,61 @@ def main():
                           "## feat-a\nполовина\n\n## feat-gone\nветки нет\n",
                           encoding="utf-8")
         out = run(top).stdout
-        want("master" in out and "feat-a" in out and "feat-gone" in out,
-             f"разделы одного файла не перечислены:\n{out}")
-        want(out.count("checkpoint.md") == 0 or "master" in out,
-             f"перечислен файл вместо разделов:\n{out}")
-        want("сирота" in out,
+        rows = [l for l in out.splitlines() if l.startswith("  [")]
+        want(len(rows) == 1,
+             f"один файл — одна строка, вышло {len(rows)}:\n{out}")
+        want("master" in rows[0] and "feat-a" in rows[0],
+             f"секции не перечислены в строке файла:\n{out}")
+        want("feat-gone" in rows[0] and "сирота" in rows[0],
              f"раздел без ветки не помечен сиротой:\n{out}")
-        want(len([l for l in out.splitlines() if l.strip().startswith("[")]) == 3,
-             f"ожидали три пронумерованных раздела:\n{out}")
+        want("←текущая" in out,
+             f"секция текущей ветки не помечена:\n{out}")
 
-        # a legacy per-branch file is still listed, so nothing written before
-        # this change disappears from the picker
+        # a legacy per-branch file is still a row, so nothing written before
+        # this change disappears from the menu
         checkpoint(top, "feat-legacy", "старый формат")
         out = run(top).stdout
+        rows = [l for l in out.splitlines() if l.startswith("  [")]
+        want(len(rows) == 2,
+             f"ждали две строки — файл и легаси, вышло {len(rows)}:\n{out}")
         want("feat-legacy" in out,
              f"старый файл-на-ветку перестал показываться:\n{out}")
+
+    # PS-061b. A checkpoint.md without branch sections is a plain row:
+    # "(сирота)" names a branch that was deleted, and here none ever existed.
+    with tempfile.TemporaryDirectory() as tmp:
+        top = Path(tmp)
+        repo(top)
+        single = top / ".primeskills" / "handoff" / "checkpoint.md"
+        single.parent.mkdir(parents=True, exist_ok=True)
+        single.write_text("# checkpoint\nтекст без секций\n", encoding="utf-8")
+        out = run(top).stdout
+        rows = [l for l in out.splitlines() if l.startswith("  [")]
+        want(len(rows) == 1,
+             f"файл без секций — одна строка, вышло {len(rows)}:\n{out}")
+        want("сирота" not in out,
+             f"файл без секций ложно помечен сиротой:\n{out}")
+
+    # PS-061c. Marks know where you stand: "--all" marks the current branch in
+    # the tree you stand in, never in the others.
+    with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as other, \
+            tempfile.TemporaryDirectory() as home:
+        one, two = Path(tmp), Path(other)
+        repo(one)
+        repo(two)
+        for top in (one, two):
+            single = top / ".primeskills" / "handoff" / "checkpoint.md"
+            single.parent.mkdir(parents=True, exist_ok=True)
+            single.write_text("# checkpoint\n\n## master\nтут\n",
+                              encoding="utf-8")
+        register(home, one, two)
+        done = run(one, "--all", home=home)
+        rows = [l for l in done.stdout.splitlines() if l.startswith("  [")]
+        want(len(rows) == 2,
+             f"ждали по строке на дерево, вышло {len(rows)}:\n{done.stdout}")
+        # the tree you stand in heads the list, so its row is the marked one
+        want("←текущая" in rows[0] and "←текущая" not in rows[1],
+             f"метка текущей не только у дерева, где стоишь:\n{done.stdout}")
 
     for f in failures:
         print(f)
