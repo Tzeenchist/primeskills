@@ -329,7 +329,6 @@ def main():
         want(rows.index(plain[0]) < rows.index(stamped[0]),
              f"сортировка всё ещё идёт по mtime:\n{out}")
 
-
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

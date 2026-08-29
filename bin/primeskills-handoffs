@@ -130,6 +130,11 @@ def written_at(body):
     made instead of when the file was last poked. Files written before the
     stamp existed have none, and those rows say which clock they are on rather
     than pretending.
+
+    A trailing UTC offset is accepted and then ignored: the stamp is read as
+    local time because a checkpoint never leaves the machine that wrote it
+    (PS-022). Honouring the offset would only matter for a file that cannot
+    get here.
     """
     best = None
     for hit in STAMP.findall(body):
@@ -175,9 +180,8 @@ def rows_of(top, here_branch):
             what = f"{stem}.md"
         stamped = written_at(body)
         rows.append({"what": what if stamped else what + "  [время файла]",
-                     "mtime": stamped if stamped else path.stat().st_mtime,
-                     "stamped": stamped is not None})
-    rows.sort(key=lambda r: r["mtime"], reverse=True)
+                     "when": stamped if stamped else path.stat().st_mtime})
+    rows.sort(key=lambda r: r["when"], reverse=True)
     return rows, skipped
 
 
@@ -190,7 +194,7 @@ def show(rows, first=1):
     make "3" an unambiguous choice everywhere, whatever the host draws.
     """
     for n, r in enumerate(rows, first):
-        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["when"]))
         print(f"  [{n}] {when}  {r['what']}")
     return first + len(rows)
 
