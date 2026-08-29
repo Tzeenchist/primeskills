@@ -116,6 +116,38 @@ def sections_of(top, body, here_branch):
     return marks
 
 
+STAMP = re.compile(r"<!--\s*handoff:\s*([0-9T:+\-]{10,32})\s*-->")
+
+
+def written_at(body):
+    """When the newest section says it was written, or None.
+
+    PS-068: the row used to be dated by `st_mtime`, which any touch moves --
+    a `sed` over the file, a copy, this program's own reader on some systems.
+    Caught on 2026-08-29 lying by three days in the fresher direction, which
+    is the worse one: freshness is what the reader picks a tree by. `handoff`
+    now stamps each section it writes, so the row can say when the record was
+    made instead of when the file was last poked. Files written before the
+    stamp existed have none, and those rows say which clock they are on rather
+    than pretending.
+
+    A trailing UTC offset is accepted and then ignored: the stamp is read as
+    local time because a checkpoint never leaves the machine that wrote it
+    (PS-022). Honouring the offset would only matter for a file that cannot
+    get here.
+    """
+    best = None
+    for hit in STAMP.findall(body):
+        try:
+            when = time.strptime(hit[:16], "%Y-%m-%dT%H:%M")
+        except ValueError:
+            continue
+        stamped = time.mktime(when)
+        if best is None or stamped > best:
+            best = stamped
+    return best
+
+
 def rows_of(top, here_branch):
     """One row per checkpoint file of the tree, newest first.
 
@@ -146,8 +178,10 @@ def rows_of(top, here_branch):
             what = f"{stem}.md (сирота)"
         else:
             what = f"{stem}.md"
-        rows.append({"what": what, "mtime": path.stat().st_mtime})
-    rows.sort(key=lambda r: r["mtime"], reverse=True)
+        stamped = written_at(body)
+        rows.append({"what": what if stamped else what + "  [время файла]",
+                     "when": stamped if stamped else path.stat().st_mtime})
+    rows.sort(key=lambda r: r["when"], reverse=True)
     return rows, skipped
 
 
@@ -160,7 +194,7 @@ def show(rows, first=1):
     make "3" an unambiguous choice everywhere, whatever the host draws.
     """
     for n, r in enumerate(rows, first):
-        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["when"]))
         print(f"  [{n}] {when}  {r['what']}")
     return first + len(rows)
 

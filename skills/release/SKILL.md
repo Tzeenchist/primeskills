@@ -28,9 +28,12 @@ handed over.
    answer, not an inference
 3. Call `merge` → **verify:** base branch carries the change and is green on the
    base
-4. Call the changed skills live in every host and record each with
-   `primeskills-run note livecall` → **verify:** `bin/primeskills-release`
-   finds no missing pair
+4. Only when the work being released is this set: call the changed skills live
+   in every host and record each with `primeskills-run note livecall`. Any
+   other project has no skills, no hosts and no pairs — say the step does not
+   apply and go on, rather than inventing something to satisfy it
+   → **verify:** `bin/primeskills-release` finds no missing pair, or you named
+   the step inapplicable and why
 5. Ask whether to deploy, and to where → **verify:** the environment is named by
    the user, not chosen by you
 6. Call `deploy` → **verify:** health checked on the environment, rollback known
