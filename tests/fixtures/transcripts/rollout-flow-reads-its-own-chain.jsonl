@@ -1,0 +1,7 @@
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c0", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/lazy/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c1", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/autoplan/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c2", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/brief/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c3", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/plan/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c4", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/cycle/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c5", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/build/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c6", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/verify/SKILL.md\"})"}}

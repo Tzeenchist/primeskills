@@ -211,6 +211,32 @@ def main():
         if ("new", "claude") in mod.missing_livecalls(at):
             failures.append("вызов после правки (13:00) не закрыл пару")
 
+        # PS-072. The gate measured from the tag being released, and that tag
+        # sits on HEAD by the program's own requirement -- so the range was
+        # always empty and no pair was ever asked for. This is PS-054 facing
+        # the other way: then every note was refused, then every release was
+        # waved through. Both times green meant "did not ask".
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=t",
+                        "-c", "user.email=t@t", "tag", "-a", "v9.1.0",
+                        "-m", "release being cut"], check=True)
+        checks += 1
+        if mod.previous_tag("v9.1.0") != "v9.0.0":
+            failures.append(f"предыдущим тегом сочли "
+                            f"{mod.previous_tag('v9.1.0')!r}, а не v9.0.0")
+        checks += 1
+        if mod.missing_livecalls("v9.1.0") != []:
+            failures.append("от выпускаемого тега диапазон обязан быть пуст — "
+                            "иначе фикстура не воспроизводит дефект")
+        checks += 1
+        from_previous = mod.missing_livecalls(mod.previous_tag("v9.1.0"))
+        if not any(n == "new" for n, _ in from_previous):
+            failures.append("от предыдущего тега гейт обязан увидеть навык "
+                            f"new, а увидел {sorted(from_previous)}")
+        checks += 1
+        if mod.previous_tag("v9.0.0") is not None:
+            failures.append("у первого тега предыдущего быть не может, "
+                            f"а нашли {mod.previous_tag('v9.0.0')!r}")
+
         print(f"{checks + 2} checks, {len(failures)} failed")
     for f in failures:
         print(f)

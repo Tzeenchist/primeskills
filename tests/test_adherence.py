@@ -18,6 +18,24 @@ FIX = ROOT / "tests" / "fixtures" / "transcripts"
 
 # fixture -> substrings that must all appear in the report
 EXPECT = {
+    # PS-073. A skill typed as `/handoff` is a user turn, not a `tool_use`, and
+    # counting only `tool_use` valued the way a person reaches for the set at
+    # zero. This fixture holds no Skill call at all.
+    "slash-command-counts.jsonl": [
+        "вызовов скиллов: 1 (handoff)",
+    ],
+    # PS-073. Reading five SKILL.md files is studying the set -- unless they are
+    # the chain one flow declares it calls. `lazy` names about nineteen, so
+    # every honest run of it used to be discarded as study, which punished the
+    # sessions that used the most of the set.
+    "rollout-flow-reads-its-own-chain.jsonl": [
+        "вызовов скиллов: 7 (autoplan, brief, build, cycle, lazy, plan, verify)",
+    ],
+    # ... and the rule it must not loosen: six skills that belong to no common
+    # flow are still somebody paging through the directory.
+    "rollout-reading-the-whole-directory.jsonl": [
+        "вызовов скиллов: 0",
+    ],
     "live-build-red-phase.jsonl": [
         "вызовов скиллов: 1 (build)",
         "core/ прочитан: действие #1",

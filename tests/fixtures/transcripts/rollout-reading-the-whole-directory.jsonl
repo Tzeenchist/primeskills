@@ -1,0 +1,6 @@
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c0", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/baby/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c1", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/fence/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c2", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/study/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c3", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/money/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c4", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/prose/SKILL.md\"})"}}
+{"type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "c5", "name": "exec", "input": "tools.exec_command({cmd:\"cat /home/agent/.primeskills/pinned/skills/ui/SKILL.md\"})"}}

@@ -122,8 +122,27 @@ def instant(text):
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
+def previous_tag(tag):
+    """The release before `tag`, or None when this is the first one.
+
+    PS-072: the gate used to measure from the tag being released. That tag sits
+    on HEAD -- this program requires it and warns when it does not -- so the
+    range was empty, no skill ever counted as changed, and the pairs were never
+    asked for. Caught on 2026-08-30 releasing 0.11.3, where three `SKILL.md`
+    files had changed since v0.11.2 and the gate said nothing. PS-054 was the
+    same defect facing the other way: then it refused every note, now it
+    accepted every release. What a release changed is measured from the release
+    before it.
+    """
+    found = git("describe", "--tags", "--abbrev=0", f"{tag}^")
+    name = found.stdout.strip()
+    return name if found.returncode == 0 and name and name != tag else None
+
+
 def missing_livecalls(at):
     """Changed skill × host pairs without a live-call note made since `at`.
+
+    `at` is the *previous* release, not the one being cut (PS-072).
 
     The note is `primeskills-run note livecall "<name>: what happened (<host>)"`
     recorded on the branch being released; its text must carry both the name
@@ -212,7 +231,9 @@ def main(argv):
         sys.exit("primeskills-release: дерево грязное — релиз описывает коммит, "
                  "а не рабочую копию")
 
-    missing = missing_livecalls(at)
+    # measured from the release before this one, not from this one (PS-072)
+    since = previous_tag(tag)
+    missing = missing_livecalls(since) if since else []
     if missing:
         lines = "\n".join(f"- {n}: нет живого вызова от {h}" for n, h in missing)
         sys.exit("primeskills-release: навыки/core менялись с прошлого тега, "
