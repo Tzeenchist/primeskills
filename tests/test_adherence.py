@@ -24,6 +24,14 @@ EXPECT = {
     "slash-command-counts.jsonl": [
         "вызовов скиллов: 1 (handoff)",
     ],
+    # PS-073, owner's ruling 2026-08-30: four bodies read is four invocations.
+    # In Codex a flow arrives as one `exec_command` chaining core and the chain
+    # of skills with `&&`; counting the first name only threw the rest away.
+    # One action, still one tool call -- three invocations inside it.
+    "rollout-one-command-four-bodies.jsonl": [
+        "вызовов инструментов: 1   вызовов скиллов: 3",
+        "вызовов скиллов: 3 (build, cycle, verify)",
+    ],
     # PS-073. Reading five SKILL.md files is studying the set -- unless they are
     # the chain one flow declares it calls. `lazy` names about nineteen, so
     # every honest run of it used to be discarded as study, which punished the
