@@ -350,27 +350,54 @@ def reason(out):
     return (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
 
 
+def disposable_repo(parent):
+    """A git repository nothing else writes to, for cases that must not read
+    the journal of the tree the suite is running in (PS-069)."""
+    repo = parent / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-q", "-m", "init"], cwd=repo, check=True)
+    return repo
+
+
 def main():
     failures = []
     cases = []
     authority_checks = 0
-    for payload, expected in COMMANDS:
-        got = decision(run(CMD, payload))
-        if got != expected:
-            failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+    # PS-069: these two tables carry rung-bearing commands -- `gh pr create`
+    # among them -- and used to be judged wherever the suite happened to stand.
+    # There the guard read the live `.primeskills/run/repo.jsonl`, so an open
+    # `pr` mandate turned the expected `ask` into an allow and the case went
+    # red for whoever was actually using mandates, while CI, whose fresh
+    # checkout has no journal at all, stayed green. A verdict that depends on
+    # the runner's permissions is not a verdict (G7).
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = disposable_repo(Path(tmp))
+        env = os.environ.copy()
+        env["PATH"] = str(ROOT / "bin") + os.pathsep + env.get("PATH", "")
+        env["HOME"] = str(repo)
 
-    for command, expected in HEREDOCS:
-        payload = json.dumps({"tool_input": {"command": command}})
-        out = run(CMD, payload)
-        got = decision(out)
-        if got != expected:
-            failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
-                            f"expected {expected}")
-        # An `ask` that came from the guard falling over is not the verdict the
-        # case is testing, and it matches half of these expectations by
-        # accident. Naming it keeps a crash from passing as a decision.
-        if "guard itself failed" in reason(out):
-            failures.append(f"heredoc: {command.splitlines()[0]!r} crashed the guard")
+        for payload, expected in COMMANDS:
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            if got != expected:
+                failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+
+        for command, expected in HEREDOCS:
+            payload = json.dumps({"cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            out = run(CMD, payload, cwd=repo, env=env)
+            got = decision(out)
+            if got != expected:
+                failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
+                                f"expected {expected}")
+            # An `ask` that came from the guard falling over is not the verdict
+            # the case is testing, and it matches half of these expectations by
+            # accident. Naming it keeps a crash from passing as a decision.
+            if "guard itself failed" in reason(out):
+                failures.append(f"heredoc: {command.splitlines()[0]!r} crashed the guard")
 
     with tempfile.TemporaryDirectory() as tree:
         redirects = REDIRECTS + [(f"printf x > {tree}/absolute.txt", None)]

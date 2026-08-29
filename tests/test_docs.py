@@ -97,6 +97,28 @@ def main():
             failures.append(f"{doc.name}: {name} назван {hit.group(1).strip()}, "
                             f"линтер держит {want}")
 
+    # 3a. PS-066: how many skills call others was written as a word -- "Seven
+    #     skills" / "Семь навыков" -- and every check here looks for digits, so
+    #     the sixth flow made both headers false and all twelve suites stayed
+    #     green. The count is a digit now and it is checked, because the fix
+    #     that only corrects today's number leaves the same silence for the
+    #     eighth flow. A single digit is below the three-character floor of the
+    #     cross-README comparison below, hence its own rule.
+    flows = sum(1 for p in sorted((ROOT / "skills").glob("*/SKILL.md"))
+                if "\ntier: flow" in p.read_text(encoding="utf-8"))
+    for doc, pattern in (
+        (ROOT / "README.md", r"(\d+) skills call others in order"),
+        (ROOT / "README.ru.md", r"(\d+) навыков вызывают другие по порядку"),
+    ):
+        checks += 1
+        hit = re.search(pattern, doc.read_text(encoding="utf-8"))
+        if not hit:
+            failures.append(f"{doc.name}: счёт потоков не найден цифрой — "
+                            f"числительное словом эта проверка не видит (PS-066)")
+        elif int(hit.group(1)) != flows:
+            failures.append(f"{doc.name}: потоков названо {hit.group(1)}, "
+                            f"в наборе {flows}")
+
     # 3b. Two READMEs are one statement in two languages. What they must not do
     #     is disagree about the facts, so the numbers are compared.
     en = (ROOT / "README.md").read_text(encoding="utf-8")
