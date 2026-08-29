@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """List every checkpoint saved on this machine, newest first.
 
-`core/OUTPUT.md` §Session start reads exactly one: the section of
-`checkpoint.md` named for the current branch. Everything written for another
-branch is invisible to everyone, and once that branch is deleted its section is
-an orphan -- the text is alive, no session will ever open it again. That is what
-this program answers: what has been saved, when it was last touched, and which
-of those checkpoints nothing points at any more. Files written under the older
-one-per-branch scheme are listed too, so nothing already saved drops out.
+One checkpoint a tree: the file `.primeskills/handoff/checkpoint.md`, with a
+`## <branch>` section per branch inside it. The file is the unit, so the row
+is the file -- the reader opens it whole and finds their branch among the
+sections themselves, instead of picking a branch blind from a menu. A branch
+name still shows on the row (the current one marked), so "which of these is
+mine" costs one glance, not a question. Files written under the older
+one-per-branch scheme are rows too, so nothing already saved drops out.
 
-Three sources, in this order: the trees named on the command line, the tree the
-caller stands in, or the register of trees the set has worked in
+Three sources, in this order: the trees named on the command line, the tree
+the caller stands in, or the register of trees the set has worked in
 (`~/.primeskills/trees.json`). The register exists because the first version
 answered "not inside a git repository" and stopped -- and agents are started
-from `$HOME`, where that is the normal case, not the edge one. Eight checkpoints
-in seven trees were invisible from there (2026-08-21, reported by OpenCode and
-Kimi). The filesystem is never scanned: what is listed is where the set has
-already worked, or what the caller named.
+from `$HOME`, where that is the normal case, not the edge one. Eight
+checkpoints in seven trees were invisible from there (2026-08-21, reported by
+OpenCode and Kimi). The filesystem is never scanned: what is listed is where
+the set has already worked, or what the caller named.
 
 It only prints, and it writes nothing -- not even the register, which
 `primeskills-run` maintains. `handon` is a read-only skill (G16), and this is
@@ -86,32 +86,43 @@ def plural(n, one, few, many):
     return {1: one, 2: few, 3: few, 4: few}.get(n % 10, many)
 
 
-def words_of(n):
-    return plural(n, "слово", "слова", "слов")
-
-
 def trees_of(n):
     return plural(n, "дереве", "деревьях", "деревьях")
 
 
-def entries(stem, body):
-    """Branches this checkpoint file speaks for, and the words each one gets.
+def branch_alive(top, branch):
+    return git("show-ref", "--verify", "--quiet",
+               f"refs/heads/{branch}", cwd=top)[0] == 0
 
-    One file per tree with a `## <branch>` section each replaced one file per
-    branch: with several live branches the state scattered, and merged branches
-    left files behind — 5 of 11 checkpoints on this machine were orphans. Files
-    written under the old name still answer for the branch they are named
-    after, so nothing already saved drops out of the picker.
+
+def sections_of(top, body, here_branch):
+    """The `## <branch>` sections a checkpoint speaks for, marks included.
+
+    The current branch of the tree we stand in is named as such, so the
+    reader sees at a glance which section their session opens by itself;
+    a section whose branch is gone keeps its text but says so.
     """
     heads = re.findall(r"^## +(\S.*?)\s*$", body, re.M)
-    if stem != "checkpoint" or not heads:
-        return [(stem, len(body.split()))]
-    parts = re.split(r"^## +\S.*?\s*$", body, flags=re.M)[1:]
-    return [(h, len(part.split())) for h, part in zip(heads, parts)]
+    if not heads:
+        return None
+    marks = []
+    for head in heads:
+        mark = ""
+        if here_branch and head == here_branch:
+            mark = " ←текущая"
+        elif not branch_alive(top, head):
+            mark = " (сирота)"
+        marks.append(head + mark)
+    return marks
 
 
 def rows_of(top, here_branch):
-    """Every checkpoint of one tree, plus what only that tree can answer."""
+    """One row per checkpoint file of the tree, newest first.
+
+    The file is what a reader opens, so the file is what gets a number.
+    `checkpoint.md` shows its branch sections inline; a legacy file named for
+    its branch shows that branch.
+    """
     root = top / ".primeskills" / "handoff"
     rows, skipped = [], []
     if not root.is_dir():
@@ -124,21 +135,23 @@ def rows_of(top, here_branch):
             continue
         body = path.read_text(encoding="utf-8", errors="replace")
         stem = str(path.relative_to(root).with_suffix("")).replace("\\", "/")
-        for branch, words in entries(stem, body):
-            exists = git("show-ref", "--verify", "--quiet",
-                         f"refs/heads/{branch}", cwd=top)[0] == 0
-            rows.append({
-                "branch": branch,
-                "mtime": path.stat().st_mtime,
-                "words": words,
-                "mark": ("текущая ветка" if branch == here_branch
-                         else "" if exists else "ветки нет — сирота"),
-            })
+        marks = sections_of(top, body, here_branch)
+        if marks is not None:
+            what = "checkpoint.md — " + ", ".join(marks)
+        elif here_branch and stem == here_branch:
+            what = f"{stem}.md — ←текущая"
+        elif stem == "checkpoint" and not branch_alive(top, stem):
+            what = "checkpoint.md"
+        elif not branch_alive(top, stem):
+            what = f"{stem}.md (сирота)"
+        else:
+            what = f"{stem}.md"
+        rows.append({"what": what, "mtime": path.stat().st_mtime})
     rows.sort(key=lambda r: r["mtime"], reverse=True)
     return rows, skipped
 
 
-def show(rows, width, first=1):
+def show(rows, first=1):
     """Numbered in print order, so a number is a complete answer.
 
     The four hosts render a list four ways -- a menu in Kimi, prose in Claude
@@ -148,9 +161,7 @@ def show(rows, width, first=1):
     """
     for n, r in enumerate(rows, first):
         when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
-        line = (f"  [{n}] {when}  {r['branch']:<{width}}  "
-                f"{r['words']:>5} {words_of(r['words'])}")
-        print(line + (f"  ← {r['mark']}" if r["mark"] else ""))
+        print(f"  [{n}] {when}  {r['what']}")
     return first + len(rows)
 
 
@@ -205,18 +216,17 @@ def main():
     trees = [(top, rows_of(top, here_branch if top == here else "")[0])
              for top in listed]
     total = sum(len(rows) for _, rows in trees)
-    width = max(len(r["branch"]) for _, rows in trees for r in rows)
     if len(trees) == 1 and not source:
         print(f"чекпоинты в {trees[0][0] / '.primeskills' / 'handoff'} "
               f"({total}), выбор по номеру:")
-        show(trees[0][1], width)
+        show(trees[0][1])
     else:
         print(f"чекпоинтов {total} в {len(trees)} {trees_of(len(trees))} "
               f"({source}), выбор по номеру:")
         n = 1
         for top, rows in trees:
             print(f"{top}")
-            n = show(rows, width, n)
+            n = show(rows, n)
     for path in skipped:
         print(f"  пропущен {path}: ведёт по ссылке за пределы дерева")
     if forgotten:

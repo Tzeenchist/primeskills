@@ -36,14 +36,16 @@ the task to another agent. Also on request: "save state", "checkpoint".
 3. Drop items the record shows as resolved → **verify:** nothing carried over
    contradicts a decision already written down
 4. Write `.primeskills/handoff/checkpoint.md`, one `## <branch>` section per
-   branch, replacing this branch's and marking any whose branch is gone, with:
-   what is being worked on,
-   1–3 sentences of summary, decisions and why, remaining work in priority
-   order, and notes — gotchas, blockers, open questions, approaches tried that
-   did not work → **verify:** a reader who was not here could act on it
+   branch, replacing this branch's. A section whose branch is gone collapses
+   to one italic line: the branch, where its work landed, the date —
+   remaining work moved to a surviving section or the queue first. Keep, with:
+   the work,
+   1–3 sentences of summary, decisions, remaining work in priority
+   order, and notes — gotchas, blockers, open questions, approaches that
+   failed → **verify:** a reader who was not here could act on it
 5. Record it: `primeskills-run note handoff "<branch> section written"`
    → **verify:** `.primeskills/.gitignore` exists and `git status` does not
-   offer the file. Say where it is and that it does not travel
+   offer the file. Say where it is
 6. Reconcile the queue with this session, checkpoint first so a spent budget
    costs one file, not two. `merge` closes what landed; finish the rest — a
    commit and date on anything closed, an entry for what was found, and on
