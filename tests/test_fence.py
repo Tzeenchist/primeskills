@@ -350,27 +350,97 @@ def reason(out):
     return (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
 
 
+def disposable_repo(parent):
+    """A git repository nothing else writes to, for cases that must not read
+    the journal of the tree the suite is running in (PS-069)."""
+    repo = parent / "repo"
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "work"], cwd=repo, check=True)
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-q", "-m", "init"], cwd=repo, check=True)
+    return repo
+
+
 def main():
     failures = []
     cases = []
     authority_checks = 0
-    for payload, expected in COMMANDS:
-        got = decision(run(CMD, payload))
-        if got != expected:
-            failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+    # PS-069: these two tables carry rung-bearing commands -- `gh pr create`
+    # among them -- and used to be judged wherever the suite happened to stand.
+    # There the guard read the live `.primeskills/run/repo.jsonl`, so an open
+    # `pr` mandate turned the expected `ask` into an allow and the case went
+    # red for whoever was actually using mandates, while CI, whose fresh
+    # checkout has no journal at all, stayed green. A verdict that depends on
+    # the runner's permissions is not a verdict (G7).
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = disposable_repo(Path(tmp))
+        env = os.environ.copy()
+        env["PATH"] = str(ROOT / "bin") + os.pathsep + env.get("PATH", "")
+        env["HOME"] = str(repo)
 
-    for command, expected in HEREDOCS:
-        payload = json.dumps({"tool_input": {"command": command}})
-        out = run(CMD, payload)
-        got = decision(out)
-        if got != expected:
-            failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
-                            f"expected {expected}")
-        # An `ask` that came from the guard falling over is not the verdict the
-        # case is testing, and it matches half of these expectations by
-        # accident. Naming it keeps a crash from passing as a decision.
-        if "guard itself failed" in reason(out):
-            failures.append(f"heredoc: {command.splitlines()[0]!r} crashed the guard")
+        for payload, expected in COMMANDS:
+            got = decision(run(CMD, payload, cwd=repo, env=env))
+            if got != expected:
+                failures.append(f"commands: {payload[:60]!r} -> {got}, expected {expected}")
+
+        for command, expected in HEREDOCS:
+            payload = json.dumps({"cwd": str(repo),
+                                  "tool_input": {"command": command}})
+            out = run(CMD, payload, cwd=repo, env=env)
+            got = decision(out)
+            if got != expected:
+                failures.append(f"heredoc: {command.splitlines()[0]!r} -> {got}, "
+                                f"expected {expected}")
+            # An `ask` that came from the guard falling over is not the verdict
+            # the case is testing, and it matches half of these expectations by
+            # accident. Naming it keeps a crash from passing as a decision.
+            if "guard itself failed" in reason(out):
+                failures.append(f"heredoc: {command.splitlines()[0]!r} crashed the guard")
+
+    # PS-069, the guard on the fix above. Moving those loops into a disposable
+    # tree is only worth anything while an open mandate really would change the
+    # verdict -- so both halves are pinned here. The first half is the hazard:
+    # in a tree where `pr` is granted, the case the suite expects to `ask` is
+    # allowed instead. The second is the property: judged the way the suite now
+    # judges it, the answer does not move. Delete the isolation and this goes
+    # red, which is the whole point of writing it down.
+    isolation_checks = 0
+    RUNG_CASE = ('gh pr create --body "$(cat <<\'EOF\'\n'
+                 f"{WIPE}\nEOF\n)\"")
+    with tempfile.TemporaryDirectory() as tmp:
+        granted = disposable_repo(Path(tmp) / "granted")
+        isolated = disposable_repo(Path(tmp) / "isolated")
+        env = os.environ.copy()
+        env["PATH"] = str(ROOT / "bin") + os.pathsep + env.get("PATH", "")
+
+        grant_env = dict(env, HOME=str(granted))
+        opened = subprocess.run(["primeskills-run", "grant", "pr", "fixture"],
+                                cwd=granted, env=grant_env,
+                                capture_output=True, text=True)
+        isolation_checks += 1
+        if opened.returncode != 0:
+            failures.append("mandate isolation: could not open the pr rung in "
+                            f"the fixture: {opened.stderr.strip()[:120]}")
+        else:
+            isolation_checks += 1
+            hazard = decision(run(CMD, json.dumps({"tool_input": {"command": RUNG_CASE}}),
+                                  cwd=granted, env=grant_env))
+            if hazard is not None:
+                failures.append(
+                    "mandate isolation: an open pr rung no longer changes the "
+                    f"verdict ({hazard}) -- the hazard this isolates is gone, "
+                    "so re-read the case before trusting either half")
+
+        isolation_checks += 1
+        held = decision(run(CMD, json.dumps({"cwd": str(isolated),
+                                             "tool_input": {"command": RUNG_CASE}}),
+                            cwd=isolated, env=dict(env, HOME=str(isolated))))
+        if held != "ask":
+            failures.append(f"mandate isolation: judged in a disposable tree the "
+                            f"case gave {held}, expected ask -- the verdict is "
+                            "reading the runner's journal again (G7)")
 
     with tempfile.TemporaryDirectory() as tree:
         redirects = REDIRECTS + [(f"printf x > {tree}/absolute.txt", None)]
@@ -672,7 +742,7 @@ def main():
              + len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
              + len(SHADOWED) + len(MODES) + len(QUOTED)
              + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1
-             + authority_checks)
+             + authority_checks + isolation_checks)
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 
