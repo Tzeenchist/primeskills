@@ -34,7 +34,7 @@ PREF = Path.home() / ".primeskills" / "lang"
 # still listed, under "other", so a new skill can never fall out of the guide.
 STAGES = [
     ("understand", ["brief", "study", "baby"]),
-    ("plan", ["plan", "ceo", "money", "eng", "beauty", "teams", "autoplan"]),
+    ("plan", ["plan", "ceo", "money", "eng", "beauty", "teams", "moderate", "autoplan"]),
     ("make", ["build", "debug", "cycle"]),
     ("check", ["verify", "vet", "probe", "measure", "ui"]),
     ("hand over", ["land", "revise", "merge", "close"]),
