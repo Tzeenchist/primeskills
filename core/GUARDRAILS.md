@@ -83,7 +83,8 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   set cannot be told from work done beside it, and the record is the only place
   that does not depend on what the host chose to log. Last step of any skill at
   all, flow or leaf: `primeskills-run note end --skill <name> "<what it leaves
-  behind>"`. Without it a skill owns every action until the next one is invoked,
+  behind>"`. The run record is the set's journal, not the work, so a read-only
+  skill writes its exit too: G16 governs the tree it was pointed at. Without it a skill owns every action until the next one is invoked,
   so a call in the first message owns the whole session — and the work someone
   else did later is read back as that skill's.
 - **G10 Instructions come by channel.** What the host handed you — the user's

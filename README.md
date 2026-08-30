@@ -33,8 +33,8 @@ does. A skill's full text loads only when that skill is needed.
 
 ```
 always in context        499 words for all 31 skills
-shared rules             3 039 words, once per session
-one skill call           3 820 … 4 238 words
+shared rules             3 065 words, once per session
+one skill call           3 846 … 4 264 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
