@@ -44,6 +44,15 @@ TEST_RUN = re.compile(r"\b(pytest|unittest|manage\.py\s+test|node\s+--test|npm\s
 # The reading was of a ritual, not of a fact.
 NEUTERED = re.compile(r"^\s*(echo|printf|#)\b|\|\|\s*(true|:)\s*$|--collect-only\b|--help\b")
 RECORDED = re.compile(r"\bprimeskills-run\s+note\b")
+# PS-076. The exit a skill writes down. Visible in every host, because
+# every host records the command that wrote it -- unlike the invocation,
+# which three of the six log not at all.
+FLOW_END = re.compile(r"(?:[\w./-]*/)?primeskills-run\s+note\s+end\b[^;&|]*?"
+                      r"--skill\s+([a-z0-9-]+)")
+# Where one command ends and the next begins. The marker has to open a segment
+# to count: mentioning it -- in a heredoc, a quoted string, a fixture being
+# written -- is not running it. Found the hard way, on this tool's own session.
+SEGMENT = re.compile(r"[\n;&|]+")
 # Narrow on purpose: a checker that cries wolf gets ignored, which is worse
 # than one that stays quiet.
 DESTRUCTIVE = re.compile(r"\b(dropdb|DROP\s+(TABLE|DATABASE)|rm\s+-rf|git\s+clean\s+-[a-z]*f"
@@ -161,6 +170,7 @@ SKILL_FILE = re.compile(r"(?:^|/)skills/([a-z0-9-]+)/SKILL\.md")
 def call(calls, tool, skill=None, path="", cmd="", raw=None, inferred=False,
          call_id=None, returncode=None, skills=None):
     calls.append({"n": len(calls) + 1, "tool": tool, "skill": skill,
+                  "after_user": False,
                   "skills": list(skills) if skills else ([skill] if skill else []),
                   "path": str(path or ""), "cmd": str(cmd or ""),
                   "inferred": inferred and bool(skill),
@@ -292,6 +302,42 @@ def named_skill(path, cmd):
     return names[0] if names else None
 
 
+# An approval is not an instruction. Of 711 live turns 106 are this short, and
+# the two commonest are "Давай" and "Да" -- said mid-flow to let it carry on.
+# Ending the span there would drop everything the skill did after being told to
+# go, which is the one direction this must never fail in: the safe error is to
+# charge a skill with too much, never with too little. No word list, because a
+# list of approvals rots; a bare continuation is short, and a short instruction
+# ("выведи todo") merely leaves the previous span open a little too long.
+CONTINUATION = 12
+
+
+def is_user_turn(event, message):
+    """A turn from the person, not the harness talking to itself.
+
+    Claude Code delivers three different things as a user-role message.
+    Counted over 49 live transcripts: 9855 were tool results, 167 were
+    injections the harness marks `isMeta` (a skill body, a local-command
+    caveat), and 711 were the user -- typed text, a slash call, or an
+    interrupt. Read a tool result as a turn and every span ends at its first
+    action: a number that would look like a triumph and measure nothing.
+    """
+    if event.get("isMeta"):
+        return False
+    content = message.get("content")
+    if isinstance(content, list):
+        if any(isinstance(i, dict) and i.get("type") == "tool_result"
+               for i in content):
+            return False
+        text = " ".join(i.get("text", "") for i in content
+                        if isinstance(i, dict))
+    elif isinstance(content, str):
+        text = content
+    else:
+        return False
+    return len(re.sub(r"<[^>]+>", "", text).strip()) > CONTINUATION
+
+
 def load_claude(path):
     """Claude Code: one JSON object per line, tool_use inside message content.
 
@@ -304,6 +350,15 @@ def load_claude(path):
     """
     calls = []
     by_id = {}
+    pending_user = False
+
+    def carry():
+        """The turn belongs to the next action, whatever produced it."""
+        nonlocal pending_user
+        if pending_user and calls:
+            calls[-1]["after_user"] = True
+            pending_user = False
+
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -313,11 +368,14 @@ def load_claude(path):
             message = event.get("message") or {}
             content = message.get("content")
             if message.get("role") == "user":
+                if is_user_turn(event, message):
+                    pending_user = True
                 # a slash command is stated, not inferred: never dropped later
                 for name in SLASH.findall(message_text(content)):
                     if name in our_skills():
                         call(calls, "SlashCommand", name, "", "",
                              f"/{name}")
+                        carry()
             if not isinstance(content, list):
                 continue
             for item in content:
@@ -327,6 +385,7 @@ def load_claude(path):
                          data.get("file_path") or data.get("notebook_path") or "",
                          data.get("command") or "",
                          json.dumps(data, ensure_ascii=False), call_id=item.get("id"))
+                    carry()
                     if item.get("id"):
                         by_id[item["id"]] = calls[-1]
                 elif isinstance(item, dict) and item.get("type") == "tool_result":
@@ -514,8 +573,33 @@ def load_calls(path):
 SPAN_CAP = 40
 
 
+def closes(c, skill):
+    """The exit that skill wrote down: run, not merely mentioned, and its own."""
+    if c["tool"] != "Bash":
+        return False
+    for piece in SEGMENT.split(c["cmd"]):
+        m = FLOW_END.match(piece.strip())
+        if m and m.group(1) == skill:
+            return True
+    return False
+
+
 def spans(calls):
-    """A skill owns what follows its invocation, up to the next one or the cap."""
+    """A skill owns what follows its invocation, up to its own recorded exit,
+    the user's next turn, or the next invocation.
+
+    PS-076: "until the next invocation or the end of the session" gave a call
+    in the first message the whole session, and 24 of 42 violations sat on
+    spans past the cap. Two boundaries close it, and both are events rather
+    than guesses about content: the exit the skill writes down (`primeskills-run
+    note end`), and, where none was written, the user's next turn. Truncating
+    at the cap was rejected for the third time here -- it makes the number
+    prettier without making it truer.
+
+    What falls outside a span belongs to no skill. It is not dropped: the
+    session-wide G8 pass reads every call either way, so an unowned violation
+    is still counted, just not charged to a skill that had stopped working.
+    """
     # Claude Code has an explicit Skill tool; the other three hosts leave only
     # the read of SKILL.md, which the loaders turn into the same field. Keying
     # on the field rather than on the tool name is what makes one task visible
@@ -524,11 +608,24 @@ def spans(calls):
     out = []
     for i, mark in enumerate(marks):
         end = marks[i + 1]["n"] if i + 1 < len(marks) else len(calls) + 1
+        how = None
+        for c in calls:
+            if not mark["n"] < c["n"] < end:
+                continue
+            # The boundary call is the next thing's, not this skill's: the
+            # note is bookkeeping and the turn is a new instruction.
+            if closes(c, mark["skill"]):
+                end, how = c["n"], "записи"
+                break
+            if c.get("after_user"):
+                end, how = c["n"], "реплике пользователя"
+                break
         owned = [c for c in calls if mark["n"] < c["n"] < end]
         out.append({
             "skill": mark["skill"],
             "at": mark["n"],
             "calls": owned,
+            "how": how,
             "long": len(owned) > SPAN_CAP,
         })
     return out
@@ -783,7 +880,8 @@ def report(path, skills_dir, quiet=False):
     # neither: 138 of 151 checks were the session-wide G8, so "adherence 56%"
     # was really a measurement of destructive-target hygiene wearing the name of
     # skill adherence.
-    tally = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0}
+    tally = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0,
+             "far_violated": 0}
     guard = {"ok": 0, "violated": 0, "na": 0}
     by_rule = {}
 
@@ -809,8 +907,9 @@ def report(path, skills_dir, quiet=False):
         if not quiet:
             tail = (f" — длиннее отсечки в {SPAN_CAP}, приписано с оговоркой"
                     if span.get("long") else "")
+            how = f", конец по {span['how']}" if span.get("how") else ""
             print(f"  · {span['skill']} (вызван #{span['at']}, "
-                  f"{len(span['calls'])} действий в пролёте{tail})")
+                  f"{len(span['calls'])} действий в пролёте{how}{tail})")
         if not checks and not quiet:
             print("      проверяемых инвариантов нет")
         for name, fn in checks:
@@ -821,6 +920,8 @@ def report(path, skills_dir, quiet=False):
             slot["na" if verdict is None else verdict] += 1
             if verdict is not None and span.get("long"):
                 tally["far"] = tally.get("far", 0) + 1
+                if verdict == "violated":
+                    tally["far_violated"] = tally.get("far_violated", 0) + 1
             if not quiet:
                 mark = {"ok": "ok  ", "violated": "НАРУШЕН",
                         "unknown": "неизв", None: "н/п "}[verdict]
@@ -1144,7 +1245,8 @@ def main(argv):
         print(__doc__)
         return 0
 
-    total = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0}
+    total = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0,
+             "far_violated": 0}
     guard = {"ok": 0, "violated": 0, "na": 0}
     rules = {}
     invoked, sessions_with_core = [], 0
@@ -1236,9 +1338,11 @@ def main(argv):
                   f"{', ' + str(counts['na']) + ' н/п' if counts['na'] else ''}"
                   f" — {name}")
     if total.get("far"):
-        print(f"из них {total['far']} на пролётах длиннее {SPAN_CAP} действий — "
-              f"там скиллу приписано и то, что могло быть посторонней работой; "
-              f"эти смотреть глазами, прежде чем считать")
+        print(f"на пролётах длиннее {SPAN_CAP} действий стоит {total['far']} "
+              f"применимых проверок, и {total.get('far_violated', 0)} из "
+              f"{total['violated']} нарушений — там скиллу приписано и то, что "
+              f"могло быть посторонней работой; эти смотреть глазами, прежде "
+              f"чем считать")
 
     g_applicable, g_rate = share(guard)
     print(f"\n## Ограничитель G8 (по всей сессии, вне зависимости от скиллов)")

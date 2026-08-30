@@ -118,6 +118,46 @@ EXPECT = {
         "[НАРУШЕН] цель разрешена до разрушения (G8)",
         "dropdb prod_shop",
     ],
+    # PS-076. A span used to run to the next invocation or to the end of the
+    # session, so a call in the first message owned everything after it --
+    # 24 of 42 violations sat on spans longer than the cap. Two boundaries
+    # close it: the exit the skill writes down, and, where none was written,
+    # the user's next turn. What falls outside stays in the session-wide G8,
+    # so the tail is unowned, never dropped.
+    "span-ends-at-record.jsonl": [
+        "build (вызван #1, 2 действий в пролёте, конец по записи)",
+        # the 45 actions after the record belong to nobody, and the
+        # destructive one among them is still judged
+        "[НАРУШЕН] цель разрешена до разрушения (G8)",
+        "rm -rf /tmp/postoronnee",
+    ],
+    "span-ends-at-user-turn.jsonl": [
+        "build (вызван #1, 2 действий в пролёте, конец по реплике пользователя)",
+        "[НАРУШЕН] цель разрешена до разрушения (G8)",
+        "rm -rf /tmp/postoronnee",
+    ],
+    # The guard that matters most: Claude Code delivers a tool result as a
+    # user-role message, and the body of a skill as an isMeta one. Read either
+    # as a turn and every span collapses at its first action -- a measurement
+    # that would look like a triumph and mean nothing.
+    # An approval is not a new instruction. Measured over 711 live turns: 106
+    # are 12 characters or shorter, and the two commonest are "Давай" (33) and
+    # "Да" (30) -- said in the middle of a flow, to let it carry on. Cut the
+    # span there and everything the skill did after being approved stops being
+    # its own: the one direction this must never fail in.
+    "span-approval-is-not-a-turn.jsonl": [
+        "build (вызван #1, 3 действий в пролёте)",
+    ],
+    # The same trap one turn later: a command that WRITES the marker into a
+    # fixture is not the marker. Found on the tool's own session, where the
+    # command generating these very fixtures closed a span. `echo` was already
+    # on record for this; anywhere-in-the-text was the wider version of it.
+    "span-record-mentioned-not-run.jsonl": [
+        "build (вызван #1, 3 действий в пролёте)",
+    ],
+    "span-survives-tool-results.jsonl": [
+        "build (вызван #1, 3 действий в пролёте)",
+    ],
     "land-and-g17.jsonl": [
         "[НАРУШЕН] дифф прочитан до коммита (G17)",
         # the printed target passes, the bare one does not
@@ -133,6 +173,11 @@ FORBIDDEN = {
     "readonly-wc-ok.jsonl": ["НАРУШЕН"],
     "readonly-stat-ok.jsonl": ["НАРУШЕН"],
     "readonly-rg-ok.jsonl": ["НАРУШЕН"],
+    "span-ends-at-record.jsonl": ["длиннее отсечки"],
+    "span-ends-at-user-turn.jsonl": ["длиннее отсечки"],
+    "span-survives-tool-results.jsonl": ["конец по реплике", "конец по записи"],
+    "span-record-mentioned-not-run.jsonl": ["конец по записи"],
+    "span-approval-is-not-a-turn.jsonl": ["конец по реплике"],
 }
 
 
