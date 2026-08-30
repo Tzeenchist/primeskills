@@ -6,6 +6,8 @@ One fixture is a real session reduced to its tool calls -- the SHOP-009 run of
 verdict was established by reading the transcript manually before this tool
 existed, so it is the regression that matters most.
 """
+import importlib.machinery
+import importlib.util
 import os
 import json
 import subprocess
@@ -132,6 +134,17 @@ FORBIDDEN = {
     "readonly-stat-ok.jsonl": ["НАРУШЕН"],
     "readonly-rg-ok.jsonl": ["НАРУШЕН"],
 }
+
+
+def _load(path):
+    loader = importlib.machinery.SourceFileLoader("_adh", str(path))
+    spec = importlib.util.spec_from_loader("_adh", loader)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+adh = _load(TOOL)
 
 
 def main():
@@ -432,6 +445,27 @@ def main():
                              capture_output=True, text=True).stdout
         if "вызовов скиллов: 1 (lazy)" not in out:
             failures.append(f"слэш-вызов и запись потока сложились в два:\n{out}")
+
+    # PS-074. Counting every name in a command (PS-073) made one line of prose
+    # about skills read as several invocations. A command that only writes read
+    # nothing; the target of a redirect is not a read either.
+    for cmd, want, why in (
+        ('echo "см. skills/a/SKILL.md skills/b/SKILL.md" > n.md', [],
+         "прозу про навыки посчитали вызовами"),
+        ('printf "%s" skills/build/SKILL.md >> log', [],
+         "printf ничего не читает"),
+        ('cat /x/skills/build/SKILL.md', ["build"],
+         "обычное чтение перестало считаться"),
+        ('cat /x/skills/build/SKILL.md > /tmp/copy.md', ["build"],
+         "чтение с редиректом потеряно — читали всё-таки навык"),
+        ('sed -n 1,9p /x/skills/cycle/SKILL.md && sed -n 1,9p /x/skills/verify/SKILL.md',
+         ["cycle", "verify"], "цепочка чтений схлопнулась"),
+    ):
+        checks += 1
+        got = adh.named_skills("", cmd)
+        if got != want:
+            failures.append(f"named_skills: {why}: {cmd[:50]!r} -> {got}, "
+                            f"ждали {want}")
 
     for f in failures:
         print(f)

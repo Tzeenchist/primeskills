@@ -242,6 +242,24 @@ def flow_closure(name, seen=None):
     return seen
 
 
+# A path a command *writes about* is not a path it read. `WRITING_TOOLS` catches
+# the editors, but a shell redirect is a Bash call like any other, and since
+# PS-073 counts every name in a command, one line of prose naming three skills
+# became three invocations (PS-074). Two shapes cover the case without
+# pretending to parse shell: a head that reads nothing, and the target of a
+# redirect.
+SAYS_NOTHING = re.compile(r"(?:^|[;&|]\s*)(?:echo|printf)\s", re.I)
+REDIRECT_TARGET = re.compile(r"(?:>>?|\btee\b)\s*\S*")
+
+
+def spoken_of(cmd):
+    """The part of a command that could have read a file."""
+    text = str(cmd or "")
+    if SAYS_NOTHING.search(text):
+        return ""
+    return REDIRECT_TARGET.sub(" ", text)
+
+
 def named_skills(path, cmd):
     """Every skill a single action loaded, in the order it named them.
 
@@ -252,7 +270,7 @@ def named_skills(path, cmd):
     2026-08-30: four bodies read is four invocations.
     """
     seen = []
-    for text in (path, cmd):
+    for text in (path, spoken_of(cmd)):
         for hit in SKILL_FILE.finditer(text or ""):
             if hit.group(1) not in seen:
                 seen.append(hit.group(1))

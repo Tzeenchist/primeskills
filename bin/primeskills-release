@@ -141,7 +141,11 @@ def previous_tag(tag):
     accepted every release. What a release changed is measured from the release
     before it.
     """
-    found = git("describe", "--tags", "--abbrev=0", f"{tag}^")
+    # Only release tags. `--tags` alone takes the nearest tag of any kind, so a
+    # marker dropped between releases would silently become the point a release
+    # is measured from (PS-074).
+    found = git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*",
+                f"{tag}^")
     name = found.stdout.strip()
     return name if found.returncode == 0 and name and name != tag else None
 
