@@ -69,10 +69,14 @@ def main():
 
         mod = load(repo)
 
-        # the gate speaks for every host the set supports; a new agent that is
-        # installed but not asked for live calls would ship unverified there
-        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "cline", "kilo"}:
-            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
+        # The gate speaks for the hosts a release waits on. Codex is installed
+        # but excluded on purpose (PS-075): its provider locks out for hours,
+        # and a gate a provider can hold shut is one that gets waved through.
+        # Pinned so that dropping a host stays a decision, not a slip.
+        if set(mod.HOSTS) != {"claude", "kimi", "opencode", "cline", "kilo"}:
+            failures.append(f"HOSTS не тот набор хостов: {mod.HOSTS}")
+        if "codex" in mod.HOSTS:
+            failures.append("codex вернулся в гейт — это решение, а не правка")
 
         # nothing changed since the tag: the gate has nothing to ask
         if mod.missing_livecalls(at) != []:
@@ -114,11 +118,11 @@ def main():
 
         # a stale note (older than the tag) does not satisfy the gate
         checks += 1
-        stale = [json.dumps({**note("new", "codex"),
+        stale = [json.dumps({**note("new", "kimi"),
                              "ts": "2020-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(stale), encoding="utf-8")
         missing = mod.missing_livecalls(at)
-        if ("new", "codex") not in missing:
+        if ("new", "kimi") not in missing:
             failures.append("протухшая запись закрыла гейту глаза")
 
         # PS-054. Timestamps are instants, not strings. `primeskills-run` writes
@@ -132,9 +136,9 @@ def main():
         from datetime import datetime, timedelta
         later = (datetime.fromisoformat(tag_at) + timedelta(minutes=25))
         utc = later.astimezone(__import__("datetime").timezone.utc).isoformat()
-        fresh = [json.dumps({**note("new", "codex"), "ts": utc})]
+        fresh = [json.dumps({**note("new", "kimi"), "ts": utc})]
         (run_dir / name).write_text("\n".join(fresh) + "\n", encoding="utf-8")
-        if ("new", "codex") in mod.missing_livecalls(at):
+        if ("new", "kimi") in mod.missing_livecalls(at):
             failures.append(
                 f"запись {utc} сделана позже тега {tag_at}, а гейт счёл её "
                 f"протухшей — время сравнивается строками")
