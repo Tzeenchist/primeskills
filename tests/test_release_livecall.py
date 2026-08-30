@@ -239,6 +239,17 @@ def main():
             failures.append("у первого тега предыдущего быть не может, "
                             f"а нашли {mod.previous_tag('v9.0.0')!r}")
 
+        # PS-074. `--tags` alone takes the nearest tag of any kind. A marker
+        # dropped between releases would become the point the next release is
+        # measured from, and the gate would ask about the wrong range.
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=t",
+                        "-c", "user.email=t@t", "tag", "-a", "wip-marker",
+                        "-m", "not a release", "v9.1.0^"], check=True)
+        checks += 1
+        if mod.previous_tag("v9.1.0") != "v9.0.0":
+            failures.append("метка между релизами сдвинула точку сравнения: "
+                            f"предыдущим сочли {mod.previous_tag('v9.1.0')!r}")
+
         print(f"{checks + 2} checks, {len(failures)} failed")
     for f in failures:
         print(f)
