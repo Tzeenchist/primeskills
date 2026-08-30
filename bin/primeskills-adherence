@@ -38,12 +38,33 @@ WRITING_TOOLS = {"Edit", "Write", "NotebookEdit"}
 TEST_PATH = re.compile(r"(^|/)(tests?|spec)[/_.]|test_[^/]*$|[^/]*_test\.[a-z]+$"
                        r"|\.test\.[a-z]+$|\.spec\.[a-z]+$|(^|/)tests?\.py$")
 TEST_RUN = re.compile(r"\b(pytest|unittest|manage\.py\s+test|node\s+--test|npm\s+(run\s+)?test"
-                      r"|jest|vitest|go\s+test|cargo\s+test)\b")
+                      r"|jest|vitest|go\s+test|cargo\s+test)\b"
+                      r"|\btests?/run\.py\b")
 # A command that merely contains the word is not a run: `echo pytest` and
 # `pytest || true` both matched, and both were counted as evidence of a suite.
 # The reading was of a ritual, not of a fact.
+# PS-078. G4 asks for two things, an exit code and the tool's own success
+# signal. The logs carry only the second: of 8824 Bash calls in Claude Code
+# transcripts not one records an exit code, and Codex records 19 in 3047. Read
+# narrowly on purpose -- a runner saying "0 failed" is a fact, a transcript
+# containing the word "error" is not.
+SUITE_OK = re.compile(r"\b0 failed\b|\b0 problems\b|\b0 errors\b"
+                      r"|\b\d+ passed\b(?![^\n]*\b[1-9]\d* failed)", re.I)
+# `FAILED` stays case-sensitive: it is pytest's per-test marker, and folded
+# case it also matches the "failed" inside "0 failed" -- a green run read red.
+SUITE_BAD = re.compile(r"\b[1-9]\d* failed\b|\b[1-9]\d* problems\b"
+                       r"|\b[1-9]\d* errors?\b|(?-i:\bFAILED\b)", re.I)
 NEUTERED = re.compile(r"^\s*(echo|printf|#)\b|\|\|\s*(true|:)\s*$|--collect-only\b|--help\b")
 RECORDED = re.compile(r"\bprimeskills-run\s+note\b")
+# PS-076. The exit a skill writes down. Visible in every host, because
+# every host records the command that wrote it -- unlike the invocation,
+# which three of the six log not at all.
+FLOW_END = re.compile(r"(?:[\w./-]*/)?primeskills-run\s+note\s+end\b[^;&|]*?"
+                      r"--skill\s+([a-z0-9-]+)")
+# Where one command ends and the next begins. The marker has to open a segment
+# to count: mentioning it -- in a heredoc, a quoted string, a fixture being
+# written -- is not running it. Found the hard way, on this tool's own session.
+SEGMENT = re.compile(r"[\n;&|]+")
 # Narrow on purpose: a checker that cries wolf gets ignored, which is worse
 # than one that stays quiet.
 DESTRUCTIVE = re.compile(r"\b(dropdb|DROP\s+(TABLE|DATABASE)|rm\s+-rf|git\s+clean\s+-[a-z]*f"
@@ -161,11 +182,37 @@ SKILL_FILE = re.compile(r"(?:^|/)skills/([a-z0-9-]+)/SKILL\.md")
 def call(calls, tool, skill=None, path="", cmd="", raw=None, inferred=False,
          call_id=None, returncode=None, skills=None):
     calls.append({"n": len(calls) + 1, "tool": tool, "skill": skill,
+                  "after_user": False,
                   "skills": list(skills) if skills else ([skill] if skill else []),
                   "path": str(path or ""), "cmd": str(cmd or ""),
                   "inferred": inferred and bool(skill),
                   "raw": raw if raw is not None else str(cmd or path or ""),
+                  "output": "",
                   "id": call_id, "returncode": returncode})
+
+
+def clip(text, limit=600):
+    """Keep the ends, not the beginning. A runner prints its verdict last, so
+    a head-first slice of a long log drops the one line worth reading; a
+    failure marker tends to come early, so the head is kept too."""
+    if len(text) <= limit:
+        return text
+    head = limit // 3
+    return text[:head] + " … " + text[-(limit - head):]
+
+
+def result_text(value, limit=600):
+    """What the tool said back, from whichever shape the host wrapped it in."""
+    if isinstance(value, str):
+        return clip(value, limit)
+    if isinstance(value, dict):
+        for key in ("output", "content", "text", "stdout"):
+            if key in value:
+                return result_text(value[key], limit)
+        return ""
+    if isinstance(value, list):
+        return clip(" ".join(result_text(i, limit) for i in value), limit)
+    return ""
 
 
 def explicit_exit(value):
@@ -292,6 +339,68 @@ def named_skill(path, cmd):
     return names[0] if names else None
 
 
+# An approval is not an instruction. Of 711 live turns 106 are this short, and
+# the two commonest are "Давай" and "Да" -- said mid-flow to let it carry on.
+# Ending the span there would drop everything the skill did after being told to
+# go, which is the one direction this must never fail in: the safe error is to
+# charge a skill with too much, never with too little. No word list, because a
+# list of approvals rots; a bare continuation is short, and a short instruction
+# ("выведи todo") merely leaves the previous span open a little too long.
+CONTINUATION = 12
+
+
+# A message that is nothing but one envelope was written by the harness, not
+# typed by anyone: Codex wraps its cwd and its skill list this way. Matching the
+# shape rather than listing the tag names, because a list of envelopes rots.
+WHOLE_BLOCK = re.compile(r"^<(\w[\w-]*)\b[^>]*>[\s\S]*</\1>$")
+
+
+def counts_as_turn(text):
+    """Typed by the person, and long enough to be an instruction rather than
+    a nod. Shared by all four hosts so one definition of a boundary exists."""
+    body = (text or "").strip()
+    if WHOLE_BLOCK.match(body):
+        return False
+    return len(re.sub(r"<[^>]+>", "", body).strip()) > CONTINUATION
+
+
+def mark_turn(calls, pending):
+    """The turn belongs to the next action, whatever produced it."""
+    if pending and calls:
+        calls[-1]["after_user"] = True
+        return False
+    return pending
+
+
+def text_of(content):
+    """The words in a content list, whichever key the host used for them."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(i.get("text", "") for i in content if isinstance(i, dict))
+    return ""
+
+
+def is_user_turn(event, message):
+    """A turn from the person, not the harness talking to itself.
+
+    Claude Code delivers three different things as a user-role message.
+    Counted over 49 live transcripts: 9855 were tool results, 167 were
+    injections the harness marks `isMeta` (a skill body, a local-command
+    caveat), and 711 were the user -- typed text, a slash call, or an
+    interrupt. Read a tool result as a turn and every span ends at its first
+    action: a number that would look like a triumph and measure nothing.
+    """
+    if event.get("isMeta"):
+        return False
+    content = message.get("content")
+    if isinstance(content, list) and any(
+            isinstance(i, dict) and i.get("type") == "tool_result"
+            for i in content):
+        return False
+    return counts_as_turn(text_of(content))
+
+
 def load_claude(path):
     """Claude Code: one JSON object per line, tool_use inside message content.
 
@@ -304,6 +413,7 @@ def load_claude(path):
     """
     calls = []
     by_id = {}
+    pending_user = False
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -313,11 +423,14 @@ def load_claude(path):
             message = event.get("message") or {}
             content = message.get("content")
             if message.get("role") == "user":
+                if is_user_turn(event, message):
+                    pending_user = True
                 # a slash command is stated, not inferred: never dropped later
                 for name in SLASH.findall(message_text(content)):
                     if name in our_skills():
                         call(calls, "SlashCommand", name, "", "",
                              f"/{name}")
+                        pending_user = mark_turn(calls, pending_user)
             if not isinstance(content, list):
                 continue
             for item in content:
@@ -327,6 +440,7 @@ def load_claude(path):
                          data.get("file_path") or data.get("notebook_path") or "",
                          data.get("command") or "",
                          json.dumps(data, ensure_ascii=False), call_id=item.get("id"))
+                    pending_user = mark_turn(calls, pending_user)
                     if item.get("id"):
                         by_id[item["id"]] = calls[-1]
                 elif isinstance(item, dict) and item.get("type") == "tool_result":
@@ -334,6 +448,7 @@ def load_claude(path):
                     if target is not None:
                         code = explicit_exit(item)
                         target["returncode"] = explicit_exit(event) if code is None else code
+                        target["output"] = result_text(item.get("content"))
     return calls
 
 
@@ -343,6 +458,7 @@ def load_codex(path):
     edits arrive as `apply_patch`."""
     calls = []
     pending = {}
+    pending_user = False
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -352,8 +468,19 @@ def load_codex(path):
             payload = event.get("payload") or {}
             if event.get("type") != "response_item":
                 continue
+            # PS-077: what the person typed arrives as a plain message. The
+            # harness sends its cwd and its skill list the same way, so the
+            # envelope rule does the telling apart.
+            if payload.get("type") == "message":
+                if (payload.get("role") == "user"
+                        and counts_as_turn(text_of(payload.get("content")))):
+                    pending_user = True
+                continue
             if payload.get("type") == "custom_tool_call_output":
                 indexes = pending.get(payload.get("call_id"), [])
+                said = result_text(payload.get("output"))
+                for index in indexes:
+                    calls[index]["output"] = said
                 codes = output_exits(payload.get("output"))
                 if len(codes) == len(indexes):
                     for index, code in zip(indexes, codes):
@@ -365,6 +492,7 @@ def load_codex(path):
             if payload.get("name") == "apply_patch":
                 target = re.search(r'"(?:path|file_path)"\s*:\s*"([^"]+)"', raw)
                 call(calls, "Edit", None, target.group(1) if target else "", "", raw[:400])
+                pending_user = mark_turn(calls, pending_user)
                 continue
             # The input is a JavaScript snippet, so the key is bare (`cmd:"..."`)
             # and one snippet may hold several commands under Promise.all. Each
@@ -380,6 +508,7 @@ def load_codex(path):
                 names = named_skills("", cmd)
                 call(calls, "Bash", names[0] if names else None, "", cmd,
                      raw[:400], inferred=True, skills=names)
+                pending_user = mark_turn(calls, pending_user)
                 indexes.append(len(calls) - 1)
             if payload.get("call_id"):
                 pending[payload["call_id"]] = indexes
@@ -391,17 +520,28 @@ def load_kimi(path):
     tool vocabulary Claude uses (Bash, Edit, Read, Write, Grep, Glob)."""
     calls = []
     by_id = {}
+    pending_user = False
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
                 event = json.loads(line)
             except ValueError:
                 continue
+            # PS-077: Kimi appends every message to its context, its own
+            # included; `origin.kind` is what says the person wrote this one.
+            if event.get("type") == "context.append_message":
+                m = event.get("message") or {}
+                if (m.get("role") == "user"
+                        and (m.get("origin") or {}).get("kind") == "user"
+                        and counts_as_turn(text_of(m.get("content")))):
+                    pending_user = True
+                continue
             inner = event.get("event") or {}
             if inner.get("type") == "tool.result":
                 target = by_id.get(inner.get("toolCallId"))
                 if target is not None:
                     target["returncode"] = explicit_exit(inner.get("result"))
+                    target["output"] = result_text(inner.get("result"))
                 continue
             if inner.get("type") != "tool.call":
                 continue
@@ -413,6 +553,7 @@ def load_kimi(path):
             call(calls, name, names[0] if names else None, target, cmd,
                  json.dumps(args, ensure_ascii=False)[:400], inferred=True,
                  call_id=inner.get("toolCallId"), skills=names)
+            pending_user = mark_turn(calls, pending_user)
             if inner.get("toolCallId"):
                 by_id[inner["toolCallId"]] = calls[-1]
     return calls
@@ -428,13 +569,39 @@ def load_opencode(db, session_id):
     JSON carries the tool name and its input."""
     import sqlite3
     calls = []
+    pending_user = False
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    rows = con.execute("select data from part where session_id = ? order by time_created, id",
-                       (session_id,))
-    for (data,) in rows:
+    # PS-077: a part says nothing about who wrote it -- the role lives one
+    # table over. The person's words arrive as `text` parts of a user message,
+    # in the same time order as the tool calls, so one pass still does.
+    roles = {}
+    try:
+        for mid, mdata in con.execute("select id, data from message where session_id = ?",
+                                      (session_id,)):
+            try:
+                roles[mid] = (json.loads(mdata) or {}).get("role")
+            except ValueError:
+                continue
+    except sqlite3.Error:
+        roles = {}
+    try:
+        rows = list(con.execute("select data, message_id from part "
+                                "where session_id = ? order by time_created, id",
+                                (session_id,)))
+    except sqlite3.Error:
+        # an older store keeps no link back to the message; the tool calls are
+        # still readable, the turns simply are not there to be seen
+        rows = [(d, None) for (d,) in
+                con.execute("select data from part where session_id = ? "
+                            "order by time_created, id", (session_id,))]
+    for data, message_id in rows:
         try:
             part = json.loads(data)
         except ValueError:
+            continue
+        if roles.get(message_id) == "user":
+            if part.get("type") == "text" and counts_as_turn(part.get("text")):
+                pending_user = True
             continue
         if part.get("type") != "tool":
             continue
@@ -447,6 +614,8 @@ def load_opencode(db, session_id):
         call(calls, name, names[0] if names else None, target, cmd,
              json.dumps(args, ensure_ascii=False)[:400], inferred=True,
              returncode=explicit_exit(state), skills=names)
+        calls[-1]["output"] = result_text(state.get("output"))
+        pending_user = mark_turn(calls, pending_user)
     con.close()
     return calls
 
@@ -514,8 +683,33 @@ def load_calls(path):
 SPAN_CAP = 40
 
 
+def closes(c, skill):
+    """The exit that skill wrote down: run, not merely mentioned, and its own."""
+    if c["tool"] != "Bash":
+        return False
+    for piece in SEGMENT.split(c["cmd"]):
+        m = FLOW_END.match(piece.strip())
+        if m and m.group(1) == skill:
+            return True
+    return False
+
+
 def spans(calls):
-    """A skill owns what follows its invocation, up to the next one or the cap."""
+    """A skill owns what follows its invocation, up to its own recorded exit,
+    the user's next turn, or the next invocation.
+
+    PS-076: "until the next invocation or the end of the session" gave a call
+    in the first message the whole session, and 24 of 42 violations sat on
+    spans past the cap. Two boundaries close it, and both are events rather
+    than guesses about content: the exit the skill writes down (`primeskills-run
+    note end`), and, where none was written, the user's next turn. Truncating
+    at the cap was rejected for the third time here -- it makes the number
+    prettier without making it truer.
+
+    What falls outside a span belongs to no skill. It is not dropped: the
+    session-wide G8 pass reads every call either way, so an unowned violation
+    is still counted, just not charged to a skill that had stopped working.
+    """
     # Claude Code has an explicit Skill tool; the other three hosts leave only
     # the read of SKILL.md, which the loaders turn into the same field. Keying
     # on the field rather than on the tool name is what makes one task visible
@@ -524,11 +718,24 @@ def spans(calls):
     out = []
     for i, mark in enumerate(marks):
         end = marks[i + 1]["n"] if i + 1 < len(marks) else len(calls) + 1
+        how = None
+        for c in calls:
+            if not mark["n"] < c["n"] < end:
+                continue
+            # The boundary call is the next thing's, not this skill's: the
+            # note is bookkeeping and the turn is a new instruction.
+            if closes(c, mark["skill"]):
+                end, how = c["n"], "записи"
+                break
+            if c.get("after_user"):
+                end, how = c["n"], "реплике пользователя"
+                break
         owned = [c for c in calls if mark["n"] < c["n"] < end]
         out.append({
             "skill": mark["skill"],
             "at": mark["n"],
             "calls": owned,
+            "how": how,
             "long": len(owned) > SPAN_CAP,
         })
     return out
@@ -591,11 +798,27 @@ def ran_tests(c):
             and not NEUTERED.search(c["cmd"].strip()))
 
 
+def signal_of(c):
+    """The runner's own verdict, read from what it printed (G4)."""
+    said = c.get("output") or ""
+    if SUITE_BAD.search(said):
+        return "violated", SUITE_BAD.search(said).group(0)
+    if SUITE_OK.search(said):
+        return "ok", SUITE_OK.search(said).group(0)
+    return None, ""
+
+
 def check_suite_ran(span):
-    """verify: something was actually run, and preferably written down."""
-    for c in span["calls"]:
-        if c["tool"] == "Bash" and RECORDED.search(c["cmd"]):
-            return "ok", f"#{c['n']}: записан в run-запись"
+    """verify: a suite was run, and its own verdict says what happened.
+
+    PS-078: this used to answer "ok" to any `primeskills-run note` in the span.
+    A note is bookkeeping — it says the agent typed a sentence, not that
+    anything ran, and it was the only branch that could return ok in practice,
+    because exit codes are absent from the logs (8824 Claude Bash calls, none
+    with a code). So the free pass went to the one piece of evidence that
+    proves nothing, while real runs read as unknown. G4 names the other half of
+    the proof and the logs do carry it: the tool's own success signal.
+    """
     runs = [c for c in span["calls"] if ran_tests(c)]
     passed = next((c for c in runs if c["returncode"] == 0), None)
     if passed:
@@ -603,8 +826,17 @@ def check_suite_ran(span):
     failed = next((c for c in runs if c["returncode"] not in (None, 0)), None)
     if failed and all(c["returncode"] is not None for c in runs):
         return "violated", f"#{failed['n']}: код {failed['returncode']}"
+    for c in runs:
+        verdict, hit = signal_of(c)
+        if verdict == "violated":
+            return "violated", f"#{c['n']}: прогон сказал «{safe(hit)}»"
+    for c in runs:
+        verdict, hit = signal_of(c)
+        if verdict == "ok":
+            return "ok", f"#{c['n']}: прогон сказал «{safe(hit)}»"
     if runs:
-        return "unknown", f"у прогона #{runs[0]['n']} код возврата в журнале не виден"
+        return "unknown", (f"у прогона #{runs[0]['n']} ни кода возврата, ни "
+                           f"собственного сигнала в журнале нет")
     return "violated", "прогона тестов в пролёте нет"
 
 
@@ -783,7 +1015,8 @@ def report(path, skills_dir, quiet=False):
     # neither: 138 of 151 checks were the session-wide G8, so "adherence 56%"
     # was really a measurement of destructive-target hygiene wearing the name of
     # skill adherence.
-    tally = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0}
+    tally = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0,
+             "far_violated": 0}
     guard = {"ok": 0, "violated": 0, "na": 0}
     by_rule = {}
 
@@ -809,8 +1042,9 @@ def report(path, skills_dir, quiet=False):
         if not quiet:
             tail = (f" — длиннее отсечки в {SPAN_CAP}, приписано с оговоркой"
                     if span.get("long") else "")
+            how = f", конец по {span['how']}" if span.get("how") else ""
             print(f"  · {span['skill']} (вызван #{span['at']}, "
-                  f"{len(span['calls'])} действий в пролёте{tail})")
+                  f"{len(span['calls'])} действий в пролёте{how}{tail})")
         if not checks and not quiet:
             print("      проверяемых инвариантов нет")
         for name, fn in checks:
@@ -821,6 +1055,8 @@ def report(path, skills_dir, quiet=False):
             slot["na" if verdict is None else verdict] += 1
             if verdict is not None and span.get("long"):
                 tally["far"] = tally.get("far", 0) + 1
+                if verdict == "violated":
+                    tally["far_violated"] = tally.get("far_violated", 0) + 1
             if not quiet:
                 mark = {"ok": "ok  ", "violated": "НАРУШЕН",
                         "unknown": "неизв", None: "н/п "}[verdict]
@@ -1144,7 +1380,8 @@ def main(argv):
         print(__doc__)
         return 0
 
-    total = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0}
+    total = {"ok": 0, "violated": 0, "unknown": 0, "na": 0, "far": 0,
+             "far_violated": 0}
     guard = {"ok": 0, "violated": 0, "na": 0}
     rules = {}
     invoked, sessions_with_core = [], 0
@@ -1236,9 +1473,11 @@ def main(argv):
                   f"{', ' + str(counts['na']) + ' н/п' if counts['na'] else ''}"
                   f" — {name}")
     if total.get("far"):
-        print(f"из них {total['far']} на пролётах длиннее {SPAN_CAP} действий — "
-              f"там скиллу приписано и то, что могло быть посторонней работой; "
-              f"эти смотреть глазами, прежде чем считать")
+        print(f"на пролётах длиннее {SPAN_CAP} действий стоит {total['far']} "
+              f"применимых проверок, и {total.get('far_violated', 0)} из "
+              f"{total['violated']} нарушений — там скиллу приписано и то, что "
+              f"могло быть посторонней работой; эти смотреть глазами, прежде "
+              f"чем считать")
 
     g_applicable, g_rate = share(guard)
     print(f"\n## Ограничитель G8 (по всей сессии, вне зависимости от скиллов)")

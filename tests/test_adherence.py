@@ -118,6 +118,76 @@ EXPECT = {
         "[НАРУШЕН] цель разрешена до разрушения (G8)",
         "dropdb prod_shop",
     ],
+    # PS-077. The user's turn is a boundary in every host, not only in Claude
+    # Code: Codex writes it as a `message` payload with role user, Kimi as a
+    # `context.append_message` whose origin is the user, OpenCode as a row in
+    # `message`. Until this, a span in those three ran to the next invocation.
+    "rollout-user-turn-ends-span.jsonl": [
+        "build (вызван #1, 2 действий в пролёте, конец по реплике пользователя)",
+        "[НАРУШЕН] цель разрешена до разрушения (G8)",
+    ],
+    # the name is forced: `load_calls` picks the Kimi reader by it
+    "wire.jsonl": [
+        "build (вызван #1, 2 действий в пролёте, конец по реплике пользователя)",
+        "[НАРУШЕН] цель разрешена до разрушения (G8)",
+    ],
+    # PS-078. Exit codes are not in the logs: of 8824 Bash calls in Claude Code
+    # transcripts none carries one, and Codex records one in 19 of 3047. So the
+    # only way this check could ever say "ok" was a `primeskills-run note` in
+    # the span -- typing, not proof. G4 names the other evidence: the tool's own
+    # success signal, read from its output.
+    "suite-note-is-not-a-run.jsonl": [
+        "[НАРУШЕН] прогон состоялся (G4)",
+        "прогона тестов в пролёте нет",
+    ],
+    "suite-signal-in-output.jsonl": [
+        "[ok  ] прогон состоялся (G4)",
+        "0 failed",
+    ],
+    "suite-signal-red.jsonl": [
+        "[НАРУШЕН] прогон состоялся (G4)",
+        "3 failed",
+    ],
+    # PS-076. A span used to run to the next invocation or to the end of the
+    # session, so a call in the first message owned everything after it --
+    # 24 of 42 violations sat on spans longer than the cap. Two boundaries
+    # close it: the exit the skill writes down, and, where none was written,
+    # the user's next turn. What falls outside stays in the session-wide G8,
+    # so the tail is unowned, never dropped.
+    "span-ends-at-record.jsonl": [
+        "build (вызван #1, 2 действий в пролёте, конец по записи)",
+        # the 45 actions after the record belong to nobody, and the
+        # destructive one among them is still judged
+        "[НАРУШЕН] цель разрешена до разрушения (G8)",
+        "rm -rf /tmp/postoronnee",
+    ],
+    "span-ends-at-user-turn.jsonl": [
+        "build (вызван #1, 2 действий в пролёте, конец по реплике пользователя)",
+        "[НАРУШЕН] цель разрешена до разрушения (G8)",
+        "rm -rf /tmp/postoronnee",
+    ],
+    # The guard that matters most: Claude Code delivers a tool result as a
+    # user-role message, and the body of a skill as an isMeta one. Read either
+    # as a turn and every span collapses at its first action -- a measurement
+    # that would look like a triumph and mean nothing.
+    # An approval is not a new instruction. Measured over 711 live turns: 106
+    # are 12 characters or shorter, and the two commonest are "Давай" (33) and
+    # "Да" (30) -- said in the middle of a flow, to let it carry on. Cut the
+    # span there and everything the skill did after being approved stops being
+    # its own: the one direction this must never fail in.
+    "span-approval-is-not-a-turn.jsonl": [
+        "build (вызван #1, 3 действий в пролёте)",
+    ],
+    # The same trap one turn later: a command that WRITES the marker into a
+    # fixture is not the marker. Found on the tool's own session, where the
+    # command generating these very fixtures closed a span. `echo` was already
+    # on record for this; anywhere-in-the-text was the wider version of it.
+    "span-record-mentioned-not-run.jsonl": [
+        "build (вызван #1, 3 действий в пролёте)",
+    ],
+    "span-survives-tool-results.jsonl": [
+        "build (вызван #1, 3 действий в пролёте)",
+    ],
     "land-and-g17.jsonl": [
         "[НАРУШЕН] дифф прочитан до коммита (G17)",
         # the printed target passes, the bare one does not
@@ -133,6 +203,13 @@ FORBIDDEN = {
     "readonly-wc-ok.jsonl": ["НАРУШЕН"],
     "readonly-stat-ok.jsonl": ["НАРУШЕН"],
     "readonly-rg-ok.jsonl": ["НАРУШЕН"],
+    "span-ends-at-record.jsonl": ["длиннее отсечки"],
+    "span-ends-at-user-turn.jsonl": ["длиннее отсечки"],
+    "span-survives-tool-results.jsonl": ["конец по реплике", "конец по записи"],
+    "span-record-mentioned-not-run.jsonl": ["конец по записи"],
+    "span-approval-is-not-a-turn.jsonl": ["конец по реплике"],
+    "rollout-user-turn-ends-span.jsonl": ["длиннее отсечки"],
+    "wire.jsonl": ["длиннее отсечки"],
 }
 
 
@@ -222,19 +299,38 @@ def main():
     if "вызовов скиллов: 1 (verify)" not in p.stdout:
         failures.append(f"журнал Kimi прочитан неверно:\n{p.stdout}")
 
+    # The real store keeps the role one table over and links parts to it by
+    # message_id; the schema here matches that, because a fixture that models
+    # less than the real thing stops testing before the code does (PS-077).
     db = fixtures / "opencode.db"
     con = sqlite3.connect(db)
-    con.execute("create table part (id text, session_id text, time_created int, data text)")
-    for n, part in enumerate([
-        {"type": "tool", "tool": "read", "state": {"input": {"filePath": "/home/x/.config/opencode/skills/land/SKILL.md"}}},
-        {"type": "tool", "tool": "bash", "state": {"input": {"command": "git status"}}},
+    con.execute("create table part (id text, message_id text, session_id text, "
+                "time_created int, data text)")
+    con.execute("create table message (id text, session_id text, data text)")
+    for mid, role in (("m1", "assistant"), ("m2", "user"), ("m3", "assistant")):
+        con.execute("insert into message values (?,?,?)",
+                    (mid, "ses_1", _json.dumps({"role": role})))
+    for n, (mid, part) in enumerate([
+        ("m1", {"type": "tool", "tool": "read", "state": {"input": {"filePath": "/home/x/.config/opencode/skills/land/SKILL.md"}}}),
+        ("m1", {"type": "tool", "tool": "bash", "state": {"input": {"command": "git status"}}}),
+        # the person speaks: everything after this is a new instruction, not
+        # `land` still running
+        ("m2", {"type": "text", "text": "стоп, дальше совсем другая задача"}),
+        ("m3", {"type": "tool", "tool": "bash", "state": {"input": {"command": "rm -rf /tmp/postoronnee"}}}),
     ]):
-        con.execute("insert into part values (?,?,?,?)", (str(n), "ses_1", n, _json.dumps(part)))
+        con.execute("insert into part values (?,?,?,?,?)",
+                    (str(n), mid, "ses_1", n, _json.dumps(part)))
     con.commit(); con.close()
     checks += 1
     p = subprocess.run([sys.executable, str(TOOL), f"{db}::ses_1"], capture_output=True, text=True)
     if "вызовов скиллов: 1 (land)" not in p.stdout:
         failures.append(f"база OpenCode прочитана неверно:\n{p.stdout}")
+    checks += 1
+    if "land (вызван #1, 1 действий в пролёте, конец по реплике пользователя)" not in p.stdout:
+        failures.append(f"реплика пользователя в OpenCode не оборвала пролёт:\n{p.stdout}")
+    checks += 1
+    if "[НАРУШЕН] цель разрешена до разрушения (G8)" not in p.stdout:
+        failures.append(f"выпавшее из пролёта выпало и из сессионного G8:\n{p.stdout}")
 
     # reading the whole set is studying it, not calling it
     study = fixtures / "study-wire.jsonl"
