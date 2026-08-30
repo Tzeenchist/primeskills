@@ -393,6 +393,34 @@ def main():
         if "с вызовом этого набора: 1" not in out:
             failures.append(f"задача со следом потока не засчитана набору:\n{out}")
 
+        # One note belongs to one task. Windows on neighbouring tasks of the
+        # same tree overlap, and counting a note in both would inflate exactly
+        # the number this was written to repair.
+        # The note sits between two tasks 7 h apart, inside a +-6 h window drawn
+        # around either one: that is the shape a window cannot resolve.
+        far = Path(tree) / "far.jsonl"
+        far.write_text(json.dumps({
+            "cwd": str(work),
+            "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "t2", "name": "Bash",
+                 "input": {"command": "ls"}}]}}) + "\n", encoding="utf-8")
+        now = session.stat().st_mtime
+        os.utime(far, (now - 7 * 3600, now - 7 * 3600))
+        between = datetime.fromtimestamp(now - 4.5 * 3600,
+                                         tz=timezone.utc).isoformat()
+        (work / ".primeskills" / "run" / "master-1.jsonl").write_text(
+            json.dumps({"kind": "note", "stage": "flow", "skill": "lazy",
+                        "text": "починить импорт", "ts": between}) + "\n",
+            encoding="utf-8")
+        checks += 1
+        out = subprocess.run([sys.executable, str(TOOL), str(session), str(far)],
+                             capture_output=True, text=True).stdout
+        if "задач: 2" not in out:
+            failures.append(f"ждали две задачи в одном дереве:\n{out}")
+        checks += 1
+        if "вызовов скиллов: 1 (lazy)" not in out:
+            failures.append(f"одна запись потока засчитана дважды:\n{out}")
+
         # and the same note must not count twice when the host did record it
         session.write_text(json.dumps({
             "cwd": str(work),
