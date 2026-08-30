@@ -248,16 +248,25 @@ def flow_closure(name, seen=None):
 # became three invocations (PS-074). Two shapes cover the case without
 # pretending to parse shell: a head that reads nothing, and the target of a
 # redirect.
-SAYS_NOTHING = re.compile(r"(?:^|[;&|]\s*)(?:echo|printf)\s", re.I)
+SAYS_NOTHING = re.compile(r"^\s*(?:echo|printf)\s", re.I)
 REDIRECT_TARGET = re.compile(r"(?:>>?|\btee\b)\s*\S*")
+SEGMENT = re.compile(r"\|\||&&|[;|]")
 
 
 def spoken_of(cmd):
-    """The part of a command that could have read a file."""
-    text = str(cmd or "")
-    if SAYS_NOTHING.search(text):
-        return ""
-    return REDIRECT_TARGET.sub(" ", text)
+    """The part of a command that could have read a file.
+
+    Judged per segment, not per line. Blanking the whole command when it
+    mentions `echo` anywhere threw away the read in
+    `cat skills/build/SKILL.md && echo ok` -- the same defect as the one this
+    fixes, pointing the other way.
+    """
+    kept = []
+    for piece in SEGMENT.split(str(cmd or "")):
+        if SAYS_NOTHING.search(piece):
+            continue
+        kept.append(REDIRECT_TARGET.sub(" ", piece))
+    return " ".join(kept)
 
 
 def named_skills(path, cmd):

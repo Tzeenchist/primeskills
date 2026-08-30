@@ -460,6 +460,15 @@ def main():
          "чтение с редиректом потеряно — читали всё-таки навык"),
         ('sed -n 1,9p /x/skills/cycle/SKILL.md && sed -n 1,9p /x/skills/verify/SKILL.md',
          ["cycle", "verify"], "цепочка чтений схлопнулась"),
+        # Judged per segment: the first cut blanked the whole line whenever it
+        # mentioned `echo`, and threw away the read standing next to it -- the
+        # same defect pointing the other way.
+        ('cat /x/skills/build/SKILL.md && echo ok', ["build"],
+         "чтение рядом с echo потеряно"),
+        ('echo start; cat /x/skills/verify/SKILL.md', ["verify"],
+         "чтение после echo потеряно"),
+        ('cat /x/skills/build/SKILL.md | tee /tmp/c.md', ["build"],
+         "чтение с tee потеряно"),
     ):
         checks += 1
         got = adh.named_skills("", cmd)
