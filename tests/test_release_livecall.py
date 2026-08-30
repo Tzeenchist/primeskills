@@ -69,14 +69,12 @@ def main():
 
         mod = load(repo)
 
-        # The gate speaks for the hosts a release waits on. Codex is installed
-        # but excluded on purpose (PS-075): its provider locks out for hours,
-        # and a gate a provider can hold shut is one that gets waved through.
-        # Pinned so that dropping a host stays a decision, not a slip.
-        if set(mod.HOSTS) != {"claude", "kimi", "opencode", "cline", "kilo"}:
-            failures.append(f"HOSTS не тот набор хостов: {mod.HOSTS}")
-        if "codex" in mod.HOSTS:
-            failures.append("codex вернулся в гейт — это решение, а не правка")
+        # The gate speaks for every host the set supports; a new agent that is
+        # installed but not asked for live calls would ship unverified there.
+        # Codex was dropped for one release and returned by decision (PS-075):
+        # pinned so that either move stays a decision, never a slip.
+        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "cline", "kilo"}:
+            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
 
         # nothing changed since the tag: the gate has nothing to ask
         if mod.missing_livecalls(at) != []:

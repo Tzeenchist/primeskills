@@ -25,13 +25,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Hosts the release gate asks about. The installer still supports six; Codex is
-# deliberately not one of them (owner's decision 2026-08-30, PS-075). Its
-# provider hits a usage limit for hours at a time -- on 0.11.5 it answered
-# "try again at 2:32 PM" -- and a gate that a provider can hold shut is a gate
-# that gets waved through instead of satisfied. The set still installs into
-# Codex; it is simply not evidence a release waits on.
-HOSTS = ("claude", "kimi", "opencode", "cline", "kilo")
+# Every host the installer supports, because a host that gets the update
+# without a live call ships unverified there. Codex was out for one release
+# (0.11.6): its provider locked the account for three hours mid-release, and a
+# gate a provider can hold shut gets waved through instead of satisfied. It is
+# back because the outage passed and the live call went through on the first
+# try -- the fullest record of the six. PS-075 holds both halves of that story.
+HOSTS = ("claude", "codex", "kimi", "opencode", "cline", "kilo")
 
 
 def git(*args):
