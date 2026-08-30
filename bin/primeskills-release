@@ -24,7 +24,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HOSTS = ("claude", "codex", "kimi", "opencode", "cline", "kilo")
+
+# Hosts the release gate asks about. The installer still supports six; Codex is
+# deliberately not one of them (owner's decision 2026-08-30, PS-075). Its
+# provider hits a usage limit for hours at a time -- on 0.11.5 it answered
+# "try again at 2:32 PM" -- and a gate that a provider can hold shut is a gate
+# that gets waved through instead of satisfied. The set still installs into
+# Codex; it is simply not evidence a release waits on.
+HOSTS = ("claude", "kimi", "opencode", "cline", "kilo")
 
 
 def git(*args):
