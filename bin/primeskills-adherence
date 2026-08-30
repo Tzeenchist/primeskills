@@ -38,10 +38,22 @@ WRITING_TOOLS = {"Edit", "Write", "NotebookEdit"}
 TEST_PATH = re.compile(r"(^|/)(tests?|spec)[/_.]|test_[^/]*$|[^/]*_test\.[a-z]+$"
                        r"|\.test\.[a-z]+$|\.spec\.[a-z]+$|(^|/)tests?\.py$")
 TEST_RUN = re.compile(r"\b(pytest|unittest|manage\.py\s+test|node\s+--test|npm\s+(run\s+)?test"
-                      r"|jest|vitest|go\s+test|cargo\s+test)\b")
+                      r"|jest|vitest|go\s+test|cargo\s+test)\b"
+                      r"|\btests?/run\.py\b")
 # A command that merely contains the word is not a run: `echo pytest` and
 # `pytest || true` both matched, and both were counted as evidence of a suite.
 # The reading was of a ritual, not of a fact.
+# PS-078. G4 asks for two things, an exit code and the tool's own success
+# signal. The logs carry only the second: of 8824 Bash calls in Claude Code
+# transcripts not one records an exit code, and Codex records 19 in 3047. Read
+# narrowly on purpose -- a runner saying "0 failed" is a fact, a transcript
+# containing the word "error" is not.
+SUITE_OK = re.compile(r"\b0 failed\b|\b0 problems\b|\b0 errors\b"
+                      r"|\b\d+ passed\b(?![^\n]*\b[1-9]\d* failed)", re.I)
+# `FAILED` stays case-sensitive: it is pytest's per-test marker, and folded
+# case it also matches the "failed" inside "0 failed" -- a green run read red.
+SUITE_BAD = re.compile(r"\b[1-9]\d* failed\b|\b[1-9]\d* problems\b"
+                       r"|\b[1-9]\d* errors?\b|(?-i:\bFAILED\b)", re.I)
 NEUTERED = re.compile(r"^\s*(echo|printf|#)\b|\|\|\s*(true|:)\s*$|--collect-only\b|--help\b")
 RECORDED = re.compile(r"\bprimeskills-run\s+note\b")
 # PS-076. The exit a skill writes down. Visible in every host, because
@@ -175,7 +187,32 @@ def call(calls, tool, skill=None, path="", cmd="", raw=None, inferred=False,
                   "path": str(path or ""), "cmd": str(cmd or ""),
                   "inferred": inferred and bool(skill),
                   "raw": raw if raw is not None else str(cmd or path or ""),
+                  "output": "",
                   "id": call_id, "returncode": returncode})
+
+
+def clip(text, limit=600):
+    """Keep the ends, not the beginning. A runner prints its verdict last, so
+    a head-first slice of a long log drops the one line worth reading; a
+    failure marker tends to come early, so the head is kept too."""
+    if len(text) <= limit:
+        return text
+    head = limit // 3
+    return text[:head] + " … " + text[-(limit - head):]
+
+
+def result_text(value, limit=600):
+    """What the tool said back, from whichever shape the host wrapped it in."""
+    if isinstance(value, str):
+        return clip(value, limit)
+    if isinstance(value, dict):
+        for key in ("output", "content", "text", "stdout"):
+            if key in value:
+                return result_text(value[key], limit)
+        return ""
+    if isinstance(value, list):
+        return clip(" ".join(result_text(i, limit) for i in value), limit)
+    return ""
 
 
 def explicit_exit(value):
@@ -312,6 +349,38 @@ def named_skill(path, cmd):
 CONTINUATION = 12
 
 
+# A message that is nothing but one envelope was written by the harness, not
+# typed by anyone: Codex wraps its cwd and its skill list this way. Matching the
+# shape rather than listing the tag names, because a list of envelopes rots.
+WHOLE_BLOCK = re.compile(r"^<(\w[\w-]*)\b[^>]*>[\s\S]*</\1>$")
+
+
+def counts_as_turn(text):
+    """Typed by the person, and long enough to be an instruction rather than
+    a nod. Shared by all four hosts so one definition of a boundary exists."""
+    body = (text or "").strip()
+    if WHOLE_BLOCK.match(body):
+        return False
+    return len(re.sub(r"<[^>]+>", "", body).strip()) > CONTINUATION
+
+
+def mark_turn(calls, pending):
+    """The turn belongs to the next action, whatever produced it."""
+    if pending and calls:
+        calls[-1]["after_user"] = True
+        return False
+    return pending
+
+
+def text_of(content):
+    """The words in a content list, whichever key the host used for them."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(i.get("text", "") for i in content if isinstance(i, dict))
+    return ""
+
+
 def is_user_turn(event, message):
     """A turn from the person, not the harness talking to itself.
 
@@ -325,17 +394,11 @@ def is_user_turn(event, message):
     if event.get("isMeta"):
         return False
     content = message.get("content")
-    if isinstance(content, list):
-        if any(isinstance(i, dict) and i.get("type") == "tool_result"
-               for i in content):
-            return False
-        text = " ".join(i.get("text", "") for i in content
-                        if isinstance(i, dict))
-    elif isinstance(content, str):
-        text = content
-    else:
+    if isinstance(content, list) and any(
+            isinstance(i, dict) and i.get("type") == "tool_result"
+            for i in content):
         return False
-    return len(re.sub(r"<[^>]+>", "", text).strip()) > CONTINUATION
+    return counts_as_turn(text_of(content))
 
 
 def load_claude(path):
@@ -351,14 +414,6 @@ def load_claude(path):
     calls = []
     by_id = {}
     pending_user = False
-
-    def carry():
-        """The turn belongs to the next action, whatever produced it."""
-        nonlocal pending_user
-        if pending_user and calls:
-            calls[-1]["after_user"] = True
-            pending_user = False
-
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -375,7 +430,7 @@ def load_claude(path):
                     if name in our_skills():
                         call(calls, "SlashCommand", name, "", "",
                              f"/{name}")
-                        carry()
+                        pending_user = mark_turn(calls, pending_user)
             if not isinstance(content, list):
                 continue
             for item in content:
@@ -385,7 +440,7 @@ def load_claude(path):
                          data.get("file_path") or data.get("notebook_path") or "",
                          data.get("command") or "",
                          json.dumps(data, ensure_ascii=False), call_id=item.get("id"))
-                    carry()
+                    pending_user = mark_turn(calls, pending_user)
                     if item.get("id"):
                         by_id[item["id"]] = calls[-1]
                 elif isinstance(item, dict) and item.get("type") == "tool_result":
@@ -393,6 +448,7 @@ def load_claude(path):
                     if target is not None:
                         code = explicit_exit(item)
                         target["returncode"] = explicit_exit(event) if code is None else code
+                        target["output"] = result_text(item.get("content"))
     return calls
 
 
@@ -402,6 +458,7 @@ def load_codex(path):
     edits arrive as `apply_patch`."""
     calls = []
     pending = {}
+    pending_user = False
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -411,8 +468,19 @@ def load_codex(path):
             payload = event.get("payload") or {}
             if event.get("type") != "response_item":
                 continue
+            # PS-077: what the person typed arrives as a plain message. The
+            # harness sends its cwd and its skill list the same way, so the
+            # envelope rule does the telling apart.
+            if payload.get("type") == "message":
+                if (payload.get("role") == "user"
+                        and counts_as_turn(text_of(payload.get("content")))):
+                    pending_user = True
+                continue
             if payload.get("type") == "custom_tool_call_output":
                 indexes = pending.get(payload.get("call_id"), [])
+                said = result_text(payload.get("output"))
+                for index in indexes:
+                    calls[index]["output"] = said
                 codes = output_exits(payload.get("output"))
                 if len(codes) == len(indexes):
                     for index, code in zip(indexes, codes):
@@ -424,6 +492,7 @@ def load_codex(path):
             if payload.get("name") == "apply_patch":
                 target = re.search(r'"(?:path|file_path)"\s*:\s*"([^"]+)"', raw)
                 call(calls, "Edit", None, target.group(1) if target else "", "", raw[:400])
+                pending_user = mark_turn(calls, pending_user)
                 continue
             # The input is a JavaScript snippet, so the key is bare (`cmd:"..."`)
             # and one snippet may hold several commands under Promise.all. Each
@@ -439,6 +508,7 @@ def load_codex(path):
                 names = named_skills("", cmd)
                 call(calls, "Bash", names[0] if names else None, "", cmd,
                      raw[:400], inferred=True, skills=names)
+                pending_user = mark_turn(calls, pending_user)
                 indexes.append(len(calls) - 1)
             if payload.get("call_id"):
                 pending[payload["call_id"]] = indexes
@@ -450,17 +520,28 @@ def load_kimi(path):
     tool vocabulary Claude uses (Bash, Edit, Read, Write, Grep, Glob)."""
     calls = []
     by_id = {}
+    pending_user = False
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
                 event = json.loads(line)
             except ValueError:
                 continue
+            # PS-077: Kimi appends every message to its context, its own
+            # included; `origin.kind` is what says the person wrote this one.
+            if event.get("type") == "context.append_message":
+                m = event.get("message") or {}
+                if (m.get("role") == "user"
+                        and (m.get("origin") or {}).get("kind") == "user"
+                        and counts_as_turn(text_of(m.get("content")))):
+                    pending_user = True
+                continue
             inner = event.get("event") or {}
             if inner.get("type") == "tool.result":
                 target = by_id.get(inner.get("toolCallId"))
                 if target is not None:
                     target["returncode"] = explicit_exit(inner.get("result"))
+                    target["output"] = result_text(inner.get("result"))
                 continue
             if inner.get("type") != "tool.call":
                 continue
@@ -472,6 +553,7 @@ def load_kimi(path):
             call(calls, name, names[0] if names else None, target, cmd,
                  json.dumps(args, ensure_ascii=False)[:400], inferred=True,
                  call_id=inner.get("toolCallId"), skills=names)
+            pending_user = mark_turn(calls, pending_user)
             if inner.get("toolCallId"):
                 by_id[inner["toolCallId"]] = calls[-1]
     return calls
@@ -487,13 +569,39 @@ def load_opencode(db, session_id):
     JSON carries the tool name and its input."""
     import sqlite3
     calls = []
+    pending_user = False
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    rows = con.execute("select data from part where session_id = ? order by time_created, id",
-                       (session_id,))
-    for (data,) in rows:
+    # PS-077: a part says nothing about who wrote it -- the role lives one
+    # table over. The person's words arrive as `text` parts of a user message,
+    # in the same time order as the tool calls, so one pass still does.
+    roles = {}
+    try:
+        for mid, mdata in con.execute("select id, data from message where session_id = ?",
+                                      (session_id,)):
+            try:
+                roles[mid] = (json.loads(mdata) or {}).get("role")
+            except ValueError:
+                continue
+    except sqlite3.Error:
+        roles = {}
+    try:
+        rows = list(con.execute("select data, message_id from part "
+                                "where session_id = ? order by time_created, id",
+                                (session_id,)))
+    except sqlite3.Error:
+        # an older store keeps no link back to the message; the tool calls are
+        # still readable, the turns simply are not there to be seen
+        rows = [(d, None) for (d,) in
+                con.execute("select data from part where session_id = ? "
+                            "order by time_created, id", (session_id,))]
+    for data, message_id in rows:
         try:
             part = json.loads(data)
         except ValueError:
+            continue
+        if roles.get(message_id) == "user":
+            if part.get("type") == "text" and counts_as_turn(part.get("text")):
+                pending_user = True
             continue
         if part.get("type") != "tool":
             continue
@@ -506,6 +614,8 @@ def load_opencode(db, session_id):
         call(calls, name, names[0] if names else None, target, cmd,
              json.dumps(args, ensure_ascii=False)[:400], inferred=True,
              returncode=explicit_exit(state), skills=names)
+        calls[-1]["output"] = result_text(state.get("output"))
+        pending_user = mark_turn(calls, pending_user)
     con.close()
     return calls
 
@@ -688,11 +798,27 @@ def ran_tests(c):
             and not NEUTERED.search(c["cmd"].strip()))
 
 
+def signal_of(c):
+    """The runner's own verdict, read from what it printed (G4)."""
+    said = c.get("output") or ""
+    if SUITE_BAD.search(said):
+        return "violated", SUITE_BAD.search(said).group(0)
+    if SUITE_OK.search(said):
+        return "ok", SUITE_OK.search(said).group(0)
+    return None, ""
+
+
 def check_suite_ran(span):
-    """verify: something was actually run, and preferably written down."""
-    for c in span["calls"]:
-        if c["tool"] == "Bash" and RECORDED.search(c["cmd"]):
-            return "ok", f"#{c['n']}: записан в run-запись"
+    """verify: a suite was run, and its own verdict says what happened.
+
+    PS-078: this used to answer "ok" to any `primeskills-run note` in the span.
+    A note is bookkeeping — it says the agent typed a sentence, not that
+    anything ran, and it was the only branch that could return ok in practice,
+    because exit codes are absent from the logs (8824 Claude Bash calls, none
+    with a code). So the free pass went to the one piece of evidence that
+    proves nothing, while real runs read as unknown. G4 names the other half of
+    the proof and the logs do carry it: the tool's own success signal.
+    """
     runs = [c for c in span["calls"] if ran_tests(c)]
     passed = next((c for c in runs if c["returncode"] == 0), None)
     if passed:
@@ -700,8 +826,17 @@ def check_suite_ran(span):
     failed = next((c for c in runs if c["returncode"] not in (None, 0)), None)
     if failed and all(c["returncode"] is not None for c in runs):
         return "violated", f"#{failed['n']}: код {failed['returncode']}"
+    for c in runs:
+        verdict, hit = signal_of(c)
+        if verdict == "violated":
+            return "violated", f"#{c['n']}: прогон сказал «{safe(hit)}»"
+    for c in runs:
+        verdict, hit = signal_of(c)
+        if verdict == "ok":
+            return "ok", f"#{c['n']}: прогон сказал «{safe(hit)}»"
     if runs:
-        return "unknown", f"у прогона #{runs[0]['n']} код возврата в журнале не виден"
+        return "unknown", (f"у прогона #{runs[0]['n']} ни кода возврата, ни "
+                           f"собственного сигнала в журнале нет")
     return "violated", "прогона тестов в пролёте нет"
 
 
