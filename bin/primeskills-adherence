@@ -957,6 +957,42 @@ def session_facts(path):
     return ("claude", cwd, stamp, stamp)
 
 
+def flow_notes(directory, first, last):
+    """Flows a task recorded for itself, from the run record of its tree.
+
+    PS-073: three of the four hosts log no invocation event, and a flow whose
+    bodies the host hands to the agent leaves no trace even there -- `lazy` ran
+    many times and was never once visible. The record is the one place that
+    does not depend on what the host chose to log, so `core/` asks a flow to
+    write itself down on its first step and this reads it back.
+
+    Attributed per task, not per session: for Claude Code and Codex a session's
+    window is a single mtime, so a note would land in every session of the
+    directory at once. A task already is the directory plus a span.
+    """
+    root = Path(directory or "") / ".primeskills" / "run"
+    if not root.is_dir():
+        return []
+    out = []
+    for path in sorted(root.glob("*.jsonl")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("kind") != "note" or e.get("stage") != "flow":
+                continue
+            name = e.get("skill")
+            when = as_seconds(e.get("ts"))
+            if name and first - TASK_GAP <= when <= last + TASK_GAP:
+                out.append(name)
+    return out
+
+
 def tasks_of(paths):
     """Group sessions into tasks: same directory, no gap longer than TASK_GAP."""
     facts = [(p,) + session_facts(p) for p in paths]
@@ -1093,7 +1129,25 @@ def main(argv):
     crossing = [t for t in grouped if len({i[1] for i in t[1]}) > 1]
 
     def names_of(items):
-        return [n for i in items for n in seen.get(str(i[0]), {}).get("skills", [])]
+        logged = [n for i in items for n in seen.get(str(i[0]), {}).get("skills", [])]
+        # ... plus what the flows wrote down about themselves, which is the
+        # only evidence in the hosts that log nothing (PS-073).
+        return logged + traced.get(id(items), [])
+
+    traced = {}
+    for directory, items in grouped:
+        first = min(i[3] for i in items)
+        last = max(i[4] for i in items)
+        marks = flow_notes(directory, first, last)
+        # A flow the host already recorded is not a second invocation: in Claude
+        # Code `/lazy` is both a slash call and a note. Only the surplus counts.
+        already = [n for i in items for n in seen.get(str(i[0]), {}).get("skills", [])]
+        extra = []
+        for name in sorted(set(marks)):
+            extra += [name] * max(0, marks.count(name) - already.count(name))
+        if extra:
+            traced[id(items)] = extra
+            invoked += extra
 
     any_skill = sum(1 for _d, items in grouped if names_of(items))
     ours = [(d, items) for d, items in grouped if own & set(names_of(items))]

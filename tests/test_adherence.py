@@ -7,9 +7,11 @@ verdict was established by reading the transcript manually before this tool
 existed, so it is the regression that matters most.
 """
 import os
+import json
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -359,6 +361,49 @@ def main():
                        capture_output=True, text=True, env=env)
     if "сессий: 1" not in p.stdout:
         failures.append(f"--newest должен оставить одну сессию:\n{p.stdout}")
+
+    # PS-073. The last blind spot: a flow whose bodies the host hands over
+    # leaves no read to infer from and no invocation event to count -- `lazy`
+    # ran many times and was never once visible. `core/` now asks a flow to
+    # write itself into the run record on its first step, and the reader joins
+    # that record to the task by directory and time. Without it this session,
+    # which calls nothing, would report no skills at all.
+    with tempfile.TemporaryDirectory() as tree:
+        work = Path(tree) / "work"
+        (work / ".primeskills" / "run").mkdir(parents=True)
+        session = Path(tree) / "session.jsonl"
+        session.write_text(json.dumps({
+            "cwd": str(work),
+            "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "t1", "name": "Bash",
+                 "input": {"command": "pytest -q"}}]}}) + "\n", encoding="utf-8")
+        stamp = datetime.fromtimestamp(session.stat().st_mtime,
+                                       tz=timezone.utc).isoformat()
+        (work / ".primeskills" / "run" / "master-1.jsonl").write_text(
+            json.dumps({"kind": "note", "stage": "flow", "skill": "lazy",
+                        "text": "починить импорт", "ts": stamp}) + "\n",
+            encoding="utf-8")
+
+        checks += 1
+        out = subprocess.run([sys.executable, str(TOOL), str(session)],
+                             capture_output=True, text=True).stdout
+        if "вызовов скиллов: 1 (lazy)" not in out:
+            failures.append(f"след потока не прочитан из записи прогона:\n{out}")
+        checks += 1
+        if "с вызовом этого набора: 1" not in out:
+            failures.append(f"задача со следом потока не засчитана набору:\n{out}")
+
+        # and the same note must not count twice when the host did record it
+        session.write_text(json.dumps({
+            "cwd": str(work),
+            "message": {"role": "user",
+                        "content": "<command-name>/lazy</command-name>"}}) + "\n",
+            encoding="utf-8")
+        checks += 1
+        out = subprocess.run([sys.executable, str(TOOL), str(session)],
+                             capture_output=True, text=True).stdout
+        if "вызовов скиллов: 1 (lazy)" not in out:
+            failures.append(f"слэш-вызов и запись потока сложились в два:\n{out}")
 
     for f in failures:
         print(f)
