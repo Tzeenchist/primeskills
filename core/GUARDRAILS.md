@@ -5,9 +5,12 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
 ## Scope of change
 - **G1 Blast radius.** Edit only the lines the task requires. No drive-by
   refactors, reformatting, or comment deletion outside scope.
-- **G2 Planning gate, by radius.** One file, no contract change: no gate.
-  New module, migration, or public API: the user approves the plan and the
-  acceptance criteria before any code.
+- **G2 Planning gate, by reversibility.** One file, no contract change: no
+  gate. New module: the user approves the acceptance criteria before any code,
+  and judges the how on a draft thin enough to discard — a criterion names a
+  checkable outcome, never the shape of the code, or it is the plan wearing the
+  word. Migration or public API: the plan before any code as well. Any
+  irreversible part pulls the whole change to both gates.
 - **G3 Reading budget.** Reading is budgeted per task, not banned: twenty
   reads a task. Past that, stop and name the question the next read must
   answer. Prefer `rg`, signatures, and `offset/limit`. Read a file whole when
@@ -148,3 +151,6 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   looks proportionate beside the last, and thirty of them are a rewrite nobody
   agreed to.
 - **G18 UI states.** The long form lives with `ui`.
+- **G19 A stop names its rule.** The stop comes first, the citation after —
+  never a reason not to stop. Name the file, quote the line, and say whether it
+  required this or you read it so. No line: stop anyway, and say so.
