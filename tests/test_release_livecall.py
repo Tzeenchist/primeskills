@@ -153,9 +153,10 @@ def main():
                 f"запись {utc} сделана позже тега {tag_at}, а гейт счёл её "
                 f"протухшей — время сравнивается строками")
 
-        # The second host in these fixtures is `kimi` rather than `kilo`: the
-        # ambiguity they test only exists between hosts the gate recognises, so
-        # naming one that left HOSTS (PS-081) would test membership instead.
+        # These fixtures pair `kimi` with `claude`, both demanded. The case that
+        # matters more is a host the gate no longer demands named beside one it
+        # does -- covered below, because PS-081 broke exactly that and twelve
+        # green suites said nothing.
         # PS-059, first facet. Matching was a substring search over the whole
         # note, so a note about one host closed another host's pair merely by
         # naming it -- and explaining a call in one host by reference to
@@ -175,6 +176,28 @@ def main():
         if ("new", "kimi") not in missing:
             failures.append("двусмысленная заметка закрыла пару по первому "
                             "попавшемуся имени хоста")
+
+        # PS-081 reopened PS-059's first facet. `HOSTS` was doing two jobs at
+        # once -- which pairs to demand, and which words are host names -- so
+        # narrowing it stopped `cline` from counting as a name, and a note about
+        # a run in cline closed kimi's pair by merely mentioning it. Ambiguity
+        # is judged against every host the set knows, demanded or not.
+        checks += 1
+        across = [json.dumps({"kind": "note", "stage": "livecall",
+                              "text": "new: прогнано в cline, там же отказ; заодно kimi",
+                              "ts": "2099-01-01T00:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(across) + "\n", encoding="utf-8")
+        if ("new", "kimi") not in mod.missing_livecalls(at):
+            failures.append("заметка про прогон в cline закрыла пару kimi — "
+                            "имя вне HOSTS перестало создавать двусмысленность")
+
+        # The name list the gate demands from and the name list it recognises are
+        # different lists: dropping a name from the second one reopens the bug.
+        checks += 1
+        known = getattr(mod, "KNOWN_HOSTS", None)
+        if known is None or set(known) != {"claude", "codex", "kimi", "opencode",
+                                          "cline", "kilo"}:
+            failures.append(f"KNOWN_HOSTS не знает все шесть имён: {known}")
 
         # a fieldless note naming one host still counts: the notes written
         # before the fields existed were not ambiguous

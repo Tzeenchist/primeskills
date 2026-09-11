@@ -39,6 +39,15 @@ ROOT = Path(__file__).resolve().parent.parent
 # in PS-081, and it is not closed.
 HOSTS = ("claude", "codex", "kimi", "opencode")
 
+# Every host name the set knows, demanded or not. Two different questions were
+# being answered by one list: which pairs the gate demands, and which words in a
+# note are host names. Narrowing HOSTS answered the second one too -- `cline`
+# stopped being a name, so "прогнано в cline, заодно kimi" named exactly one
+# host and closed kimi's pair, which is PS-059's first facet reopened. Ambiguity
+# is judged against this list; what to demand is HOSTS. Dropping a name here
+# reopens the bug, so the test pins all six.
+KNOWN_HOSTS = ("claude", "codex", "kimi", "opencode", "cline", "kilo")
+
 
 def git(*args):
     return subprocess.run(("git", "-C", str(ROOT)) + args,
@@ -212,9 +221,12 @@ def missing_livecalls(at):
             # host by reference to another is the natural thing to write --
             # that is how a note about kilo closed claude's pair. One host
             # named, no ambiguity, still counts: the notes written before the
-            # fields existed were not ambiguous.
+            # fields existed were not ambiguous. Names are counted over
+            # KNOWN_HOSTS, not HOSTS: a host the gate stopped demanding is still
+            # a host someone writes about, and it has to keep making a note
+            # ambiguous.
             text = str(e.get("text", "")).lower()
-            named = [h for h in HOSTS if h in text]
+            named = [h for h in KNOWN_HOSTS if h in text]
             if len(named) != 1:
                 continue
             for n in names:
