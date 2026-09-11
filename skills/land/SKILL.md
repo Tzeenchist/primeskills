@@ -20,7 +20,7 @@ order exists to prevent.
 - Two passes over the whole change (G17): once for secrets, once for whether the
   message matches. Neither substitutes for the other.
 - Integration is the user's decision. You prepare it; merging, releasing, and
-  deploying are theirs to choose (PRINCIPLES 8).
+  deploying are theirs to choose (P8).
 - Never force-push, never rewrite history, never `git add -A`.
 - Commit, push and pull request are three rungs, not one gesture. Each is
   checked against the run record before it happens, never remembered afterwards.

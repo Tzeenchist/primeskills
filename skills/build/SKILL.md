@@ -19,7 +19,7 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
   was asked.
 - Red, green, refactor are three phases. Never blur them: no cleanup while
   making it pass, no new behaviour while refactoring.
-- Every changed line traces to the request (PRINCIPLES 3).
+- Every changed line traces to the request (P3).
 - A task is done when its acceptance criteria are met *and* the standing bar is
   met. They are different questions and you need both.
 
@@ -64,9 +64,9 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 - The test will not go red for the right reason: the test is wrong, or the
   behaviour already exists. Find out which before writing code.
 - The plan turns out to be wrong mid-way: stop and say so. Do not quietly
-  build something else (PRINCIPLES 8).
+  build something else (P8).
 - A step needs an abstraction "for later": that is the moment to cut, not to
-  generalise (PRINCIPLES 2).
+  generalise (P2).
 - Three failed attempts at the same step, counted on the shared counter (G12):
   stop building. Handing to `debug` is allowed and improvising is not — `debug`
   starts by reproducing and stating a hypothesis, which is the opposite of a
