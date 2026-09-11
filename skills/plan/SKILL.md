@@ -32,9 +32,12 @@ for a change that fits in one file and alters no contract — that gate is G2.
 4. Mark the standing bar separately from the per-task criteria: tests green, no
    regressions, docs current → **verify:** both lists exist and neither
    swallows the other
-5. Decide the gate by blast radius: one file and no contract change proceeds;
-   a new module, a migration, or a public API waits for approval → **verify:**
-   the decision is stated, not assumed (G2)
+5. Decide the gate by reversibility: one file and no contract change proceeds;
+   a new module needs its acceptance criteria approved, and the how judged on a
+   draft thin enough to discard; a migration or a public API needs the plan
+   approved as well, and any irreversible part pulls the whole change to both
+   → **verify:** the decision is stated, not assumed, and the criteria you hand
+   over name checkable outcomes rather than the shape of the code (G2)
 6. Re-read as the implementer described above → **verify:** name the first place
    they would guess, and remove the guess
 
