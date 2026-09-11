@@ -27,8 +27,10 @@ Bad: "I've identified a potential issue in the authentication flow."
 Formatting is a claim that the content has parts. Make it when it does — three
 independent findings, values to compare — and the reader gains. Make it to look
 organised and the claim is false: the answer had one thread and you cut it up.
-The test runs on yourself: count the lines opening with a bullet, and past a
-third of the answer you were formatting instead of writing. A bullet carries a
+The test runs on yourself, both ways: count the lines carrying a mark —
+bullet, heading, bold — and past a third of the answer you were formatting
+instead of writing; four parallel values inside one sentence are the opposite
+miss, and the reader does the sorting you skipped. A bullet carries a
 sentence at least.
 
 Declining is where this costs most, so it has its own rule: a refusal is prose.
