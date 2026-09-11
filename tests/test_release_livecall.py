@@ -69,12 +69,24 @@ def main():
 
         mod = load(repo)
 
-        # The gate speaks for every host the set supports; a new agent that is
-        # installed but not asked for live calls would ship unverified there.
+        # The gate speaks for the hosts a live call can be made from, which is
+        # not the same as the hosts the installer supports: whatever the two
+        # lists differ by ships unverified, so the difference has to stay named.
         # Codex was dropped for one release and returned by decision (PS-075):
         # pinned so that either move stays a decision, never a slip.
-        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "cline", "kilo"}:
-            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
+        # 2026-09-11: cline and kilo are out by the owner's decision (PS-081).
+        # cline's own `npm update --global cline` destroyed its install mid-probe
+        # (ENOTEMPTY on a nested zod) and is not being reinstalled; kilo holds 0
+        # credentials and is not being signed in. The installer still writes to
+        # both, so both ship without live verification -- that hole is named in
+        # PS-081, not closed, exactly as 0.11.6 named Codex's.
+        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode"}:
+            failures.append(f"HOSTS не покрывает четыре хоста: {mod.HOSTS}")
+        # Returning either one is a decision with a live call behind it, never a
+        # slip. This guard goes when they come back (PS-081), like PS-075's did.
+        for host in ("cline", "kilo"):
+            if host in mod.HOSTS:
+                failures.append(f"{host} вернулся в HOSTS — это решение, а не правка")
 
         # nothing changed since the tag: the gate has nothing to ask
         if mod.missing_livecalls(at) != []:
@@ -141,23 +153,26 @@ def main():
                 f"запись {utc} сделана позже тега {tag_at}, а гейт счёл её "
                 f"протухшей — время сравнивается строками")
 
+        # The second host in these fixtures is `kimi` rather than `kilo`: the
+        # ambiguity they test only exists between hosts the gate recognises, so
+        # naming one that left HOSTS (PS-081) would test membership instead.
         # PS-059, first facet. Matching was a substring search over the whole
         # note, so a note about one host closed another host's pair merely by
         # naming it -- and explaining a call in one host by reference to
         # another is the natural thing to write. Structured fields settle it.
         checks += 1
         one = [json.dumps({"kind": "note", "stage": "livecall",
-                           "text": "new: checked in kilo; only Claude Code arms hooks",
+                           "text": "new: checked in kimi; only Claude Code arms hooks",
                            "ts": "2099-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(one) + "\n", encoding="utf-8")
         missing = mod.missing_livecalls(at)
         if ("new", "claude") not in missing:
-            failures.append("заметка про kilo закрыла пару (new, claude), "
+            failures.append("заметка про kimi закрыла пару (new, claude), "
                             "просто упомянув Claude Code")
         # a note naming two hosts is ambiguous and closes neither: which one
         # it is about is exactly what the text cannot say
         checks += 1
-        if ("new", "kilo") not in missing:
+        if ("new", "kimi") not in missing:
             failures.append("двусмысленная заметка закрыла пару по первому "
                             "попавшемуся имени хоста")
 
@@ -182,7 +197,7 @@ def main():
         if ("new", "claude") in missing:
             failures.append("запись с полями skill/host не закрыла свою пару")
         checks += 1
-        if ("new", "kilo") not in missing:
+        if ("new", "kimi") not in missing:
             failures.append("запись с полями закрыла чужую пару")
 
         # PS-059, second facet. `since` came from the tag, so a call made

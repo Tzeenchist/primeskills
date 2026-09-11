@@ -10,7 +10,7 @@ Refuses rather than guesses. `VERSION`, the top entry of `CHANGELOG.md` and the
 tag must agree, the tag must point at the commit being released, and the entry
 must have a body -- an empty release is the failure this program exists to
 prevent. When skills or core changed since the last tag, every changed skill
-must have a recorded live call from each of the six hosts (`livecall` notes in
+must have a recorded live call from each host in `HOSTS` (`livecall` notes in
 the run record) -- PS-052: twice a skill was done until it was called from
 where it lives. Prints the plan and changes nothing until `--apply`.
 """
@@ -25,13 +25,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Every host the installer supports, because a host that gets the update
-# without a live call ships unverified there. Codex was out for one release
-# (0.11.6): its provider locked the account for three hours mid-release, and a
-# gate a provider can hold shut gets waved through instead of satisfied. It is
-# back because the outage passed and the live call went through on the first
-# try -- the fullest record of the six. PS-075 holds both halves of that story.
-HOSTS = ("claude", "codex", "kimi", "opencode", "cline", "kilo")
+# The hosts a live call can actually be made from -- not every host the
+# installer supports, which is the gap this list has to keep naming. Codex was
+# out for one release (0.11.6): its provider locked the account for three hours
+# mid-release, and a gate a provider can hold shut gets waved through instead of
+# satisfied. It came back when the outage passed (PS-075).
+#
+# 2026-09-11, by the owner's decision (PS-081): cline and kilo are out, and not
+# because of an outage. cline's own `npm update --global cline` destroyed its
+# install (ENOTEMPTY on a nested zod) and it is not being reinstalled; kilo has
+# 0 credentials and is not being signed in. The installer still writes to both,
+# so both receive updates nobody exercises. That is a hole, it is named here and
+# in PS-081, and it is not closed.
+HOSTS = ("claude", "codex", "kimi", "opencode")
 
 
 def git(*args):
