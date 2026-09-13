@@ -4,6 +4,9 @@ description: Use before creating anything, to find out what is actually wanted a
 budget: 550
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
+model_refs:
+  - model: gpt-6-astra
+    path: ../../core/ASTRA.md
 ---
 
 # Brief

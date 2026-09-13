@@ -20,6 +20,7 @@ anyone who can push to a branch write the next agent's opening context.
 
     primeskills-run grant push "ветка feature/x, до PR"   # a rung the user opened
     primeskills-run grant deploy --target staging "релиз 0.4"  # named, one use
+    primeskills-run note livecall --skill verify --host codex --model gpt-6-astra "Astra path passed"
     primeskills-run may push                          # exits 1 when never granted
     primeskills-run may deploy --target staging       # target must match
     primeskills-run revoke push
@@ -464,7 +465,7 @@ def counters(entries):
 
 
 def cmd_note(path, argv):
-    """`--skill` and `--host` address a note instead of describing it.
+    """`--skill`, `--host`, and `--model` address a note instead of describing it.
 
     The live-call gate used to look for both names anywhere in the text, so a
     note about one host closed another host's pair by naming it -- and a call
@@ -474,11 +475,11 @@ def cmd_note(path, argv):
     """
     if len(argv) < 2:
         sys.exit("usage: primeskills-run note <stage> [--skill <name>] "
-                 "[--host <host>] <text>")
+                 "[--host <host>] [--model <model>] <text>")
     stage, rest = argv[0], argv[1:]
     fields, words, i = {}, [], 0
     while i < len(rest):
-        if rest[i] in ("--skill", "--host") and i + 1 < len(rest):
+        if rest[i] in ("--skill", "--host", "--model") and i + 1 < len(rest):
             fields[rest[i][2:]] = rest[i + 1]
             i += 2
         else:

@@ -89,6 +89,14 @@ def main():
         if "12 passed" not in record.read_text(encoding="utf-8"):
             failures.append("note: запись не попала в журнал")
 
+        checks += 1
+        run(repo, "note", "livecall", "--skill", "verify", "--host", "codex",
+            "--model", "gpt-6-astra", "Astra path exercised")
+        livecall = json.loads(record.read_text(encoding="utf-8").splitlines()[-1])
+        if (livecall.get("model") != "gpt-6-astra"
+                or livecall.get("text") != "Astra path exercised"):
+            failures.append(f"livecall lost model attribution: {livecall}")
+
         # evidence is bound to the tree: one byte and it is no longer about it
         checks += 1
         code, out = run(repo, "check", "verify")

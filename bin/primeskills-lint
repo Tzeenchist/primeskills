@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from psmeta import split_frontmatter  # noqa: E402  (path set above; see psmeta)
+from psmeta import MODEL_REFS, split_frontmatter  # noqa: E402  (path set above; see psmeta)
 
 SECTIONS = ["Trigger", "Invariants", "Procedure", "Stop conditions", "Output", "References"]
 ROLES = {"read-only", "reports", "exercises", "write"}
@@ -18,6 +18,8 @@ DESC_MAX = 140
 DEFAULT_BUDGET = 920
 REF_BUDGET = 805             # one reference file
 REF_TOTAL_BUDGET = 1380      # all references of one skill
+MODEL_REF_BUDGET = 50        # one model overlay
+KNOWN_MODELS = set(MODEL_REFS)
 PARAPHRASE = 0.34            # share of a core rule's words an invariant may echo
 # G16 as patterns: a read-only or reports skill must not run mutating commands,
 # and prose is where the violation hides ("then commit the result"). The list
@@ -250,6 +252,29 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
         if not isinstance(ref, dict) or not ref.get("when"):
             bad("F7", f"ref without 'when': {ref}")
 
+    seen_models = set()
+    for ref in meta.get("model_refs") or []:
+        if not isinstance(ref, dict) or not ref.get("model") or not ref.get("path"):
+            bad("F19", f"model_ref needs model and path: {ref}")
+            continue
+        model = ref["model"]
+        if model not in KNOWN_MODELS:
+            bad("F19", f"unknown model '{model}'")
+        if model in seen_models:
+            bad("F19", f"duplicate model_ref for '{model}'")
+        seen_models.add(model)
+        target = (path.parent / ref["path"]).resolve()
+        if not target.is_file():
+            bad("F19", f"model_ref path does not exist: {ref['path']}")
+            continue
+        if model in MODEL_REFS:
+            expected = (path.parents[2] / "core" / MODEL_REFS[model]).resolve()
+            if target != expected:
+                bad("F19", f"model '{model}' resolves to {target}, expected {expected}")
+        words = len(target.read_text(encoding="utf-8").split())
+        if words > MODEL_REF_BUDGET:
+            bad("F19", f"{ref['path']} is {words} words > {MODEL_REF_BUDGET}")
+
     for item in list_items(content.get("Invariants", "")):
         key = normalize(item)
         if not key:
@@ -286,7 +311,7 @@ def check_skill(path, seen_invariants, problems, rules=None, known=()):
         bad("F11", f"references total {total} words > {REF_TOTAL_BUDGET}")
 
 
-def pointer_words(root):
+def pointer_words(root, agent=None):
     """The block the installer writes into each host's always-loaded file.
 
     Loaded from *our own* bin/, never from the tree being linted. It used to
@@ -305,7 +330,7 @@ def pointer_words(root):
         spec = importlib.util.spec_from_loader("_pi", loader)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        return len(mod.bootstrap_text().split())
+        return len(mod.bootstrap_text(agent).split())
     except Exception:
         return 0
 
@@ -319,6 +344,7 @@ def check_call_cost(root, files, core_dir, problems):
     core = sum(len((core_dir / n).read_text(encoding="utf-8").split())
                for n in CORE_ALWAYS if (core_dir / n).is_file())
     descs, worst, worst_name = 0, 0, None
+    skills = []
     for path in files:
         meta, _, _ = split_frontmatter(path.read_text(encoding="utf-8"))
         if not isinstance(meta, dict):
@@ -327,14 +353,32 @@ def check_call_cost(root, files, core_dir, problems):
         if meta.get("tier") == "flow":
             continue
         budget = meta.get("budget", DEFAULT_BUDGET)
+        skills.append((path, meta, budget))
         if budget > worst:
             worst, worst_name = budget, meta.get("name")
-    base = core + descs + pointer_words(root)
+    base = core + descs + pointer_words(root, "codex")
     total = base + worst
     if total > CALL_BUDGET:
         problems.append((core_dir, "C3",
                          f"худший вызов {total} слов > {CALL_BUDGET} "
                          f"(база {base} + бюджет '{worst_name}' {worst})"))
+    for model in MODEL_REFS:
+        model_worst, model_name = 0, None
+        for path, meta, budget in skills:
+            targets = {
+                (path.parent / ref["path"]).resolve()
+                for ref in meta.get("model_refs") or []
+                if isinstance(ref, dict) and ref.get("model") == model and ref.get("path")
+            }
+            overlay = sum(len(target.read_text(encoding="utf-8").split())
+                          for target in targets if target.is_file())
+            if budget + overlay > model_worst:
+                model_worst, model_name = budget + overlay, meta.get("name")
+        total = base + model_worst
+        if total > CALL_BUDGET:
+            problems.append((core_dir, "C3",
+                             f"путь {model} {total} слов > {CALL_BUDGET} "
+                             f"(база {base} + навык '{model_name}' {model_worst})"))
 
 
 def check_core(core_dir, problems):

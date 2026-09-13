@@ -6,7 +6,7 @@ dependency, so `primeskills-lint` and `primeskills-route` died with ImportError
 on any machine that did not already happen to have it.
 
 What the frontmatter here actually uses is a small subset of YAML: scalars,
-inline lists, and one list of flat mappings (`refs`). The only nested block is
+inline lists, and lists of flat mappings (`refs`, `model_refs`). The only nested block is
 `hooks:`, which nothing in this repository reads -- Claude Code parses it
 itself -- so it is carried as opaque text and never interpreted.
 
@@ -20,6 +20,8 @@ primeskills-help, a strip in primeskills-status) and the documents they fed had
 already drifted apart once. This is the one place a field name is spelled.
 """
 import re
+
+MODEL_REFS = {"gpt-6-astra": "ASTRA.md"}
 
 # Keys whose value this parser carries but never interprets, because no tool
 # here reads them. Adding a key to this list is a decision to stop checking it.
@@ -65,7 +67,7 @@ def take_block(lines, i):
 
 
 def mapping_list(key, block, problems):
-    """`refs:` and nothing else so far: a list of mappings, one level deep."""
+    """A list of mappings, one level deep (`refs` and `model_refs`)."""
     items, current = [], None
     for line in dedent(block):
         if not line.strip():

@@ -32,15 +32,15 @@ does. A skill's full text loads only when that skill is needed.
 > — Ilya Priymak, author
 
 ```
-always in context        499 words for all 31 skills
-shared rules             3 218 words, once per session
-one skill call           3 999 … 4 417 words
+always in context        496 words for all 31 skills
+shared rules             3 177 words, once per session
+one skill call           3 955 … 4 373 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
 it rather than a promise: the linter refuses a skill that pushes a call over the
 ceiling. A sequence pays for the chain it calls and is deliberately outside that
-ceiling — `primeskills-status` prints what each one costs, up to about 12 400. For comparison, one pass of the gstack set costs about 92 000 words —
+ceiling — `primeskills-status` prints what each one costs, up to about 12 900. For comparison, one pass of the gstack set costs about 92 000 words —
 measured in `bench/RESULT.md`.
 
 ## Discipline and evidence
@@ -80,7 +80,7 @@ declared in the open: the analytical ones are allowed `WebFetch` and
 | agent | how it installs |
 |---|---|
 | Claude Code | skills + a pointer to the shared rules in `CLAUDE.md`, guards in `settings.json` |
-| Codex | skills + a pointer in `~/.codex/AGENTS.md` |
+| Codex | skills + a pointer in `~/.codex/AGENTS.md`; matching `model_refs` add the GPT-6 Astra overlay |
 | Kimi Code | `extra_skill_dirs` in the config + a pointer + the `prime-analyst` profile |
 | OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile |
 | Cline | skills + a pointer in `~/.agents/AGENTS.md` (the cross-tool agents.md standard) |
@@ -213,7 +213,7 @@ primeskills-run ship          run + record + open rungs in one call
 primeskills-handoffs          which checkpoints are saved in this tree
 primeskills-adherence --all   were the invariants of called skills followed
 primeskills-lint              skill format: rules F and C — including G16 (F16) and the asking means (F17)
-primeskills-release           release notes; changed skills must have been called live in all four hosts
+primeskills-release           release notes; changed skills need calls from four hosts and declared Codex model variants
 python3 tests/run.py          the whole suite
 ```
 
