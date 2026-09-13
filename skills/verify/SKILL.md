@@ -6,6 +6,9 @@ role: write
 refs:
   - path: ref/harness.md
     when: tests touch a database, an external service, or spawn processes
+model_refs:
+  - model: gpt-6-astra
+    path: ../../core/ASTRA.md
 ---
 
 # Verify

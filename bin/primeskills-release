@@ -23,6 +23,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from psmeta import MODEL_REFS, split_frontmatter  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # The hosts a live call can actually be made from -- not every host the
@@ -170,18 +173,33 @@ def missing_livecalls(at):
 
     `at` is the *previous* release, not the one being cut (PS-072).
 
-    The note is `primeskills-run note livecall "<name>: what happened (<host>)"`
-    recorded on the branch being released; its text must carry both the name
-    and the host, because a verdict nobody can attribute to a host is the
-    four-faces-of-one-defect again. Old notes do not count: the gate asks
-    about this release's changes, so a call recorded for the previous tag
-    must not satisfy this one.
+    New notes use structured skill, host, and optional model fields. Legacy
+    notes may still carry the skill and host in unambiguous text. Old notes do
+    not count: the gate asks about this release's changes, so a call recorded
+    for the previous tag must not satisfy this one.
     """
     tagged = instant(git("show", "-s", "--format=%cI", at).stdout.strip())
     skills, core_changed = changed_since(at)
     if not skills and not core_changed:
         return []
     names = set(skills) | ({"core"} if core_changed else set())
+    variants = {name: set() for name in names}
+    for name in skills:
+        path = ROOT / "skills" / name / "SKILL.md"
+        if not path.is_file():
+            continue
+        meta, _, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+        if isinstance(meta, dict):
+            variants[name] = {
+                ref.get("model") for ref in meta.get("model_refs") or []
+                if isinstance(ref, dict) and ref.get("model") in MODEL_REFS
+            }
+    if core_changed:
+        for model, filename in MODEL_REFS.items():
+            changed = git("diff", "--name-only", f"{at}..HEAD", "--",
+                          f"core/{filename}").stdout.strip()
+            if changed:
+                variants["core"].add(model)
     # Each name is proved against its own change, not against the tag. Anchored
     # to the tag, a call made after it but before the change counted as proof of
     # the change -- which happened on 2026-08-25, when a checkpoint written
@@ -211,10 +229,13 @@ def missing_livecalls(at):
             # read from it. Falling back to the text keeps notes written before
             # the fields existed, but a fielded note must not also close pairs
             # it never claimed: that is the hole this closes.
-            skill, host = e.get("skill"), e.get("host")
-            if skill or host:
+            skill, host, model = e.get("skill"), e.get("host"), e.get("model")
+            if skill or host or model:
                 if skill in names and host in HOSTS and fresh(skill):
-                    have.add((skill, host))
+                    if host == "codex" and model in variants.get(skill, set()):
+                        have.add((skill, host, model))
+                    else:
+                        have.add((skill, host))
                 continue
             # Text is read only where it can answer. A note naming two hosts
             # cannot say which one it is about, and explaining a call in one
@@ -232,7 +253,10 @@ def missing_livecalls(at):
             for n in names:
                 if n.lower() in text and fresh(n):
                     have.add((n, named[0]))
-    return sorted((n, h) for n in names for h in HOSTS if (n, h) not in have)
+    required = {(n, h) for n in names for h in HOSTS}
+    required |= {(n, "codex", model)
+                 for n, models in variants.items() for model in models}
+    return sorted(required - have)
 
 
 def main(argv):
@@ -264,12 +288,15 @@ def main(argv):
     since = previous_tag(tag)
     missing = missing_livecalls(since) if since else []
     if missing:
-        lines = "\n".join(f"- {n}: нет живого вызова от {h}" for n, h in missing)
+        lines = "\n".join(
+            f"- {pair[0]}: нет живого вызова от {pair[1]}"
+            + (f" на {pair[2]}" if len(pair) == 3 else "")
+            for pair in missing)
         sys.exit("primeskills-release: навыки/core менялись с прошлого тега, "
                  f"а живых вызовов не хватает:\n{lines}\n"
                  "Позовите навык в каждом хосте и запишите: "
-                 'primeskills-run note livecall "<имя>: что показал вызов '
-                 '(<host>)"')
+                 "primeskills-run note livecall --skill <name> --host <host> "
+                 "[--model <model>] \"<result>\"")
 
     # A tag subject that only repeats the version says nothing the title
     # already carries, and it became the release title verbatim once.

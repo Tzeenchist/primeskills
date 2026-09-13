@@ -288,9 +288,62 @@ def main():
             failures.append("метка между релизами сдвинула точку сравнения: "
                             f"предыдущим сочли {mod.previous_tag('v9.1.0')!r}")
 
-        print(f"{checks + 2} checks, {len(failures)} failed")
+    # A model overlay adds one Codex requirement without replacing the common
+    # Codex path. An Astra call proves the overlay; a different Codex model
+    # proves the shared instructions. Core/ASTRA.md has the same requirement.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "master"], cwd=repo, check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=t",
+                        "-c", "user.email=t@t", "commit", "-q", "--allow-empty",
+                        "-m", "init"], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=t",
+                        "-c", "user.email=t@t", "tag", "-a", "v1.0.0",
+                        "-m", "old release"], check=True)
+        at = git(repo, "rev-list", "-n", "1", "v1.0.0")
+        skill = repo / "skills" / "variant" / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(
+            "---\nname: variant\ndescription: d\nrole: write\nmodel_refs:\n"
+            "  - model: gpt-6-astra\n    path: ../../core/ASTRA.md\n---\nbody\n",
+            encoding="utf-8")
+        core = repo / "core"
+        core.mkdir()
+        (core / "ASTRA.md").write_text("changed\n", encoding="utf-8")
+        commit(repo, "add model variant")
+        mod = load(repo)
+        missing = set(mod.missing_livecalls(at))
+        checks += 1
+        if {("variant", "codex"), ("variant", "codex", "gpt-6-astra"),
+                ("core", "codex", "gpt-6-astra")} - missing:
+            failures.append(f"model requirements missing from gate: {sorted(missing)}")
+
+        run_dir = repo / ".primeskills" / "run"
+        run_dir.mkdir(parents=True)
+        record = run_dir / f"master-{hashlib.sha1(b'master').hexdigest()[:8]}.jsonl"
+        note = lambda skill, model: {
+            "kind": "note", "stage": "livecall", "skill": skill,
+            "host": "codex", "model": model, "text": "exercised",
+            "ts": "2099-01-01T00:00:00+00:00",
+        }
+        record.write_text(json.dumps(note("variant", "gpt-6-astra")) + "\n",
+                          encoding="utf-8")
+        missing = set(mod.missing_livecalls(at))
+        checks += 1
+        if (("variant", "codex", "gpt-6-astra") in missing
+                or ("variant", "codex") not in missing):
+            failures.append(f"Astra call did not stay separate from common: {sorted(missing)}")
+        record.write_text("\n".join((json.dumps(note("variant", "gpt-6-astra")),
+                                     json.dumps(note("variant", "gpt-5.6-sol")))) + "\n",
+                          encoding="utf-8")
+        checks += 1
+        if ("variant", "codex") in set(mod.missing_livecalls(at)):
+            failures.append("non-Astra Codex call did not prove the common path")
+
     for f in failures:
         print(f)
+    print(f"{checks + 2} checks, {len(failures)} failed")
     return 1 if failures else 0
 
 

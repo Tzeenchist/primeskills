@@ -15,7 +15,11 @@ import importlib.machinery
 import importlib.util
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from psmeta import MODEL_REFS, split_frontmatter  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
@@ -43,7 +47,7 @@ def words(p):
     return len(p.read_text(encoding="utf-8").split())
 
 
-def bootstrap_words():
+def bootstrap_words(agent=None):
     """The pointer the installer writes into each host's always-loaded file."""
     spec = importlib.util.spec_from_loader(
         "primeskills_install",
@@ -51,7 +55,7 @@ def bootstrap_words():
             "primeskills_install", str(ROOT / "bin" / "primeskills-install")))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    return mod.bootstrap_text().split()
+    return mod.bootstrap_text(agent).split()
 
 
 _LINT = None
@@ -122,6 +126,33 @@ def body_words(p):
     return len(re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.S).split())
 
 
+def model_ref_words(path, model):
+    meta, _, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+    if not isinstance(meta, dict):
+        return 0
+    targets = {
+        (path.parent / ref["path"]).resolve()
+        for ref in meta.get("model_refs") or []
+        if isinstance(ref, dict) and ref.get("model") == model and ref.get("path")
+    }
+    return sum(words(target) for target in targets if target.is_file())
+
+
+def call_paths():
+    """Worst single-skill Codex paths for shared and model-specific text."""
+    skills = sorted(ROOT.glob("skills/*/SKILL.md"))
+    flows = {p.parent.name for p in skills if "\ntier: flow" in p.read_text(encoding="utf-8")}
+    singles = [p for p in skills if p.parent.name not in flows]
+    core = sum(words(ROOT / "core" / f) for f in ALWAYS)
+    descs = sum(len(description(p).split()) for p in skills)
+    base = core + descs + len(bootstrap_words("codex"))
+    paths = {"common": base + max(budget_of(p) for p in singles)}
+    for model in MODEL_REFS:
+        paths[model] = base + max(
+            budget_of(p) + model_ref_words(p, model) for p in singles)
+    return paths
+
+
 def figures():
     """The five numbers the READMEs quote, so they can be checked, not retyped.
 
@@ -134,9 +165,13 @@ def figures():
     flows = [p for p in skills if "\ntier: flow" in p.read_text(encoding="utf-8")]
     core = sum(words(ROOT / "core" / f) for f in ALWAYS)
     descs = sum(len(d.split()) for d in (description(p) for p in skills))
-    always = descs + len(bootstrap_words())
+    always = descs + len(bootstrap_words("codex"))
     base = always + core
-    bodies = {p.parent.name: body_words(p) for p in skills}
+    bodies = {
+        p.parent.name: body_words(p) + max(
+            [model_ref_words(p, model) for model in MODEL_REFS] or [0])
+        for p in skills
+    }
     singles = {n: w for n, w in bodies.items() if n not in {f.parent.name for f in flows}}
     return {"always": always, "skills": len(skills), "core": core,
             "one_min": base + min(singles.values()),
@@ -154,15 +189,19 @@ def main():
                           capture_output=True, text=True).stdout.strip()
 
     descs = sum(len(d.split()) for d in (description(p) for p in skills))
-    pointer = len(bootstrap_words())
-    bodies = {p.parent.name: body_words(p) for p in skills}
+    pointer = len(bootstrap_words("codex"))
+    bodies = {
+        p.parent.name: body_words(p) + max(
+            [model_ref_words(p, model) for model in MODEL_REFS] or [0])
+        for p in skills
+    }
     always = descs + pointer
     base = always + core          # what the first skill call has cost by the time it starts
     singles = {n: w for n, w in bodies.items() if n not in {f.parent.name for f in flows}}
 
     print(f"primeskills @ {head}")
     print(f"  skills             {len(skills)} (of which flows: {len(flows)})")
-    print(f"  always in context  {always} words "
+    print(f"  always in context  up to {always} words "
           f"({len(skills)} descriptions {descs} + core pointer {pointer})")
     version = (ROOT / "VERSION")
     if version.is_file():
@@ -191,6 +230,10 @@ def main():
     worst_name = max(budgets, key=budgets.get)
     print(f"  headroom           {call_budget() - base - budgets[worst_name]} words before "
           f"C3 refuses (budget of '{worst_name}' is {budgets[worst_name]})")
+    paths = call_paths()
+    print("  Codex paths        " + ", ".join(
+        f"{name} {value} ({call_budget() - value} headroom)"
+        for name, value in paths.items()))
     print("  a flow             base + every body it can call:")
     everything = {p.parent.name: calls_of(p) for p in skills}
     certain = {k: [c for c in v if c not in calls_optional_of(k, skills)]

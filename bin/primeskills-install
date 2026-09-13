@@ -24,6 +24,9 @@ if sys.version_info < (3, 11):  # tomllib, used to read Kimi's configuration
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from psmeta import MODEL_REFS
+
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 HOME = Path.home()
@@ -64,6 +67,7 @@ PREFIX = "prime-"
 # makes core reachable. Markers keep uninstall exact.
 BEGIN, END = "<!-- primeskills:begin -->", "<!-- primeskills:end -->"
 CORE_FILES = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
+ASTRA_MODEL, ASTRA_FILE = next(iter(MODEL_REFS.items()))
 # Read-only agent profiles. Paths and frontmatter come from each project's own
 # documentation; four guesses beforehand all failed, and the docs took a minute.
 PROFILES = {
@@ -102,18 +106,24 @@ def rule_span():
     return top("PRINCIPLES.md", "P") or 8, top("GUARDRAILS.md", "G")
 
 
-def bootstrap_text():
+def bootstrap_text(agent=None):
     paths = "\n".join(f"- {ROOT / 'core' / f}" for f in CORE_FILES)
     principles, guardrails = rule_span()
-    return f"""{BEGIN}
+    common = f"""{BEGIN}
 ## primeskills
 
-Before the first primeskills skill runs in a session, read these three files
-once. The skills reference them by number (PRINCIPLES §1-§{principles},
-GUARDRAILS G1-G{guardrails}) and are incomplete without them.
+Before the first primeskills skill, read:
 
 {paths}
-{END}"""
+
+They define its PRINCIPLES P1-P{principles} and GUARDRAILS G1-G{guardrails}.
+"""
+    if agent == "codex":
+        common += f"""
+Codex: read only the `model_refs` entry matching your model. `{ASTRA_MODEL}`:
+- {ROOT / 'core' / ASTRA_FILE}
+"""
+    return common + END
 
 
 def markers_sane(text):
@@ -235,7 +245,7 @@ def bootstrap(agent, apply_it, remove):
     target.parent.mkdir(parents=True, exist_ok=True)
     backup_once(target)
     write_atomic(target,
-                 cleaned if remove else (cleaned.rstrip() + "\n\n" + bootstrap_text() + "\n"))
+                 cleaned if remove else (cleaned.rstrip() + "\n\n" + bootstrap_text(agent) + "\n"))
     return (f"core pointer removed from {target.name}" if remove
             else f"core pointer {'refreshed in' if had else 'added to'} {target.name}")
 
