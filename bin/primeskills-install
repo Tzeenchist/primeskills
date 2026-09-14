@@ -648,7 +648,8 @@ def pin(ref, agents, force=False):
     failed install left the agents following a tree the record said they were
     not following.
     """
-    sha = git("-C", str(ROOT), "rev-parse", ref).stdout.strip()
+    sha = git("-C", str(ROOT), "rev-parse", "--verify",
+              f"{ref}^{{commit}}").stdout.strip()
     if not sha:
         sys.exit(f"primeskills-install: {ref!r} is not a commit in {ROOT}")
     if pinned_is_dirty() and not force:

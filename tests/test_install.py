@@ -463,6 +463,25 @@ def main():
               checks += 1
               if not (h / ".primeskills" / "pin.json").is_file():
                   failures.append("пин не записан")
+              # An annotated tag has its own object id. The pin record must
+              # name the commit actually checked out, not that tag object,
+              # or doctor/status report a source that no agent reads.
+              subprocess.run(["git", "-C", str(clone), "-c", "user.email=t@t",
+                              "-c", "user.name=t", "tag", "-a", "pin-test",
+                              "-m", "pin test"], capture_output=True)
+              tagged = subprocess.run(
+                  [sys.executable, str(tool), "claude", "--pin", "pin-test"],
+                  capture_output=True, text=True, env=env)
+              state = json.loads(
+                  (h / ".primeskills" / "pin.json").read_text(encoding="utf-8"))
+              deployed = subprocess.run(
+                  ["git", "-C", str(h / ".primeskills" / "pinned"),
+                   "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+              checks += 1
+              if tagged.returncode != 0 or state.get("commit") != deployed:
+                  failures.append(
+                      "annotated tag записал в pin.json не deployed commit: "
+                      f"recorded={state.get('commit')} deployed={deployed}")
               # uncommitted work inside the pinned tree must stop the removal
               (h / ".primeskills" / "pinned" / "DIRTY.txt").write_text("моё\n",
                                                                       encoding="utf-8")
