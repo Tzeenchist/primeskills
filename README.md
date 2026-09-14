@@ -32,9 +32,9 @@ does. A skill's full text loads only when that skill is needed.
 > — Ilya Priymak, author
 
 ```
-always in context        496 words for all 31 skills
+always in context        488 words for all 31 skills
 shared rules             3 177 words, once per session
-one skill call           3 955 … 4 373 words
+one skill call           3 947 … 4 376 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
@@ -80,7 +80,7 @@ declared in the open: the analytical ones are allowed `WebFetch` and
 | agent | how it installs |
 |---|---|
 | Claude Code | skills + a pointer to the shared rules in `CLAUDE.md`, guards in `settings.json` |
-| Codex | skills + a pointer in `~/.codex/AGENTS.md`; matching `model_refs` add the GPT-6 Astra overlay |
+| Codex | skills + the same shared-rules pointer in `~/.codex/AGENTS.md` |
 | Kimi Code | `extra_skill_dirs` in the config + a pointer + the `prime-analyst` profile |
 | OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile |
 | Cline | skills + a pointer in `~/.agents/AGENTS.md` (the cross-tool agents.md standard) |

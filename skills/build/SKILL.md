@@ -34,8 +34,9 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 3. Resolve what the suite will touch before running it — database, cache,
    directories — and print each one (G8) → **verify:** every named target is a
    test target you can point at, not a working or dev store
-4. Run the suite once before touching anything → **verify:** you know which
-   failures were already there
+4. Run the narrowest relevant baseline once before touching anything; broaden
+   only when the change, named risk, or repository gate requires it → **verify:**
+   you know which relevant failures were already there
 5. Restate the task as a verifiable goal → **verify:** it names a command or an
    observation that will settle it
 6. Cut it into steps a single commit can carry → **verify:** each step has its

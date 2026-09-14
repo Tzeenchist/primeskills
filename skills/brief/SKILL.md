@@ -1,20 +1,17 @@
 ---
 name: brief
-description: Use before creating anything, to find out what is actually wanted and what to cut
+description: Use before creating to find out what users actually want when unresolved product choices could change what gets built
 budget: 550
 role: read-only
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
-model_refs:
-  - model: gpt-6-astra
-    path: ../../core/ASTRA.md
 ---
 
 # Brief
 
 ## Trigger
-Any request to build, add, or change behaviour, before design or code. Skip
-only when the change is mechanical and the user has already said exactly what
-they want.
+Use when unresolved product choices would change what gets built. Skip when
+the request and acceptance criteria already settle the intent, including small
+local changes and an approved plan.
 
 ## Invariants
 - No code, no files, no design decisions until the user has approved the intent.
