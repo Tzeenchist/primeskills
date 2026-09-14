@@ -6,9 +6,6 @@ role: write
 refs:
   - path: ref/harness.md
     when: tests touch a database, an external service, or spawn processes
-model_refs:
-  - model: gpt-6-astra
-    path: ../../core/ASTRA.md
 ---
 
 # Verify
@@ -49,8 +46,8 @@ pushing, and before handing work to another agent.
    → **verify:** the recorded failure and this pass describe the same test.
    With no record, prove it in a throwaway worktree — never by reverting the
    live tree, which can eat work that is not yours
-7. Run the full suite unless a flow already ran it for this state; where it is
-   impractical or impossible, run what covers the change and its neighbours
+7. Run affected checks first. Broaden to the full suite for named risks or a
+   repository/release gate, unless a flow already ran it for this state
    → **verify:** exit code is 0, and you name the run used and what it left out
 8. Kill spawned processes, remove temp artifacts → **verify:** none left behind
 

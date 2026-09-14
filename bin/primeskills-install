@@ -118,11 +118,6 @@ Before the first primeskills skill, read:
 
 They define its PRINCIPLES P1-P{principles} and GUARDRAILS G1-G{guardrails}.
 """
-    if agent == "codex":
-        common += f"""
-Codex: read only the `model_refs` entry matching your model. `{ASTRA_MODEL}`:
-- {ROOT / 'core' / ASTRA_FILE}
-"""
     return common + END
 
 

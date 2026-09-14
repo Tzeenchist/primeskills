@@ -52,9 +52,19 @@ def main():
     if common != install.bootstrap_text("kimi") or "ASTRA.md" in common:
         failures.append("Astra overlay changed a non-Codex bootstrap")
     checks += 1
-    astra = str(install.ROOT / "core" / "ASTRA.md")
-    if astra not in codex or "gpt-6-astra" not in codex or "model_refs" not in codex:
-        failures.append("Codex bootstrap does not connect the Astra model reference")
+    if codex != common or "ASTRA.md" in codex or "model_refs" in codex:
+        failures.append("Codex bootstrap asks the model to route its own overlay")
+
+    for name, phrase in (
+        ("brief", "unresolved product choices"),
+        ("build", "narrowest relevant baseline"),
+        ("verify", "affected checks first"),
+    ):
+        checks += 1
+        skill = (install.ROOT / "skills" / name / "SKILL.md").read_text(
+            encoding="utf-8")
+        if "model_refs:" in skill or phrase not in skill:
+            failures.append(f"{name} does not carry the common Astra-safe rule")
 
     paths = status.call_paths()
     checks += 1
