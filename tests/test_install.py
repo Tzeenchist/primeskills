@@ -248,6 +248,104 @@ def main():
         if agents.is_file() and "primeskills:begin" in agents.read_text(encoding="utf-8"):
             failures.append("cline: uninstall не снял блок из ~/.agents/AGENTS.md")
 
+    # OMP uses its native agent directory for both skills and AGENTS.md. The
+    # directory is relocatable through PI_CODING_AGENT_DIR, so both the default
+    # and relocated paths must be real inputs rather than documentation-only.
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        agent_dir = h / ".omp" / "agent"
+        agent_dir.mkdir(parents=True)
+        agents = agent_dir / "AGENTS.md"
+        agents.write_text("my OMP notes\n", encoding="utf-8")
+
+        run(home, "omp", "--apply")
+        skills = agent_dir / "skills"
+        want = len(list(ROOT.glob("skills/*/SKILL.md")))
+        linked = list(skills.glob("*")) if skills.is_dir() else []
+        checks += 1
+        if len(linked) != want:
+            failures.append(f"omp: слинковано {len(linked)} из {want} навыков")
+        checks += 1
+        text = agents.read_text(encoding="utf-8")
+        if "my OMP notes" not in text or "<!-- primeskills:begin -->" not in text:
+            failures.append("omp: AGENTS.md потерял чужой текст или не получил core")
+
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        checked = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                                 text=True, env=dict(os.environ, HOME=home))
+        checks += 1
+        if "[ok  ] omp" not in checked.stdout:
+            failures.append(f"doctor не признал установку OMP:\n{checked.stdout}")
+
+        run(home, "omp", "--uninstall", "--apply")
+        checks += 1
+        if "my OMP notes" not in agents.read_text(encoding="utf-8"):
+            failures.append("omp: uninstall удалил чужой текст из AGENTS.md")
+        checks += 1
+        if "primeskills:begin" in agents.read_text(encoding="utf-8"):
+            failures.append("omp: uninstall не снял managed block из AGENTS.md")
+
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        relocated = h / "profiles" / "reviewer" / "agent"
+        relocated.mkdir(parents=True)
+        env = dict(os.environ, HOME=home, PI_CODING_AGENT_DIR=str(relocated))
+        moved = subprocess.run(
+            [sys.executable, str(TOOL), "omp", "--apply", "--live"],
+            capture_output=True, text=True, env=env,
+        )
+        checks += 1
+        if moved.returncode != 0 or not (relocated / "skills" / "build").exists():
+            failures.append(f"omp: PI_CODING_AGENT_DIR не соблюдён:\n{moved.stdout}{moved.stderr}")
+        checks += 1
+        if (h / ".omp" / "agent").exists():
+            failures.append("omp: при relocation создан дефолтный agent dir")
+
+    for bad_dir in ("", "profiles/reviewer/agent"):
+        with tempfile.TemporaryDirectory() as home:
+            env = dict(os.environ, HOME=home, PI_CODING_AGENT_DIR=bad_dir)
+            refused = subprocess.run(
+                [sys.executable, str(TOOL), "omp", "--apply", "--live"],
+                cwd=home, capture_output=True, text=True, env=env,
+            )
+            checks += 1
+            if (refused.returncode == 0
+                    or "PI_CODING_AGENT_DIR must be an absolute path" not in refused.stderr):
+                failures.append(
+                    f"omp: опасный agent dir {bad_dir!r} не отклонён:\n"
+                    f"{refused.stdout}{refused.stderr}"
+                )
+            checks += 1
+            if (Path(home) / "skills").exists() or (Path(home) / "profiles").exists():
+                failures.append(f"omp: отказ для {bad_dir!r} успел записать каталог")
+            (Path(home) / ".claude").mkdir()
+            unaffected = subprocess.run(
+                [sys.executable, str(TOOL), "claude", "--apply", "--live"],
+                capture_output=True, text=True, env=env,
+            )
+            checks += 1
+            if unaffected.returncode != 0 or not (Path(home) / ".claude" / "skills").is_dir():
+                failures.append(
+                    f"omp: плохой agent dir сломал установку Claude:\n"
+                    f"{unaffected.stdout}{unaffected.stderr}"
+                )
+            doctor = ROOT / "bin" / "primeskills-doctor"
+            diagnosed = subprocess.run(
+                [sys.executable, str(doctor)], capture_output=True, text=True, env=env,
+            )
+            checks += 1
+            if "[FAIL] omp" not in diagnosed.stdout or "must be an absolute path" not in diagnosed.stdout:
+                failures.append(f"doctor не диагностировал плохой OMP agent dir:\n{diagnosed.stdout}")
+
+    with tempfile.TemporaryDirectory() as home:
+        skipped = run(home, "omp", "--apply")
+        checks += 1
+        if skipped.returncode != 0 or "not installed here, skipped" not in skipped.stdout:
+            failures.append(f"omp: отсутствующий хост не пропущен явно:\n{skipped.stdout}{skipped.stderr}")
+        checks += 1
+        if (Path(home) / ".omp").exists():
+            failures.append("omp: installer создал каталог отсутствующего хоста")
+
     # kilo is an OpenCode fork: skills under its config dir, core through the
     # `instructions` field, prime-analyst in agent/. Two things are its own.
     # It accepts four config names and reads the one that exists, so the

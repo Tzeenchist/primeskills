@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # 0 credentials and is not being signed in. The installer still writes to both,
 # so both receive updates nobody exercises. That is a hole, it is named here and
 # in PS-081, and it is not closed.
-HOSTS = ("claude", "codex", "kimi", "opencode")
+HOSTS = ("claude", "codex", "kimi", "opencode", "omp")
 
 # Every host name the set knows, demanded or not. Two different questions were
 # being answered by one list: which pairs the gate demands, and which words in a
@@ -48,8 +48,8 @@ HOSTS = ("claude", "codex", "kimi", "opencode")
 # stopped being a name, so "прогнано в cline, заодно kimi" named exactly one
 # host and closed kimi's pair, which is PS-059's first facet reopened. Ambiguity
 # is judged against this list; what to demand is HOSTS. Dropping a name here
-# reopens the bug, so the test pins all six.
-KNOWN_HOSTS = ("claude", "codex", "kimi", "opencode", "cline", "kilo")
+# reopens the bug, so the test pins all seven.
+KNOWN_HOSTS = ("claude", "codex", "kimi", "opencode", "omp", "cline", "kilo")
 
 
 def git(*args):
@@ -247,7 +247,8 @@ def missing_livecalls(at):
             # a host someone writes about, and it has to keep making a note
             # ambiguous.
             text = str(e.get("text", "")).lower()
-            named = [h for h in KNOWN_HOSTS if h in text]
+            named = [h for h in KNOWN_HOSTS
+                     if re.search(rf"(?<![\w-]){re.escape(h)}(?![\w-])", text)]
             if len(named) != 1:
                 continue
             for n in names:

@@ -17,7 +17,7 @@
 *[English](README.md) · Русский*
 
 Набор инструкций для агента-программиста — того, что пишет код по вашей просьбе:
-Claude Code, Codex, Kimi Code, OpenCode, Cline, Kilo. Каждая инструкция покрывает один род
+Claude Code, Codex, Kimi Code, OpenCode, Oh My Pi, Cline, Kilo. Каждая инструкция покрывает один род
 работы: как искать причину бага, как проверить изменение, как передать работу
 дальше.
 
@@ -87,6 +87,7 @@ Claude Code, Codex, Kimi Code, OpenCode, Cline, Kilo. Каждая инстру�
 | Codex | навыки + тот же указатель на общие правила в `~/.codex/AGENTS.md` |
 | Kimi Code | `extra_skill_dirs` в конфиге + указатель + профиль `prime-analyst` |
 | OpenCode | навыки + общие правила в `instructions` + профиль `prime-analyst` |
+| Oh My Pi (`omp`) | нативные навыки + указатель на общие правила в `~/.omp/agent/AGENTS.md` |
 | Cline | навыки + указатель в `~/.agents/AGENTS.md` (кросс-тул стандарт agents.md) |
 | Kilo | навыки + общие правила в `instructions` + профиль `prime-analyst` |
 
@@ -216,7 +217,7 @@ primeskills-run ship          прогон + запись в журнал + от
 primeskills-handoffs          какие чекпоинты сохранены в этом дереве
 primeskills-adherence --all   соблюдались ли инварианты вызванных навыков
 primeskills-lint              формат навыков: правила F и C — включая G16 (F16) и средство выбора (F17)
-primeskills-release           описание релиза; нужны четыре хоста и объявленные варианты моделей Codex
+primeskills-release           описание релиза; нужны пять хостов и объявленные варианты моделей Codex
 python3 tests/run.py          весь прогон
 ```
 
