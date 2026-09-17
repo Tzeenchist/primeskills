@@ -242,6 +242,13 @@ def main():
     check_skills(r, "codex", HOME / ".codex" / "skills")
     check_core(r, "codex", HOME / ".codex" / "AGENTS.md", "primeskills:begin")
 
+    omp = installer()
+    if omp.OMP_AGENT_DIR_ERROR:
+        r.line(FAIL, "omp", "agent directory", omp.OMP_AGENT_DIR_ERROR)
+    else:
+        check_skills(r, "omp", omp.OMP_AGENT_DIR / "skills")
+        check_core(r, "omp", omp.OMP_AGENT_DIR / "AGENTS.md", "primeskills:begin")
+
     check_skills(r, "opencode", HOME / ".config" / "opencode" / "skills")
     cfg = HOME / ".config" / "opencode" / "opencode.json"
     if cfg.is_file():

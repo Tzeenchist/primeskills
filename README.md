@@ -17,7 +17,8 @@
 *English · [Русский](README.ru.md)*
 
 Instructions for a coding agent — the kind that writes code when you ask:
-Claude Code, Codex, Kimi Code, OpenCode. Each one covers a single kind of work:
+Claude Code, Codex, Kimi Code, OpenCode, Oh My Pi, Cline, and Kilo. Each one
+covers a single kind of work:
 how to chase a bug to its cause, how to check a change, how to hand work on.
 
 Sets like this usually sit in the agent's head the whole time. This one barely
@@ -83,6 +84,7 @@ declared in the open: the analytical ones are allowed `WebFetch` and
 | Codex | skills + the same shared-rules pointer in `~/.codex/AGENTS.md` |
 | Kimi Code | `extra_skill_dirs` in the config + a pointer + the `prime-analyst` profile |
 | OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile |
+| Oh My Pi (`omp`) | native skills + a shared-rules pointer in `~/.omp/agent/AGENTS.md` |
 | Cline | skills + a pointer in `~/.agents/AGENTS.md` (the cross-tool agents.md standard) |
 | Kilo | skills + shared rules in `instructions` + the `prime-analyst` profile |
 
@@ -213,7 +215,7 @@ primeskills-run ship          run + record + open rungs in one call
 primeskills-handoffs          which checkpoints are saved in this tree
 primeskills-adherence --all   were the invariants of called skills followed
 primeskills-lint              skill format: rules F and C — including G16 (F16) and the asking means (F17)
-primeskills-release           release notes; changed skills need calls from four hosts and declared Codex model variants
+primeskills-release           release notes; changed skills need calls from five hosts and declared Codex model variants
 python3 tests/run.py          the whole suite
 ```
 

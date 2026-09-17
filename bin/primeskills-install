@@ -30,6 +30,19 @@ from psmeta import MODEL_REFS
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 HOME = Path.home()
+
+
+def omp_agent_dir():
+    raw = os.environ.get("PI_CODING_AGENT_DIR")
+    if raw is None:
+        return HOME / ".omp" / "agent", None
+    path = Path(raw).expanduser()
+    if not raw.strip() or not path.is_absolute():
+        return HOME / ".omp" / "agent", "PI_CODING_AGENT_DIR must be an absolute path"
+    return path, None
+
+
+OMP_AGENT_DIR, OMP_AGENT_DIR_ERROR = omp_agent_dir()
 # A pin is a git worktree the agents read instead of the live working copy.
 # Without one, editing a file here changes the behaviour of every agent
 # immediately, including the session running right now -- which has already
@@ -44,6 +57,7 @@ TARGETS = {
     "claude": HOME / ".claude" / "skills",
     "codex": HOME / ".codex" / "skills",
     "opencode": HOME / ".config" / "opencode" / "skills",
+    "omp": OMP_AGENT_DIR / "skills",
     "cline": HOME / ".cline" / "skills",
     "kilo": HOME / ".config" / "kilo" / "skills",
 }
@@ -84,6 +98,7 @@ ALWAYS_LOADED = {
     "claude": HOME / ".claude" / "CLAUDE.md",
     "codex": HOME / ".codex" / "AGENTS.md",
     "kimi": HOME / ".kimi-code" / "AGENTS.md",
+    "omp": OMP_AGENT_DIR / "AGENTS.md",
     # Cline reads the cross-tool agents.md standard from ~/.agents (its docs
     # list it beside the native rules). The file is shared with every other
     # tool that speaks the standard, so the managed markers do the exactness
@@ -727,7 +742,7 @@ def unpin(agents, force=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("agents", nargs="*", default=[],
-                    help="claude codex opencode kimi cline kilo; empty = all")
+                    help="claude codex opencode kimi omp cline kilo; empty = all")
     ap.add_argument("--apply", action="store_true", help="do it (default: print the plan)")
     ap.add_argument("--uninstall", action="store_true")
     ap.add_argument("--pin", metavar="COMMIT",
@@ -739,13 +754,17 @@ def main():
     ap.add_argument("--live", action="store_true",
                     help="install from the working copy instead of a pinned commit")
     args = ap.parse_args()
+    agents = args.agents or list(TARGETS) + ["kimi"]
+    if "omp" in agents and OMP_AGENT_DIR_ERROR:
+        print(OMP_AGENT_DIR_ERROR, file=sys.stderr)
+        return 2
 
     if args.pin:
         return pin(args.pin, args.agents, args.force)
     if args.unpin:
         return unpin(args.agents, args.force)
     # Pinned by default. An installation that follows a working copy is a
-    # supply chain the length of one editor: every save reaches four agents and
+    # supply chain the length of one editor: every save reaches installed agents and
     # the hooks they run, in sessions already in flight. Development wants that
     # and says so with --live; everyone else gets a fixed commit.
     if (args.apply and not args.live and ROOT != PINNED
@@ -759,7 +778,6 @@ def main():
         print(f"note: agents are pinned to {state['commit'][:8]}; this command "
               f"installs from {ROOT}. Use --pin/--unpin to move the pin.")
 
-    agents = args.agents or list(TARGETS) + ["kimi"]
     verb = ("remove" if args.apply else "would remove") if args.uninstall else \
            ("link" if args.apply else "would link")
     recorded = manifest_read()

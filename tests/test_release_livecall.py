@@ -80,8 +80,8 @@ def main():
         # credentials and is not being signed in. The installer still writes to
         # both, so both ship without live verification -- that hole is named in
         # PS-081, not closed, exactly as 0.11.6 named Codex's.
-        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode"}:
-            failures.append(f"HOSTS не покрывает четыре хоста: {mod.HOSTS}")
+        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "omp"}:
+            failures.append(f"HOSTS не покрывает пять хостов: {mod.HOSTS}")
         # Returning either one is a decision with a live call behind it, never a
         # slip. This guard goes when they come back (PS-081), like PS-075's did.
         for host in ("cline", "kilo"):
@@ -92,7 +92,7 @@ def main():
         if mod.missing_livecalls(at) != []:
             failures.append("без изменений с тега гейт требовать ничего не должен")
 
-        # a skill and core change; no notes yet -> eight missing pairs
+        # a skill and core change; no notes yet -> ten missing pairs
         (repo / "skills" / "new").mkdir(parents=True)
         (repo / "skills" / "new" / "SKILL.md").write_text("v1\n", encoding="utf-8")
         core = repo / "core"
@@ -104,7 +104,7 @@ def main():
         expect = {("new", h) for h in mod.HOSTS} | {("core", h) for h in mod.HOSTS}
         checks = 1
         if set(missing) != expect:
-            failures.append(f"ожидали 8 пар, получили {sorted(missing)}")
+            failures.append(f"ожидали 10 пар, получили {sorted(missing)}")
         # an untouched skill is nobody's business
         if any(n == "old" for n, _ in missing):
             failures.append("гейт спросил про навык, который не менялся")
@@ -196,8 +196,8 @@ def main():
         checks += 1
         known = getattr(mod, "KNOWN_HOSTS", None)
         if known is None or set(known) != {"claude", "codex", "kimi", "opencode",
-                                          "cline", "kilo"}:
-            failures.append(f"KNOWN_HOSTS не знает все шесть имён: {known}")
+                                          "omp", "cline", "kilo"}:
+            failures.append(f"KNOWN_HOSTS не знает все семь имён: {known}")
 
         # a fieldless note naming one host still counts: the notes written
         # before the fields existed were not ambiguous
@@ -208,6 +208,17 @@ def main():
         (run_dir / name).write_text("\n".join(plain) + "\n", encoding="utf-8")
         if ("new", "kimi") in mod.missing_livecalls(at):
             failures.append("однозначная старая заметка перестала считаться")
+
+        # A short host name must still be a token. OMP occurs inside ordinary
+        # words such as "prompt" and "completed"; substring matching would
+        # turn a single-host legacy note into an ambiguous two-host note.
+        checks += 1
+        boundary = [json.dumps({"kind": "note", "stage": "livecall",
+                                "text": "new: prompt completed in kimi",
+                                "ts": "2099-01-01T00:00:00+00:00"})]
+        (run_dir / name).write_text("\n".join(boundary) + "\n", encoding="utf-8")
+        if ("new", "kimi") in mod.missing_livecalls(at):
+            failures.append("omp внутри prompt/completed сделал заметку про kimi двусмысленной")
 
         # fields win over text: the same note, addressed properly
         checks += 1
