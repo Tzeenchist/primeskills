@@ -25,7 +25,7 @@ import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from psmeta import MODEL_REFS
+from psmeta import MODEL_REFS, split_frontmatter
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -74,6 +74,22 @@ OPENCODE_CONFIG = HOME / ".config" / "opencode" / "opencode.json"
 KILO_DIR = HOME / ".config" / "kilo"
 KILO_CONFIG_NAMES = ("kilo.json", "kilo.jsonc", "opencode.json", "opencode.jsonc")
 PREFIX = "prime-"
+
+# OpenCode and Kilo keep skills and commands in two different lists, and the
+# `/` menu completes from the second one only: the command loader scans
+# `{command,commands}/**/*.md`, while skills reach the model as an
+# `<available_skills>` block it never offers for completion. Linked skills
+# alone therefore leave the menu empty and the name has to be typed in full.
+# Each file here is a shortcut, not a second copy of a skill: its body says
+# which skill to use, so SKILL.md stays the only place the instructions live.
+COMMAND_TARGETS = {
+    "opencode": HOME / ".config" / "opencode" / "command",
+    "kilo": KILO_DIR / "command",
+}
+# Ownership is read from the file, because a command is a plain file the user
+# may also write by hand. A file without this line is someone else's `/name`
+# and is neither overwritten nor removed.
+COMMAND_MARK = "<!-- primeskills:command -->"
 
 # Skills reference core by number (PRINCIPLES §3, GUARDRAILS G8). Linking
 # skills/ alone leaves every one of those references pointing at a file no host
@@ -181,6 +197,84 @@ def profile(agent, apply_it, remove):
         dest.symlink_to(src)
     return ("prime-analyst removed" if remove else
             f"prime-analyst linked into {dest.parent.name}/")
+
+
+def command_text(skill):
+    """One command file: a description for the menu, a body that runs the skill.
+
+    The description is the skill's own, read through the set's one frontmatter
+    reader. It is written as a JSON string because a colon or a quote inside it
+    would otherwise end the YAML scalar early, and these hosts refuse to start
+    on a file they cannot parse.
+    """
+    meta, _, _ = split_frontmatter((skill / "SKILL.md").read_text(encoding="utf-8"))
+    description = str((meta or {}).get("description") or "").strip()
+    return (f"---\n"
+            f"description: {json.dumps(description, ensure_ascii=False)}\n"
+            f"---\n\n"
+            f"{COMMAND_MARK}\n"
+            f"Use the `{skill.name}` skill and follow it for this task.\n\n"
+            f"ARGUMENTS: $ARGUMENTS\n")
+
+
+def is_our_command(path):
+    """Ours if the file carries the marker. A symlink never is: we write plain
+    files, so anything else at that name was put there by someone else."""
+    if path.is_symlink():
+        return False
+    try:
+        return COMMAND_MARK in path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def slash_commands(agent, apply_it, remove):
+    """`/<skill>` in the host's menu, one file per skill. One status line back.
+
+    A skill dropped from the set leaves its command behind otherwise, and a
+    command that names a skill the host no longer has is an instruction that
+    fails silently -- the same defect the stale sweep exists for downstairs.
+    """
+    root = COMMAND_TARGETS.get(agent)
+    if root is None:
+        return None
+    # Rendering happens before the sweep because the sweep asks which names the
+    # set still has; on removal nothing is rendered, and reading 31 SKILL.md
+    # files to delete them would be work for an answer nobody reads.
+    wanted = {} if remove else {skill.name: command_text(skill) for skill in ours()}
+    stale, refused, written = [], [], []
+    for path in sorted(root.glob("*.md")) if root.is_dir() else []:
+        if not is_our_command(path):
+            continue
+        if remove or path.stem not in wanted:
+            stale.append(path.stem)
+            if apply_it:
+                path.unlink()
+    where = f"{root.parent.name}/{root.name}"
+    if remove:
+        # The directory is ours too when nothing else moved in; anything the
+        # user put there keeps it, and is never touched.
+        if apply_it and root.is_dir() and not any(root.iterdir()):
+            root.rmdir()
+        return (f"{len(stale)} commands removed from {where}" if apply_it
+                else f"{len(stale)} commands would be removed from {where}")
+    for name, text in wanted.items():
+        dest = root / f"{name}.md"
+        if (dest.exists() or dest.is_symlink()) and not is_our_command(dest):
+            refused.append(name)
+            continue
+        written.append(name)
+        if apply_it:
+            root.mkdir(parents=True, exist_ok=True)
+            write_atomic(dest, text)
+    note = ""
+    if stale:
+        note += ("  (stale removed: " if apply_it else "  (stale to remove: ") + \
+                ", ".join(sorted(stale)) + ")"
+    if refused:
+        note += f"  (LEFT ALONE, not ours: {', '.join(sorted(refused))})"
+    verb = "written to" if apply_it else "would be written to"
+    return f"{len(written)} commands {verb} {where}{note}"
 
 
 def kilo_config():
@@ -861,6 +955,9 @@ def main():
         print(f"{agent}: {verb} {count} skills in {root}{note}")
         print(f"{agent}: {bootstrap(agent, args.apply, args.uninstall)}")
         note = profile(agent, args.apply, args.uninstall)
+        if note:
+            print(f"{agent}: {note}")
+        note = slash_commands(agent, args.apply, args.uninstall)
         if note:
             print(f"{agent}: {note}")
 

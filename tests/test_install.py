@@ -733,6 +733,91 @@ def main():
         if "would" in wet:
             failures.append(f"боевой прогон заговорил сослагательно:\n{wet}")
 
+    # The slash menu. OpenCode and Kilo complete `/name` from the command
+    # loader and never from the linked skills, so these files are the whole of
+    # what the user sees when typing. They are also plain files in a directory
+    # the user writes by hand, which is why ownership is read from the file.
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+        commands = h / ".config" / "opencode" / "command"
+        commands.mkdir(parents=True)
+        (commands / "eng.md").write_text("someone else's command\n", encoding="utf-8")
+        (commands / "gone.md").write_text(
+            '---\ndescription: "x"\n---\n\n<!-- primeskills:command -->\n'
+            "Use the `gone` skill and follow it for this task.\n", encoding="utf-8")
+
+        out = run(tmp, "opencode", "--apply").stdout
+        want = sorted(p.parent.name for p in ROOT.glob("skills/*/SKILL.md"))
+
+        checks += 1
+        written = sorted(p.stem for p in commands.glob("*.md")
+                         if "primeskills:command" in p.read_text(encoding="utf-8"))
+        if written != [n for n in want if n != "eng"]:
+            failures.append(f"команды написаны не по составу набора: {written}")
+
+        checks += 1
+        if (commands / "eng.md").read_text(encoding="utf-8") != "someone else's command\n":
+            failures.append("чужая команда eng.md перезаписана")
+        checks += 1
+        if "LEFT ALONE, not ours: eng" not in out:
+            failures.append(f"про чужую команду не сказано в отчёте:\n{out}")
+        checks += 1
+        if (commands / "gone.md").exists():
+            failures.append("команда снятого скилла осталась в меню")
+
+        text = (commands / "vet.md").read_text(encoding="utf-8")
+        checks += 1
+        if "Use the `vet` skill" not in text:
+            failures.append(f"тело команды не называет скилл:\n{text}")
+        checks += 1
+        if "$ARGUMENTS" not in text:
+            failures.append(f"команда не передаёт аргументы:\n{text}")
+        # read from the skill rather than typed here: a description copied into
+        # the test goes stale the first time the skill is reworded
+        source = [line.split(":", 1)[1].strip()
+                  for line in (ROOT / "skills" / "vet" / "SKILL.md")
+                  .read_text(encoding="utf-8").splitlines()
+                  if line.startswith("description:")]
+        checks += 1
+        if not source or source[0] not in text:
+            failures.append(f"описание не взято из SKILL.md: {source}")
+
+        # the doctor reads the same state the installer left: a name held by
+        # the user's own command is not a missing install, and a FAIL telling
+        # them to run --apply would never clear -- the installer refuses that
+        # name on purpose
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=dict(os.environ, HOME=tmp)).stdout
+        line = [l for l in told.splitlines() if "slash commands" in l and "opencode" in l]
+        checks += 1
+        if not any("[warn]" in l and "eng" in l for l in line):
+            failures.append(f"доктор не предупредил про чужую команду:\n{told}")
+        checks += 1
+        if any("[FAIL]" in l for l in line):
+            failures.append(f"доктор ругается на законное состояние:\n{told}")
+
+        # uninstall takes back ours and only ours
+        run(tmp, "opencode", "--uninstall", "--apply")
+        checks += 1
+        left = sorted(p.name for p in commands.glob("*.md"))
+        if left != ["eng.md"]:
+            failures.append(f"после uninstall в каталоге команд осталось: {left}")
+
+    # with nothing of the user's in it, the directory goes too: it is ours
+    with tempfile.TemporaryDirectory() as tmp:
+        h = Path(tmp)
+        (h / ".config" / "opencode").mkdir(parents=True)
+        run(tmp, "opencode", "--apply")
+        commands = h / ".config" / "opencode" / "command"
+        checks += 1
+        if not commands.is_dir():
+            failures.append("каталог команд не создан установкой")
+        run(tmp, "opencode", "--uninstall", "--apply")
+        checks += 1
+        if commands.exists():
+            failures.append("после uninstall остался пустой каталог команд")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")
