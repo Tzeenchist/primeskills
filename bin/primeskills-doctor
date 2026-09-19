@@ -126,10 +126,16 @@ def check_commands(r, agent, root):
     the skill list. Linked skills with no command files is the state where the
     set works when the name is typed in full and the menu offers nothing."""
     want = sorted(p.parent.name for p in SKILLS.glob("*/SKILL.md"))
-    have = sorted(p.stem for p in root.glob("*.md")
-                  if installer().is_our_command(p)) if root.is_dir() else []
-    missing = [n for n in want if n not in have]
-    if not have:
+    have, foreign = [], []
+    if root.is_dir():
+        for path in sorted(root.glob("*.md")):
+            (have if installer().is_our_command(path) else foreign).append(path.stem)
+    # A name the user's own command holds is not a missing install: the
+    # installer leaves it alone on purpose, so --apply would change nothing and
+    # a FAIL telling the user to run it would never clear.
+    taken = [n for n in want if n in foreign]
+    missing = [n for n in want if n not in have and n not in taken]
+    if not have and not taken:
         r.line(FAIL, agent, "slash commands", f"none found in {root} — "
                f"run primeskills-install --apply")
     elif missing:
@@ -139,6 +145,10 @@ def check_commands(r, agent, root):
                f"Run primeskills-install --apply")
     else:
         r.line(OK, agent, "slash commands", f"{len(have)}")
+    if taken:
+        r.line(WARN, agent, "slash commands taken",
+               f"{', '.join(taken)} — a command of yours holds the name, so "
+               f"the menu runs that one; the skill is still available by name")
 
 
 def check_core(r, agent, path, needle):

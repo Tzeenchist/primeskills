@@ -782,6 +782,21 @@ def main():
         if not source or source[0] not in text:
             failures.append(f"описание не взято из SKILL.md: {source}")
 
+        # the doctor reads the same state the installer left: a name held by
+        # the user's own command is not a missing install, and a FAIL telling
+        # them to run --apply would never clear -- the installer refuses that
+        # name on purpose
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=dict(os.environ, HOME=tmp)).stdout
+        line = [l for l in told.splitlines() if "slash commands" in l and "opencode" in l]
+        checks += 1
+        if not any("[warn]" in l and "eng" in l for l in line):
+            failures.append(f"доктор не предупредил про чужую команду:\n{told}")
+        checks += 1
+        if any("[FAIL]" in l for l in line):
+            failures.append(f"доктор ругается на законное состояние:\n{told}")
+
         # uninstall takes back ours and only ours
         run(tmp, "opencode", "--uninstall", "--apply")
         checks += 1

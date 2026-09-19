@@ -238,7 +238,10 @@ def slash_commands(agent, apply_it, remove):
     root = COMMAND_TARGETS.get(agent)
     if root is None:
         return None
-    wanted = {skill.name: command_text(skill) for skill in ours()}
+    # Rendering happens before the sweep because the sweep asks which names the
+    # set still has; on removal nothing is rendered, and reading 31 SKILL.md
+    # files to delete them would be work for an answer nobody reads.
+    wanted = {} if remove else {skill.name: command_text(skill) for skill in ours()}
     stale, refused, written = [], [], []
     for path in sorted(root.glob("*.md")) if root.is_dir() else []:
         if not is_our_command(path):
