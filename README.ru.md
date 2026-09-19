@@ -86,10 +86,10 @@ Claude Code, Codex, Kimi Code, OpenCode, Oh My Pi, Cline, Kilo. Каждая и�
 | Claude Code | навыки + указатель на общие правила в `CLAUDE.md`, ограничители в `settings.json` |
 | Codex | навыки + тот же указатель на общие правила в `~/.codex/AGENTS.md` |
 | Kimi Code | `extra_skill_dirs` в конфиге + указатель + профиль `prime-analyst` |
-| OpenCode | навыки + общие правила в `instructions` + профиль `prime-analyst` |
+| OpenCode | навыки + общие правила в `instructions` + профиль `prime-analyst` + команды `/<навык>` в меню |
 | Oh My Pi (`omp`) | нативные навыки + указатель на общие правила в `~/.omp/agent/AGENTS.md` |
 | Cline | навыки + указатель в `~/.agents/AGENTS.md` (кросс-тул стандарт agents.md) |
-| Kilo | навыки + общие правила в `instructions` + профиль `prime-analyst` |
+| Kilo | навыки + общие правила в `instructions` + профиль `prime-analyst` + команды `/<навык>` в меню |
 
 У аналитических навыков отобраны редактирующие инструменты, и хосты это
 соблюдают. Оболочка — отдельный канал, её не перехватывает никто, поэтому

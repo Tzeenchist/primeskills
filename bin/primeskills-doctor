@@ -121,6 +121,26 @@ def check_skills(r, agent, root):
                f"primeskills-install --apply removes the stale one")
 
 
+def check_commands(r, agent, root):
+    """OpenCode and Kilo complete `/name` from the command loader, never from
+    the skill list. Linked skills with no command files is the state where the
+    set works when the name is typed in full and the menu offers nothing."""
+    want = sorted(p.parent.name for p in SKILLS.glob("*/SKILL.md"))
+    have = sorted(p.stem for p in root.glob("*.md")
+                  if installer().is_our_command(p)) if root.is_dir() else []
+    missing = [n for n in want if n not in have]
+    if not have:
+        r.line(FAIL, agent, "slash commands", f"none found in {root} — "
+               f"run primeskills-install --apply")
+    elif missing:
+        shown = ", ".join(missing[:5]) + (" …" if len(missing) > 5 else "")
+        r.line(FAIL, agent, "slash commands",
+               f"{len(want) - len(missing)} of {len(want)} — missing: {shown}. "
+               f"Run primeskills-install --apply")
+    else:
+        r.line(OK, agent, "slash commands", f"{len(have)}")
+
+
 def check_core(r, agent, path, needle):
     if path is None or not path.is_file():
         r.line(FAIL, agent, "core reachable", f"{path} missing")
@@ -260,6 +280,7 @@ def main():
         r.line(WARN, "opencode", "core reachable", "no config")
 
     check_profile(r, "opencode", HOME / ".config" / "opencode" / "agents" / "prime-analyst.md")
+    check_commands(r, "opencode", HOME / ".config" / "opencode" / "command")
 
     kimi = HOME / ".kimi-code" / "config.toml"
     if kimi.is_file():
@@ -296,6 +317,7 @@ def main():
                    f"in instructions ({kilo_cfg.name})" if hit else "not in instructions")
 
     check_profile(r, "kilo", HOME / ".config" / "kilo" / "agent" / "prime-analyst.md")
+    check_commands(r, "kilo", HOME / ".config" / "kilo" / "command")
 
     check_command(r)
 

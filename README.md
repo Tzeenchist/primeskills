@@ -83,10 +83,10 @@ declared in the open: the analytical ones are allowed `WebFetch` and
 | Claude Code | skills + a pointer to the shared rules in `CLAUDE.md`, guards in `settings.json` |
 | Codex | skills + the same shared-rules pointer in `~/.codex/AGENTS.md` |
 | Kimi Code | `extra_skill_dirs` in the config + a pointer + the `prime-analyst` profile |
-| OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile |
+| OpenCode | skills + shared rules in `instructions` + the `prime-analyst` profile + `/<skill>` commands in the menu |
 | Oh My Pi (`omp`) | native skills + a shared-rules pointer in `~/.omp/agent/AGENTS.md` |
 | Cline | skills + a pointer in `~/.agents/AGENTS.md` (the cross-tool agents.md standard) |
-| Kilo | skills + shared rules in `instructions` + the `prime-analyst` profile |
+| Kilo | skills + shared rules in `instructions` + the `prime-analyst` profile + `/<skill>` commands in the menu |
 
 Analytical skills have their editing tools taken away, and the hosts honour
 that. The shell is a separate channel that nobody intercepts, so role isolation
