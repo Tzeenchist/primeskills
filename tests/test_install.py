@@ -910,6 +910,36 @@ def main():
         if "not installed here, skipped" not in out:
             failures.append(f"qoder: пропуск не назван в отчёте:\n{out}")
 
+    # A hook the installer wrote from the pinned tree is ours, exactly as one
+    # written from a live checkout is: the installer has accepted both roots
+    # since PS-048, and the doctor was still comparing against its own. The
+    # first real install of qoder from the pin (2026-09-21) came back
+    # "installed command is not ours" for the two hooks it had just armed.
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        (h / ".qoder").mkdir()
+        pinned = h / ".primeskills" / "pinned" / "skills" / "fence" / "bin"
+        pinned.mkdir(parents=True)
+        for script in ("check-commands.py", "check-boundary.py"):
+            shutil.copy2(ROOT / "skills" / "fence" / "bin" / script, pinned / script)
+        (h / ".qoder" / "settings.json").write_text(json.dumps({"hooks": {"PreToolUse": [
+            {"matcher": "Bash",
+             "hooks": [{"type": "command",
+                        "command": f"python3 {pinned / 'check-commands.py'}"}]},
+            {"matcher": "Edit|Write|NotebookEdit",
+             "hooks": [{"type": "command",
+                        "command": f"python3 {pinned / 'check-boundary.py'}"}]},
+        ]}}, indent=2) + "\n", encoding="utf-8")
+
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=dict(os.environ, HOME=home)).stdout
+        armed = [l for l in told.splitlines() if "qoder" in l and "hook armed" in l]
+        checks += 1
+        if len(armed) != 2 or any("not ours" in l for l in armed):
+            failures.append("доктор не узнал хук из закреплённого дерева:\n"
+                            + "\n".join(armed))
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

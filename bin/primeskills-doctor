@@ -58,6 +58,12 @@ HOME = Path.home()
 SKILLS = ROOT / "skills"
 PREFIX = "prime-"  # the installer's collision prefix; same literal there
 FENCE = SKILLS / "fence" / "bin"
+# The set has two trees, and a hook from either is ours: the installer has said
+# so since PS-048, because `--unpin` running from the working copy read the
+# pinned tree's hooks as a stranger's. The doctor compared against its own tree
+# alone, so a hook the installer had just armed from the pin came back
+# "installed command is not ours" (found 2026-09-21, installing qoder).
+PINNED_FENCE = HOME / ".primeskills" / "pinned" / "skills" / "fence" / "bin"
 
 OK, FAIL, WARN = "ok  ", "FAIL", "warn"
 
@@ -201,7 +207,8 @@ def check_hooks_declared(r, agent="claude", settings=None):
         (boundary / "boundary").write_text(str(Path(tmp) / "inside") + "\n",
                                             encoding="utf-8")
         for matcher, script, payload, expect in cases:
-            expected_script = FENCE / script
+            expected = {(root / script).resolve()
+                        for root in (FENCE, PINNED_FENCE)}
             commands = [str(hook.get("command", ""))
                         for entry in entries if entry.get("matcher") == matcher
                         for hook in (entry.get("hooks") or [])]
@@ -212,7 +219,7 @@ def check_hooks_declared(r, agent="claude", settings=None):
                 except ValueError:
                     continue
                 if (len(candidate) == 2 and Path(candidate[0]).name.startswith("python")
-                        and Path(candidate[1]).resolve() == expected_script.resolve()):
+                        and Path(candidate[1]).resolve() in expected):
                     argv = candidate
                     break
             valid = bool(argv)
