@@ -818,6 +818,98 @@ def main():
         if commands.exists():
             failures.append("после uninstall остался пустой каталог команд")
 
+    # qoder is Claude Code-shaped: skills under its own config directory,
+    # AGENTS.md as the always-loaded file, commands in `commands/` -- plural,
+    # unlike opencode's `command/` -- and PreToolUse hooks in settings.json.
+    # That file also holds the host's model and permission settings, so the
+    # writer has to give back everything it did not put there.
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        (h / ".qoder").mkdir()
+        (h / ".qoder" / "settings.json").write_text(json.dumps({
+            "model": {"name": "qfmodel"},
+            "permissions": {"trustDirectories": [str(h)]},
+        }, indent=2) + "\n", encoding="utf-8")
+
+        run(home, "qoder", "--apply")
+        want = len(list(ROOT.glob("skills/*/SKILL.md")))
+
+        skills = h / ".qoder" / "skills"
+        linked = sorted(skills.glob("*")) if skills.is_dir() else []
+        checks += 1
+        if len(linked) != want:
+            failures.append(f"qoder: слинковано {len(linked)} из {want} навыков")
+        # one symlink per skill, the codex shape. Proved live 2026-09-21: qoder
+        # reads both SKILL.md and the ref/ payload through such a link, so the
+        # per-file shape claude needs is not needed here.
+        checks += 1
+        if not all(p.is_symlink() for p in linked):
+            failures.append("qoder: навык поставлен не ссылкой на каталог")
+        checks += 1
+        if linked and not (linked[0] / "SKILL.md").is_file():
+            failures.append("qoder: через ссылку не читается SKILL.md")
+
+        agents = h / ".qoder" / "AGENTS.md"
+        text = agents.read_text(encoding="utf-8") if agents.is_file() else ""
+        checks += 1
+        if ("<!-- primeskills:begin -->" not in text
+                or "core/PRINCIPLES.md" not in text):
+            failures.append("qoder: указателя на core нет в ~/.qoder/AGENTS.md")
+
+        commands = h / ".qoder" / "commands"
+        written = (sorted(p.stem for p in commands.glob("*.md")
+                          if "primeskills:command" in p.read_text(encoding="utf-8"))
+                   if commands.is_dir() else [])
+        checks += 1
+        if len(written) != want:
+            failures.append(f"qoder: команд написано {len(written)} из {want}")
+
+        settings = json.loads((h / ".qoder" / "settings.json").read_text(encoding="utf-8"))
+        armed = [x["command"] for e in settings.get("hooks", {}).get("PreToolUse", [])
+                 for x in e.get("hooks", [])]
+        checks += 1
+        if not any("check-commands.py" in c for c in armed):
+            failures.append(f"qoder: сторож не взведён в settings.json: {armed}")
+        checks += 1
+        if settings.get("model", {}).get("name") != "qfmodel":
+            failures.append("qoder: запись хуков потеряла чужие настройки")
+
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=dict(os.environ, HOME=home)).stdout
+        checks += 1
+        if "[ok  ] qoder" not in told:
+            failures.append(f"доктор не признал установку qoder:\n{told}")
+
+        run(home, "qoder", "--uninstall", "--apply")
+        left = json.loads((h / ".qoder" / "settings.json").read_text(encoding="utf-8"))
+        # the root itself stays, as it does for every other host: uninstall
+        # takes back the links it made and does not claim the directory
+        checks += 1
+        if skills.is_dir() and list(skills.glob("*")):
+            failures.append(f"qoder: uninstall оставил {len(list(skills.glob('*')))} ссылок")
+        checks += 1
+        if "hooks" in left:
+            failures.append("qoder: uninstall не снял хуки")
+        checks += 1
+        if left.get("model", {}).get("name") != "qfmodel":
+            failures.append("qoder: uninstall затёр чужие настройки")
+        checks += 1
+        if agents.is_file() and "primeskills:begin" in agents.read_text(encoding="utf-8"):
+            failures.append("qoder: uninstall не снял блок из AGENTS.md")
+
+    # a HOME without qoder gets nothing: a host that is not installed must not
+    # have its configuration directory created for it
+    with tempfile.TemporaryDirectory() as home:
+        h = Path(home)
+        out = run(home, "qoder", "--apply").stdout
+        checks += 1
+        if (h / ".qoder").exists():
+            failures.append("qoder: установщик создал каталог отсутствующего хоста")
+        checks += 1
+        if "not installed here, skipped" not in out:
+            failures.append(f"qoder: пропуск не назван в отчёте:\n{out}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

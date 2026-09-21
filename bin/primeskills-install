@@ -60,6 +60,12 @@ TARGETS = {
     "omp": OMP_AGENT_DIR / "skills",
     "cline": HOME / ".cline" / "skills",
     "kilo": HOME / ".config" / "kilo" / "skills",
+    # Qoder keeps everything under one config directory, like Claude Code:
+    # `skills/`, `commands/`, `agents/` and `AGENTS.md` all sit in `~/.qoder`.
+    # A live call on 2026-09-21 read both `SKILL.md` and a skill's `ref/`
+    # payload through a directory symlink, so it takes the plain link shape
+    # rather than claude's per-file one.
+    "qoder": HOME / ".qoder" / "skills",
 }
 KIMI_CONFIG = HOME / ".kimi-code" / "config.toml"
 OPENCODE_CONFIG = HOME / ".config" / "opencode" / "opencode.json"
@@ -85,6 +91,10 @@ PREFIX = "prime-"
 COMMAND_TARGETS = {
     "opencode": HOME / ".config" / "opencode" / "command",
     "kilo": KILO_DIR / "command",
+    # Qoder scans `commands/` -- plural, unlike the singular `command/` the
+    # OpenCode family uses -- and completes `/name` from it. Same wrapper file,
+    # same `$ARGUMENTS`, same ownership marker.
+    "qoder": HOME / ".qoder" / "commands",
 }
 # Ownership is read from the file, because a command is a plain file the user
 # may also write by hand. A file without this line is someone else's `/name`
@@ -120,6 +130,9 @@ ALWAYS_LOADED = {
     # tool that speaks the standard, so the managed markers do the exactness
     # work uninstall relies on everywhere else.
     "cline": HOME / ".agents" / "AGENTS.md",
+    # Qoder reads `~/.qoder/AGENTS.md` at home scope on every session. Its
+    # `.agents` support covers skills only, so this block is delivered once.
+    "qoder": HOME / ".qoder" / "AGENTS.md",
 }
 
 
@@ -358,6 +371,13 @@ def bootstrap(agent, apply_it, remove):
 # cannot resolve is an instruction that fails silently, so the command gets a
 # place on PATH here rather than an absolute path baked into every SKILL.md.
 CLAUDE_SETTINGS = HOME / ".claude" / "settings.json"
+# The hosts where the guard is a hook and not a paragraph. Both read the same
+# shape -- `hooks.PreToolUse[].matcher` in a JSON settings file -- so one
+# writer serves both. Everywhere else G9 is text the agent follows.
+HOOK_SETTINGS = {
+    "claude": CLAUDE_SETTINGS,
+    "qoder": HOME / ".qoder" / "settings.json",
+}
 # The guard hooks used to be declared in fence's own frontmatter, so nothing was
 # intercepted until someone invoked the skill: a destructive command on step two
 # of a session that reached `/fence` on step twenty went through untouched, while
@@ -405,16 +425,17 @@ def is_our_hook(entry):
     return False
 
 
-def hooks(apply_it, remove):
+def hooks(apply_it, remove, agent="claude"):
     """Arm the guards at install time. One line of status back."""
-    if not CLAUDE_SETTINGS.parent.is_dir():
-        return "Claude Code not installed here, skipped"
+    settings = HOOK_SETTINGS[agent]
+    if not settings.parent.is_dir():
+        return "not installed here, skipped"
     data = {}
-    if CLAUDE_SETTINGS.is_file():
+    if settings.is_file():
         try:
-            data = json.loads(CLAUDE_SETTINGS.read_text(encoding="utf-8"))
+            data = json.loads(settings.read_text(encoding="utf-8"))
         except ValueError:
-            return f"{CLAUDE_SETTINGS.name} is not valid JSON — left alone, fix by hand"
+            return f"{settings.name} is not valid JSON — left alone, fix by hand"
     pre = (data.get("hooks") or {}).get("PreToolUse") or []
     kept = [e for e in pre if not is_our_hook(e)]
     wanted = [{"matcher": matcher,
@@ -431,8 +452,8 @@ def hooks(apply_it, remove):
         data["hooks"].pop("PreToolUse")
     if not data["hooks"]:
         data.pop("hooks")
-    backup_once(CLAUDE_SETTINGS)
-    write_atomic(CLAUDE_SETTINGS, json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+    backup_once(settings)
+    write_atomic(settings, json.dumps(data, indent=2, ensure_ascii=False) + "\n",
                  check=json.loads)
     return ("hooks removed from settings.json" if remove
             else f"hooks armed in settings.json ({len(wanted)} matchers)")
@@ -836,7 +857,8 @@ def unpin(agents, force=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("agents", nargs="*", default=[],
-                    help="claude codex opencode kimi omp cline kilo; empty = all")
+                    help="claude codex opencode kimi omp cline kilo qoder; "
+                         "empty = all")
     ap.add_argument("--apply", action="store_true", help="do it (default: print the plan)")
     ap.add_argument("--uninstall", action="store_true")
     ap.add_argument("--pin", metavar="COMMIT",
@@ -878,8 +900,9 @@ def main():
     created = {}
 
     print(f"shared: {command(args.apply, args.uninstall)}")
-    if "claude" in agents:
-        print(f"claude: {hooks(args.apply, args.uninstall)}")
+    for host in HOOK_SETTINGS:
+        if host in agents:
+            print(f"{host}: {hooks(args.apply, args.uninstall, host)}")
 
     for agent in agents:
         if agent == "kimi":
