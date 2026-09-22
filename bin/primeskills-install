@@ -388,6 +388,15 @@ HOOK_SETTINGS = {
 HOOKS = [("Bash", "check-commands.py", "fence: checking the command"),
          ("Edit|Write|NotebookEdit", "check-boundary.py", "fence: checking the boundary")]
 MANIFEST = HOME / ".primeskills" / "installed.json"
+# Hooks get their own record for the same reason links have one: a path test
+# answers "is this from a tree of mine", and that question has a different
+# answer depending on which copy is running. `pin()` runs the installer from
+# the pinned tree, where ROOT *is* PINNED and the two roots collapse into one,
+# so a hook armed earlier from a live checkout read as a stranger's and was
+# kept -- the repin of 2026-09-22 left the guard armed twice (PS-087). What
+# this installer wrote, it records; what it recorded, it may take back from
+# any tree.
+HOOKS_MANIFEST = HOME / ".primeskills" / "hooks.json"
 LOCAL_BIN = HOME / ".local" / "bin"
 # Every tool a skill names by bare name belongs here: `handon` called
 # `primeskills-handoffs` and Codex answered 127, command not found
@@ -407,7 +416,7 @@ def hook_command(script):
     return "python3 " + shlex.quote(str(ROOT / "skills" / "fence" / "bin" / script))
 
 
-def is_our_hook(entry):
+def is_our_hook(entry, recorded=()):
     """Ours if it runs a fence script from any tree of this set.
 
     Testing against ROOT alone read the same installation two ways depending on
@@ -420,6 +429,8 @@ def is_our_hook(entry):
     roots = [str(ROOT), str(PINNED)]
     for h in entry.get("hooks", []):
         cmd = str(h.get("command", ""))
+        if cmd in recorded:
+            return True
         if "/skills/fence/bin/" in cmd and any(r in cmd for r in roots):
             return True
     return False
@@ -436,8 +447,10 @@ def hooks(apply_it, remove, agent="claude"):
             data = json.loads(settings.read_text(encoding="utf-8"))
         except ValueError:
             return f"{settings.name} is not valid JSON — left alone, fix by hand"
+    record = hooks_record_read()
+    mine = set(record.get(str(settings), []))
     pre = (data.get("hooks") or {}).get("PreToolUse") or []
-    kept = [e for e in pre if not is_our_hook(e)]
+    kept = [e for e in pre if not is_our_hook(e, mine)]
     wanted = [{"matcher": matcher,
                "hooks": [{"type": "command", "command": hook_command(script),
                           "statusMessage": message}]}
@@ -455,6 +468,14 @@ def hooks(apply_it, remove, agent="claude"):
     backup_once(settings)
     write_atomic(settings, json.dumps(data, indent=2, ensure_ascii=False) + "\n",
                  check=json.loads)
+    # Written after the file, so a failed write leaves no claim on hooks that
+    # were never armed. The record names commands, not paths: the next run may
+    # be from the other tree and a path would tell it nothing.
+    if remove:
+        record.pop(str(settings), None)
+    else:
+        record[str(settings)] = [h["command"] for e in wanted for h in e["hooks"]]
+    hooks_record_write(record)
     return ("hooks removed from settings.json" if remove
             else f"hooks armed in settings.json ({len(wanted)} matchers)")
 
@@ -501,6 +522,24 @@ def manifest_read():
         return json.loads(MANIFEST.read_text(encoding="utf-8"))
     except ValueError:
         return {}
+
+
+def hooks_record_read():
+    """Which hook commands this installer armed, per settings file."""
+    if not HOOKS_MANIFEST.is_file():
+        return {}
+    try:
+        data = json.loads(HOOKS_MANIFEST.read_text(encoding="utf-8"))
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def hooks_record_write(entries):
+    HOOKS_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(HOOKS_MANIFEST,
+                 json.dumps(entries, indent=2, ensure_ascii=False) + "\n",
+                 check=json.loads)
 
 
 def manifest_write(entries):
