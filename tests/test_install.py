@@ -940,6 +940,59 @@ def main():
             failures.append("доктор не узнал хук из закреплённого дерева:\n"
                             + "\n".join(armed))
 
+    # PS-087. A hook a live checkout armed is still ours when the next run
+    # happens from the pinned tree: there ROOT == PINNED, the two roots
+    # collapse into one, and a path test alone calls our own hook a
+    # stranger's. The repin of 2026-09-22 left both pairs armed and claude ran
+    # the guard twice. Ownership of a hook is now a record, like ownership of
+    # a link: what this installer armed, it can take back from any tree.
+    with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as other:
+        h, o = Path(home), Path(other)
+        (h / ".qoder").mkdir()
+        settings = h / ".qoder" / "settings.json"
+        gone = o / "skills" / "fence" / "bin"
+        armed = [f"python3 {gone / 'check-commands.py'}",
+                 f"python3 {gone / 'check-boundary.py'}"]
+        settings.write_text(json.dumps({"hooks": {"PreToolUse": [
+            {"matcher": "Bash",
+             "hooks": [{"type": "command", "command": armed[0]}]},
+            {"matcher": "Edit|Write|NotebookEdit",
+             "hooks": [{"type": "command", "command": armed[1]}]},
+            {"matcher": "Bash",
+             "hooks": [{"type": "command", "command": "python3 /home/other/guard.py"}]},
+        ]}}, indent=2) + "\n", encoding="utf-8")
+        record = h / ".primeskills" / "hooks.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(json.dumps({str(settings): armed}), encoding="utf-8")
+
+        run(home, "qoder", "--apply")
+        live = json.loads(settings.read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
+        commands = [x["command"] for e in live for x in e.get("hooks", [])]
+        ours = [c for c in commands if "/skills/fence/bin/" in c]
+        checks += 1
+        if any(str(o) in c for c in commands):
+            failures.append(f"хук прежнего дерева остался взведённым: {commands}")
+        checks += 1
+        if len(ours) != 2:
+            failures.append(f"сторож взведён {len(ours)} раз вместо двух: {ours}")
+        checks += 1
+        if "python3 /home/other/guard.py" not in commands:
+            failures.append(f"чужой хук снесён вместе с нашими: {commands}")
+        checks += 1
+        kept = json.loads(record.read_text(encoding="utf-8")).get(str(settings))
+        if kept != ours:
+            failures.append(f"запись не описывает взведённое: {kept} vs {ours}")
+
+        run(home, "qoder", "--uninstall", "--apply")
+        checks += 1
+        after = json.loads(settings.read_text(encoding="utf-8")).get("hooks", {})
+        left = [x["command"] for e in after.get("PreToolUse", []) for x in e.get("hooks", [])]
+        if left != ["python3 /home/other/guard.py"]:
+            failures.append(f"после uninstall осталось: {left}")
+        checks += 1
+        if json.loads(record.read_text(encoding="utf-8")).get(str(settings)):
+            failures.append("запись о снятых хуках не убрана")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")
