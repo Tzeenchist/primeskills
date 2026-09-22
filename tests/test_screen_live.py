@@ -33,6 +33,19 @@ def run(task):
     return proc
 
 
+def screens(stdout):
+    """Прогонщик пишет NDJSON: по строке на экран, сразу, — чтобы таймаут
+    обёртки не уносил уже измеренное."""
+    out = []
+    for line in stdout.splitlines():
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if "screen" in payload:
+            out.append(payload["screen"])
+    return out
+
+
 def main():
     if browser_missing():
         print(f"skipped: браузера нет в {CACHE} — установить "
@@ -46,8 +59,7 @@ def main():
     if page.returncode != 0:
         print(f"прогонщик упал: {page.stderr.strip()[:400]}")
         return 1
-    result = json.loads(page.stdout)
-    screen = result["screens"][0]
+    screen = screens(page.stdout)[0]
     if screen["status"] != "ok":
         failures.append(f"стенд не открылся: {screen}")
     found = {c["id"] for c in screen.get("checks", []) if c["verdict"] == "НАШЛА"}
@@ -61,7 +73,7 @@ def main():
     if login.returncode != 0:
         failures.append(f"страница входа уронила прогонщик: {login.stderr[:200]}")
     else:
-        got = json.loads(login.stdout)["screens"][0]
+        got = screens(login.stdout)[0]
         if got["status"] != "not_run":
             failures.append(f"вход: ожидался not_run, получено {got['status']}")
         if "url_final" not in got:

@@ -5,9 +5,12 @@
  * контекст агента не попадает — туда уходит только отчёт обёртки.
  *
  * Вход — JSON на stdin: {"screens":[{"name","url","anchor","goal"?}],
- * "viewport"?:{"width","height"}}. Выход — JSON на stdout. Рамку (сколько
- * экранов, сколько времени, сколько строк) держит обёртка `screen.py`; здесь
- * гоняется ровно то, что передали.
+ * "viewport"?:{"width","height"}}. Выход — NDJSON на stdout: по строке
+ * {"screen":…} на КАЖДЫЙ пройденный экран, сразу, и {"done":true} в конце.
+ * Построчно — чтобы таймаут обёртки не уносил уже измеренное: один общий
+ * JSON в конце означал бы, что убитый прогон не оставил ничего.
+ * Рамку (сколько экранов, сколько времени, сколько строк) держит обёртка
+ * `screen.py`; здесь гоняется ровно то, что передали.
  *
  * У каждой проверки три исхода: ПРОШЛА, НАШЛА, НЕ ИЗМЕРЕНО с причиной.
  * Третий — не вежливость: контраст поверх картинки или градиента не
@@ -247,12 +250,12 @@ async function main() {
   try {
     task = JSON.parse(raw);
   } catch (err) {
-    process.stdout.write(JSON.stringify({ error: "bad_json", detail: String(err.message || err) }));
+    process.stdout.write(JSON.stringify({ error: "bad_json", detail: String(err.message || err) }) + "\n");
     return 2;
   }
   const screens = Array.isArray(task.screens) ? task.screens : [];
   if (!screens.length) {
-    process.stdout.write(JSON.stringify({ error: "no_screens", detail: "в задании нет ни одного экрана" }));
+    process.stdout.write(JSON.stringify({ error: "no_screens", detail: "в задании нет ни одного экрана" }) + "\n");
     return 2;
   }
   const { chromium } = await loadPlaywright();
@@ -266,16 +269,18 @@ async function main() {
       error: "browser_unusable",
       detail,
       fix: `npx -y playwright@${PLAYWRIGHT_VERSION} install chromium`,
-    }));
+    }) + "\n");
     return 3;
   }
-  const out = { playwright: PLAYWRIGHT_VERSION, viewport, screens: [] };
   try {
-    for (const spec of screens) out.screens.push(await runScreen(browser, spec, viewport));
+    for (const spec of screens) {
+      const screen = await runScreen(browser, spec, viewport);
+      process.stdout.write(JSON.stringify({ screen }) + "\n");
+    }
   } finally {
     await browser.close();
   }
-  process.stdout.write(JSON.stringify(out));
+  process.stdout.write(JSON.stringify({ done: true, playwright: PLAYWRIGHT_VERSION, viewport }) + "\n");
   return 0;
 }
 

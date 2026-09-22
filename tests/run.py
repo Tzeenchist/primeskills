@@ -154,6 +154,7 @@ def main():
     livecall = subprocess.run([sys.executable, str(Path(__file__).parent / "test_release_livecall.py")])
     models = subprocess.run([sys.executable, str(Path(__file__).parent / "test_model_variants.py")])
     bench = subprocess.run([sys.executable, str(Path(__file__).parent / "test_bench.py")])
+    frame = subprocess.run([sys.executable, str(Path(__file__).parent / "test_screen.py")])
     screen = subprocess.run([sys.executable, str(Path(__file__).parent / "test_screen_live.py")])
 
     # routing over the real skill set, not just fixtures
@@ -165,7 +166,7 @@ def main():
                  or install.returncode or docs.returncode
                  or checkpoints.returncode or coverage.returncode
                  or livecall.returncode or models.returncode or bench.returncode
-                 or screen.returncode
+                 or frame.returncode or screen.returncode
                  or live.returncode) else 0
 
 
