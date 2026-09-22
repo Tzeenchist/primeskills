@@ -58,6 +58,12 @@ HOME = Path.home()
 SKILLS = ROOT / "skills"
 PREFIX = "prime-"  # the installer's collision prefix; same literal there
 FENCE = SKILLS / "fence" / "bin"
+# The set has two trees, and a hook from either is ours: the installer has said
+# so since PS-048, because `--unpin` running from the working copy read the
+# pinned tree's hooks as a stranger's. The doctor compared against its own tree
+# alone, so a hook the installer had just armed from the pin came back
+# "installed command is not ours" (found 2026-09-21, installing qoder).
+PINNED_FENCE = HOME / ".primeskills" / "pinned" / "skills" / "fence" / "bin"
 
 OK, FAIL, WARN = "ok  ", "FAIL", "warn"
 
@@ -179,9 +185,9 @@ def check_pin(r):
            else "pin.json points at a worktree that is gone")
 
 
-def check_hooks_declared(r):
+def check_hooks_declared(r, agent="claude", settings=None):
     """Run the command the host installed and compare its actual decision."""
-    settings = Path.home() / ".claude" / "settings.json"
+    settings = settings or Path.home() / ".claude" / "settings.json"
     installed = {}
     if settings.is_file():
         try:
@@ -201,7 +207,8 @@ def check_hooks_declared(r):
         (boundary / "boundary").write_text(str(Path(tmp) / "inside") + "\n",
                                             encoding="utf-8")
         for matcher, script, payload, expect in cases:
-            expected_script = FENCE / script
+            expected = {(root / script).resolve()
+                        for root in (FENCE, PINNED_FENCE)}
             commands = [str(hook.get("command", ""))
                         for entry in entries if entry.get("matcher") == matcher
                         for hook in (entry.get("hooks") or [])]
@@ -212,7 +219,7 @@ def check_hooks_declared(r):
                 except ValueError:
                     continue
                 if (len(candidate) == 2 and Path(candidate[0]).name.startswith("python")
-                        and Path(candidate[1]).resolve() == expected_script.resolve()):
+                        and Path(candidate[1]).resolve() in expected):
                     argv = candidate
                     break
             valid = bool(argv)
@@ -227,7 +234,7 @@ def check_hooks_declared(r):
                     got = None
             live = valid and got == expect
             detail = f"decision={got}" if valid else "installed command is not ours"
-            r.line(OK if live else FAIL, "claude", f"hook armed for {matcher}",
+            r.line(OK if live else FAIL, agent, f"hook armed for {matcher}",
                    detail if commands else "not in settings.json — run primeskills-install --apply")
 
 
@@ -305,6 +312,13 @@ def main():
 
     check_skills(r, "cline", HOME / ".cline" / "skills")
     check_core(r, "cline", HOME / ".agents" / "AGENTS.md", "primeskills:begin")
+
+    # Qoder keeps skills, commands, AGENTS.md and settings.json in one config
+    # directory, so all four checks read the same place.
+    check_skills(r, "qoder", HOME / ".qoder" / "skills")
+    check_core(r, "qoder", HOME / ".qoder" / "AGENTS.md", "primeskills:begin")
+    check_commands(r, "qoder", HOME / ".qoder" / "commands")
+    check_hooks_declared(r, "qoder", HOME / ".qoder" / "settings.json")
 
     check_skills(r, "kilo", HOME / ".config" / "kilo" / "skills")
     # Kilo accepts four config names and reads the one that exists; checking

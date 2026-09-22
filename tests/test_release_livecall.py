@@ -80,8 +80,11 @@ def main():
         # credentials and is not being signed in. The installer still writes to
         # both, so both ship without live verification -- that hole is named in
         # PS-081, not closed, exactly as 0.11.6 named Codex's.
-        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "omp"}:
-            failures.append(f"HOSTS не покрывает пять хостов: {mod.HOSTS}")
+        # 2026-09-21: qoder joins by the owner's decision. Its live call is
+        # cheap -- the CLI is logged in and answers a `-p` prompt in under a
+        # minute -- so unlike cline and kilo it ships verified, not named.
+        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "omp", "qoder"}:
+            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
         # Returning either one is a decision with a live call behind it, never a
         # slip. This guard goes when they come back (PS-081), like PS-075's did.
         for host in ("cline", "kilo"):
@@ -104,7 +107,7 @@ def main():
         expect = {("new", h) for h in mod.HOSTS} | {("core", h) for h in mod.HOSTS}
         checks = 1
         if set(missing) != expect:
-            failures.append(f"ожидали 10 пар, получили {sorted(missing)}")
+            failures.append(f"ожидали {len(expect)} пар, получили {sorted(missing)}")
         # an untouched skill is nobody's business
         if any(n == "old" for n, _ in missing):
             failures.append("гейт спросил про навык, который не менялся")
@@ -196,8 +199,8 @@ def main():
         checks += 1
         known = getattr(mod, "KNOWN_HOSTS", None)
         if known is None or set(known) != {"claude", "codex", "kimi", "opencode",
-                                          "omp", "cline", "kilo"}:
-            failures.append(f"KNOWN_HOSTS не знает все семь имён: {known}")
+                                          "omp", "cline", "kilo", "qoder"}:
+            failures.append(f"KNOWN_HOSTS не знает все восемь имён: {known}")
 
         # a fieldless note naming one host still counts: the notes written
         # before the fields existed were not ambiguous
