@@ -33,9 +33,9 @@ does. A skill's full text loads only when that skill is needed.
 > — Ilya Priymak, author
 
 ```
-always in context        488 words for all 31 skills
+always in context        507 words for all 32 skills
 shared rules             3 177 words, once per session
-one skill call           3 947 … 4 376 words
+one skill call           3 966 … 4 395 words
 ```
 
 **The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
@@ -184,6 +184,7 @@ their place too — `/baby` and `/prose` are among the most used here:
 # check what came out
 /vet          read the diff before it merges
 /probe        drive the running app, report the bugs it has
+/screen       open the page in a browser, measure what it shows
 /measure      where the time actually goes
 /ui           the states an interface owes the user
 

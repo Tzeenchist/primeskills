@@ -30,7 +30,8 @@ runs; the properties of the diff are `vet`.
 - What you did not test is part of the result. Say it.
 - Reach is HTTP, the command line, and what the system writes to its logs and
   stores. There is no browser here, so a state that needs one — a hover, a
-  drag, a rendering bug — is `NOT RUN` with the reason. Describing a screen you
+  drag, a rendering bug — is `NOT RUN` with the reason, and the reason names
+  `screen`, which does reach it. Describing a screen you
   did not reach is the failure this skill exists to prevent, and an interface
   nobody could bring up is an unknown, never a pass.
 
