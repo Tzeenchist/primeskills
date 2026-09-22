@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Стенд screen</title>
+<!--
+  Стенд для навыка screen (PS-088). Пять дефектов, по одному на проверку;
+  у каждого рядом комментарий с ожидаемым вердиктом. Файл открывается по
+  file:// — живому тесту не нужен поднятый сервер.
+-->
+<style>
+  body { background: #ffffff; color: #111111; font: 16px/1.5 system-ui, sans-serif; margin: 0; }
+  #app { padding: 24px; }
+  .stack { position: relative; height: 80px; }
+  .stack p { position: absolute; top: 0; left: 0; margin: 0; background: transparent; }
+  /* дефект 4: фокус снят и ничем не заменён */
+  .bare-focus { outline: none; }
+  .bare-focus:focus { outline: none; box-shadow: none; }
+  /* дефект 3: серый по белому — 2.85:1 при пороге 4.5 */
+  .faint { color: #999999; }
+  /* дефект 2: блок уезжает вправо за пределы окна */
+  .runaway { position: absolute; left: 1500px; top: 200px; width: 320px; background: #eef; }
+  .ok-focus:focus { outline: 3px solid #1d4ed8; }
+</style>
+
+<div id="app">
+  <h1>Стенд</h1>
+
+  <!-- дефект 1 → НАШЛА: перекрытие двух текстовых узлов -->
+  <div class="stack">
+    <p>Нижняя строка, которую перекрывают</p>
+    <p>Верхняя строка поверх нижней</p>
+  </div>
+
+  <!-- дефект 3 → НАШЛА: контраст 2.85:1 -->
+  <p class="faint">Бледная подпись под порогом контраста</p>
+
+  <!-- контроль: контраст в норме, проверка обязана промолчать -->
+  <p>Обычный текст с нормальным контрастом</p>
+
+  <!-- дефект 4 → НАШЛА: фокус не виден -->
+  <button class="bare-focus" type="button">Кнопка без фокуса</button>
+
+  <!-- контроль: у этой кнопки фокус виден -->
+  <button class="ok-focus" type="button">Кнопка с фокусом</button>
+
+  <!-- дефект 2 → НАШЛА: выход за правую границу окна -->
+  <div class="runaway">Блок, уехавший за экран</div>
+</div>
+
+<!-- дефект 5 → НАШЛА: ошибка в консоли при загрузке, свой скрипт -->
+<script>
+  console.error("стенд: ошибка загрузки виджета");
+</script>

@@ -37,3 +37,6 @@ print the guide to this set of skills -> primeskills
 which skill do I use for that -> primeskills
 what order should we work the queue in -> moderate
 reorder the backlog so nothing starts blocked -> moderate
+open the page in a browser and report what is broken -> screen
+is the text contrast and focus outline good enough -> screen
+the page overflows the viewport, check it live -> screen

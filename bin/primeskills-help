@@ -36,7 +36,7 @@ STAGES = [
     ("understand", ["brief", "study", "baby"]),
     ("plan", ["plan", "ceo", "money", "eng", "beauty", "teams", "moderate", "autoplan"]),
     ("make", ["build", "debug", "cycle"]),
-    ("check", ["verify", "vet", "probe", "measure", "ui"]),
+    ("check", ["verify", "vet", "probe", "screen", "measure", "ui"]),
     ("hand over", ["land", "revise", "merge", "close"]),
     ("ship", ["deploy", "release", "lazy"]),
     ("keep", ["handoff", "handon", "fence", "prose", "primeskills"]),
