@@ -33,6 +33,15 @@ FOUND, UNMEASURED, PASS = "НАШЛА", "НЕ ИЗМЕРЕНО", "ПРОШЛА"
 EXIT_OK, EXIT_FINDINGS, EXIT_FRAME, EXIT_TOOLING, EXIT_TIMEOUT = 0, 1, 2, 3, 4
 
 
+def first_line(text):
+    """Первая строка, а не последняя: у брошенного исключения там сообщение с
+    командой починки, а в конце — кадр стека, который читателю не поможет."""
+    for line in (text or "").strip().splitlines():
+        if line.strip():
+            return line.strip()[:200]
+    return "вывода не было"
+
+
 def refuse(message):
     print(message)
     sys.exit(EXIT_FRAME)
@@ -64,11 +73,9 @@ def build_task(args):
             refuse(f"отказ: экрану {i} ({spec[0]}) не назван якорь. "
                    "Без якоря «чисто» может относиться к странице входа, а не к вашей.")
         url, anchor = spec[0], spec[1]
-        if url.startswith(("https://", "http://")) and "://" in url:
-            host = url.split("://", 1)[1].split("/", 1)[0]
-            if host and not (host.startswith(("127.", "localhost", "0.0.0.0", "[::1]"))
-                             or host.split(":")[0].startswith(("10.", "192.168.", "172."))):
-                pass  # чужой адрес разрешён, но прод запрещён навыком, а не программой
+        # Прод запрещён навыком, а не программой: список «что считать продом»
+        # живёт у владельца проекта, а не здесь, и зашитый сюда он устареет
+        # молча. Программа держит то, что проверяемо: число экранов и якорь.
         screens.append({"name": spec[3] if len(spec) > 3 else f"экран {i}",
                         "url": url, "anchor": anchor,
                         **({"goal": spec[2]} if len(spec) > 2 and spec[2] else {})})
@@ -88,7 +95,7 @@ def ensure_playwright():
                            f"playwright@{PLAYWRIGHT_VERSION}", "--no-fund", "--no-audit"],
                           capture_output=True, text=True)
     if done.returncode != 0:
-        print("отказ: playwright не поставился — " + done.stderr.strip().splitlines()[-1][:200])
+        print("отказ: playwright не поставился — " + first_line(done.stderr))
         sys.exit(EXIT_TOOLING)
 
 
@@ -201,7 +208,7 @@ def main(argv):
     lines, findings = report(screens, task, timed_out, args.timeout, args.max_lines)
     print("\n".join(lines))
     if not screens and stderr.strip():
-        print(f"прогонщик молчал, stderr: {stderr.strip().splitlines()[-1][:200]}")
+        print(f"прогонщик молчал: {first_line(stderr)}")
         return EXIT_TOOLING
     if timed_out:
         return EXIT_TIMEOUT
