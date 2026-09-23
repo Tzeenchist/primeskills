@@ -83,11 +83,15 @@ def main():
         # 2026-09-21: qoder joins by the owner's decision. Its live call is
         # cheap -- the CLI is logged in and answers a `-p` prompt in under a
         # minute -- so unlike cline and kilo it ships verified, not named.
-        if set(mod.HOSTS) != {"claude", "codex", "kimi", "opencode", "omp", "qoder"}:
-            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
-        # Returning either one is a decision with a live call behind it, never a
-        # slip. This guard goes when they come back (PS-081), like PS-075's did.
-        for host in ("cline", "kilo"):
+        # 2026-09-23: kimi dropped by the owner's decision -- its subscription
+        # no longer includes Kimi Code, and a demand nobody can satisfy turns
+        # the gate into a wall. It comes back the way qoder arrived: with a
+        # live call, not with an edit here.
+        if set(mod.HOSTS) != {"claude", "codex", "opencode", "omp", "qoder"}:
+            failures.append(f"HOSTS не покрывает пять хостов: {mod.HOSTS}")
+        # Returning any of them is a decision with a live call behind it, never
+        # a slip. This guard goes when they come back (PS-081), like PS-075's.
+        for host in ("cline", "kilo", "kimi"):
             if host in mod.HOSTS:
                 failures.append(f"{host} вернулся в HOSTS — это решение, а не правка")
 
@@ -131,11 +135,11 @@ def main():
 
         # a stale note (older than the tag) does not satisfy the gate
         checks += 1
-        stale = [json.dumps({**note("new", "kimi"),
+        stale = [json.dumps({**note("new", "omp"),
                              "ts": "2020-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(stale), encoding="utf-8")
         missing = mod.missing_livecalls(at)
-        if ("new", "kimi") not in missing:
+        if ("new", "omp") not in missing:
             failures.append("протухшая запись закрыла гейту глаза")
 
         # PS-054. Timestamps are instants, not strings. `primeskills-run` writes
@@ -156,7 +160,7 @@ def main():
                 f"запись {utc} сделана позже тега {tag_at}, а гейт счёл её "
                 f"протухшей — время сравнивается строками")
 
-        # These fixtures pair `kimi` with `claude`, both demanded. The case that
+        # These fixtures pair `qoder` with `claude`, both demanded. The case that
         # matters more is a host the gate no longer demands named beside one it
         # does -- covered below, because PS-081 broke exactly that and twelve
         # green suites said nothing.
@@ -166,7 +170,7 @@ def main():
         # another is the natural thing to write. Structured fields settle it.
         checks += 1
         one = [json.dumps({"kind": "note", "stage": "livecall",
-                           "text": "new: checked in kimi; only Claude Code arms hooks",
+                           "text": "new: checked in qoder; only Claude Code arms hooks",
                            "ts": "2099-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(one) + "\n", encoding="utf-8")
         missing = mod.missing_livecalls(at)
@@ -176,7 +180,7 @@ def main():
         # a note naming two hosts is ambiguous and closes neither: which one
         # it is about is exactly what the text cannot say
         checks += 1
-        if ("new", "kimi") not in missing:
+        if ("new", "qoder") not in missing:
             failures.append("двусмысленная заметка закрыла пару по первому "
                             "попавшемуся имени хоста")
 
@@ -187,11 +191,11 @@ def main():
         # is judged against every host the set knows, demanded or not.
         checks += 1
         across = [json.dumps({"kind": "note", "stage": "livecall",
-                              "text": "new: прогнано в cline, там же отказ; заодно kimi",
+                              "text": "new: прогнано в cline, там же отказ; заодно qoder",
                               "ts": "2099-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(across) + "\n", encoding="utf-8")
-        if ("new", "kimi") not in mod.missing_livecalls(at):
-            failures.append("заметка про прогон в cline закрыла пару kimi — "
+        if ("new", "qoder") not in mod.missing_livecalls(at):
+            failures.append("заметка про прогон в cline закрыла пару qoder — "
                             "имя вне HOSTS перестало создавать двусмысленность")
 
         # The name list the gate demands from and the name list it recognises are
@@ -206,10 +210,10 @@ def main():
         # before the fields existed were not ambiguous
         checks += 1
         plain = [json.dumps({"kind": "note", "stage": "livecall",
-                             "text": "new: menu opened in kimi, choice lands",
+                             "text": "new: menu opened in qoder, choice lands",
                              "ts": "2099-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(plain) + "\n", encoding="utf-8")
-        if ("new", "kimi") in mod.missing_livecalls(at):
+        if ("new", "qoder") in mod.missing_livecalls(at):
             failures.append("однозначная старая заметка перестала считаться")
 
         # A short host name must still be a token. OMP occurs inside ordinary
@@ -217,11 +221,11 @@ def main():
         # turn a single-host legacy note into an ambiguous two-host note.
         checks += 1
         boundary = [json.dumps({"kind": "note", "stage": "livecall",
-                                "text": "new: prompt completed in kimi",
+                                "text": "new: prompt completed in qoder",
                                 "ts": "2099-01-01T00:00:00+00:00"})]
         (run_dir / name).write_text("\n".join(boundary) + "\n", encoding="utf-8")
-        if ("new", "kimi") in mod.missing_livecalls(at):
-            failures.append("omp внутри prompt/completed сделал заметку про kimi двусмысленной")
+        if ("new", "qoder") in mod.missing_livecalls(at):
+            failures.append("omp внутри prompt/completed сделал заметку про qoder двусмысленной")
 
         # fields win over text: the same note, addressed properly
         checks += 1
@@ -234,7 +238,7 @@ def main():
         if ("new", "claude") in missing:
             failures.append("запись с полями skill/host не закрыла свою пару")
         checks += 1
-        if ("new", "kimi") not in missing:
+        if ("new", "qoder") not in missing:
             failures.append("запись с полями закрыла чужую пару")
 
         # PS-059, second facet. `since` came from the tag, so a call made

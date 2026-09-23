@@ -44,7 +44,16 @@ ROOT = Path(__file__).resolve().parent.parent
 # 2026-09-21, by the owner's decision: qoder joins. Unlike cline and kilo it
 # arrives verified rather than named -- the CLI is signed in and answers a
 # `-p` prompt, so a live call costs a minute and the gate can demand one.
-HOSTS = ("claude", "codex", "kimi", "opencode", "omp", "qoder")
+# 2026-09-23, by the owner's decision: kimi leaves. `kimi -p` answers
+# `403 provider.auth_error: Your current subscription does not have access to
+# Kimi Code`, and three attempts with different hypotheses -- closed stdin, no
+# TTY, another model -- changed nothing: the cause sits with the account. A
+# gate that cannot be satisfied is not a gate, it is a wall, and a wall gets
+# walked around. The host keeps its place in KNOWN_HOSTS, so "прогнано в kimi"
+# still names a host and cannot be read as another one; only the demand is
+# dropped. It returns the moment the subscription does -- with a live call,
+# like qoder did, never by an edit.
+HOSTS = ("claude", "codex", "opencode", "omp", "qoder")
 
 # Every host name the set knows, demanded or not. Two different questions were
 # being answered by one list: which pairs the gate demands, and which words in a
