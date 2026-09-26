@@ -13,6 +13,7 @@ The decision must sit under hookSpecificOutput; a top-level permissionDecision
 is ignored and silently no-ops the guard.
 """
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -380,6 +381,39 @@ def segments(command):
     return out, unreadable
 
 
+def temp_roots():
+    """The system temp directory, as the OS and the session name it."""
+    roots = set()
+    for raw in ("/tmp", os.environ.get("TMPDIR", ""), tempfile.gettempdir()):
+        if raw:
+            real = os.path.realpath(raw)
+            if real != "/" and os.path.isdir(real):
+                roots.add(real)
+    return roots
+
+
+def own_temp(target):
+    """Is this a path of your own strictly inside the system temp directory?
+
+    PS-091: Codex asked before every `rm -r` of its own temp folder, and this
+    guard denied the same to Claude in its scratchpad. Judged by where the path
+    resolves and who owns it, never by how it is spelled: a variable, a glob,
+    `~`, `..` out, a symlink out and the temp root itself all stay questions.
+    """
+    # Absolute only: a relative `../../x` from a tree that itself sits in the
+    # temp directory lands there too, and it names what the tree rule refuses.
+    if not target.startswith("/") or re.search(r"[$`*?\[\]{}~]", target):
+        return False
+    try:
+        real = os.path.realpath(target)
+        if not any(real.startswith(root + os.sep) for root in temp_roots()):
+            return False
+        return (not os.path.lexists(target)
+                or os.lstat(target).st_uid == os.getuid())
+    except (OSError, ValueError):
+        return False
+
+
 def rm_verdict(tokens):
     """`rm` is read by its flags and its targets, not by their order.
 
@@ -393,8 +427,9 @@ def rm_verdict(tokens):
                     for t in flags)
     if not recursive:
         return None
-    if targets and all(SAFE_TARGET.fullmatch(t) for t in targets):
-        return None            # build artifacts, inside the working directory
+    if targets and all(SAFE_TARGET.fullmatch(t) or own_temp(t)
+                       for t in targets):
+        return None            # build artifacts in the tree, or your own temp
     return "recursive delete (rm -r) permanently removes files"
 
 

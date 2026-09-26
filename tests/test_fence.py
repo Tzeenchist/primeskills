@@ -363,6 +363,56 @@ def disposable_repo(parent):
     return repo
 
 
+def temp_cases(failures):
+    """PS-091: a directory of your own under the system temp dir is scratch.
+
+    Codex asked before every `rm -r` of its own temp folder, and this guard
+    denied the same to Claude in its scratchpad, because the only exemption
+    was build artifacts inside the working directory. The exemption is by
+    where the path resolves and who owns it -- never by how it is spelled, so
+    `..`, a symlink out, the temp root itself and a variable still ask.
+    """
+    checks = 0
+    uid = os.getuid()
+    tmp_root = Path(os.path.realpath(tempfile.gettempdir()))
+    with tempfile.TemporaryDirectory() as own:
+        own_p = Path(own)
+        (own_p / "sub").mkdir()
+        outside = Path(tempfile.mkdtemp(dir=str(ROOT / "tests")))
+        try:
+            (own_p / "out").symlink_to(outside)
+            foreign = next((p for p in tmp_root.iterdir()
+                            if p.is_dir() and not p.is_symlink()
+                            and p.lstat().st_uid != uid), None)
+            cases = [
+                (f"rm -rf {own}", None),
+                (f"rm -r {own}/sub", None),
+                (f"rm -rf {own}/never-made", None),
+                (f"rm -rf {own} node_modules", None),
+                ("rm -rf sub", "ask"),                      # relative: tree rule
+                (f"rm -rf {tmp_root}", "ask"),
+                (f"rm -rf {tmp_root}/", "ask"),
+                (f"rm -rf {own}/../../home/x", "ask"),
+                (f"rm -rf {own}/out", "ask"),                # symlink leaves temp
+                (f"rm -rf {own}/out/x", "ask"),
+                (f"rm -rf {own}*", "ask"),                   # glob: unknown set
+                ("rm -rf $TMPDIR/x", "ask"),
+                (f"rm -rf {own} /var/data", "ask"),
+            ]
+            if foreign:
+                cases.append((f"rm -rf {foreign}", "ask"))  # not yours
+            for command, expected in cases:
+                checks += 1
+                payload = json.dumps({"cwd": own,
+                                      "tool_input": {"command": command}})
+                got = decision(run(CMD, payload, cwd=own))
+                if got != expected:
+                    failures.append(f"temp: {command!r} -> {got}, expected {expected}")
+        finally:
+            outside.rmdir()
+    return checks
+
+
 def main():
     failures = []
     cases = []
@@ -527,8 +577,10 @@ def main():
         # cannot be read at all, and the advice "record the grant" is advice the
         # user has often already followed -- twice on 2026-08-25, with the rung
         # open in a journal the command's directory could not see.
+        # `away` stands for someone else's directory, so it cannot sit in the
+        # system temp dir: your own directory there is scratch since PS-091.
         with tempfile.TemporaryDirectory() as bare, \
-                tempfile.TemporaryDirectory() as away:
+                tempfile.TemporaryDirectory(dir=str(ROOT / "tests")) as away:
             # the target has to sit outside the session's own tree: deleting
             # inside your working directory is ordinary work and passes
             payload = json.dumps({"tool_name": "Bash",
@@ -735,6 +787,7 @@ def main():
                 failures.append(f"boundary: {payload[:50]!r} -> {got}, expected {expected}")
 
     crash_checks = check_crashed(failures)
+    temp_checks = temp_cases(failures)
 
     for f in failures:
         print(f)
@@ -742,7 +795,7 @@ def main():
              + len(COMMANDS) + len(HEREDOCS) + len(REDIRECTS) + 1
              + len(SHADOWED) + len(MODES) + len(QUOTED)
              + len(UNREADABLE) + len(IN_TREE) + len(cases) + 1
-             + authority_checks + isolation_checks)
+             + authority_checks + isolation_checks + temp_checks)
     print(f"{total} checks, {len(failures)} failed")
     return 1 if failures else 0
 
