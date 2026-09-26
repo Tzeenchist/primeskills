@@ -343,13 +343,14 @@ def main():
     # multiple-choice question written as text (PS-090); both vendors' prompts
     # say an unanswered optional question is not a stop, and silence is not
     # approval. §Asking has to answer both, or the host's rule wins by default.
+    flat = " ".join(asking.split())
     checks += 1
-    if not re.search(r"rung[^.]*plain sentence", asking):
+    if not re.search(r"rung[^.]*plain sentence", flat):
         failures.append("core/OUTPUT.md §Asking не говорит, что вопрос о "
                         "ступени задаётся одной фразой, а не пикером")
     checks += 1
-    if not re.search(r"nobody answers[^.]*assumption", asking) or \
-            not re.search(r"never opens on silence", asking):
+    if not re.search(r"nobody answers[^.]*assumption", flat) or \
+            not re.search(r"never opens on silence", flat):
         failures.append("core/OUTPUT.md §Asking не говорит, что делать с "
                         "вопросом без ответа и что молчание ступень не открывает")
     for skill in sorted((ROOT / "skills").glob("*/SKILL.md")):

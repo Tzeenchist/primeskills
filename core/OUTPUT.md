@@ -50,9 +50,9 @@ A choice among enumerable options goes to the host's picker, named by name:
 `AskUserQuestion` (Claude Code, Kimi), `question` (OpenCode),
 `request_user_input` (Codex, terminal only). An instruction to "ask" that does
 not name the means degrades to prose — the agent prints a list instead of
-opening a menu. A rung is one plain sentence, never a picker. Without a picker,
-or open-ended: one plain question. An optional question nobody answers: proceed
-on a stated assumption. A rung never opens on silence.
+opening a menu. A rung is one plain sentence, never a picker. An optional
+question nobody answers: proceed on a stated assumption. A rung never opens on
+silence. Without a picker, or open-ended: one plain question.
 
 More options than the picker holds — four in Claude Code — is not one of those
 cases. Batch them: offer the likeliest, spend the last slot on "ещё →", re-ask
