@@ -339,6 +339,19 @@ def main():
         failures.append("core/OUTPUT.md §Asking не говорит, что делать, когда "
                         "вариантов больше, чем держит пикер — без этого "
                         "длинный список молча становится набором номера")
+    # Codex on GPT-6 forbids a permission request in its picker and a
+    # multiple-choice question written as text (PS-090); both vendors' prompts
+    # say an unanswered optional question is not a stop, and silence is not
+    # approval. §Asking has to answer both, or the host's rule wins by default.
+    checks += 1
+    if not re.search(r"rung[^.]*plain sentence", asking):
+        failures.append("core/OUTPUT.md §Asking не говорит, что вопрос о "
+                        "ступени задаётся одной фразой, а не пикером")
+    checks += 1
+    if not re.search(r"nobody answers[^.]*assumption", asking) or \
+            not re.search(r"never opens on silence", asking):
+        failures.append("core/OUTPUT.md §Asking не говорит, что делать с "
+                        "вопросом без ответа и что молчание ступень не открывает")
     for skill in sorted((ROOT / "skills").glob("*/SKILL.md")):
         body = skill.read_text(encoding="utf-8").split("---", 2)[-1]
         copied = [name for name in ("AskUserQuestion", "request_user_input")
