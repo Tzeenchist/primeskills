@@ -39,7 +39,8 @@ to work each clause until one lets them through. Two sentences, then what you
 can do instead.
 
 ## Before sending
-Delete: an opener announcing what you are about to do; a closer asking
+Delete from the final answer, not from progress updates: an opener
+announcing what you are about to do; a closer asking
 "anything else?"; a "by the way" sidebar; an idiom where the
 literal action fits. Cut a hedge carrying no information, keep one carrying
 real uncertainty — deleting that manufactures confidence (G5).
