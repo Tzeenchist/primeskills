@@ -13,10 +13,7 @@ These files are English because instruction-following is more reliable in it.
 - Short sentences, concrete nouns, active voice.
 - Builder talking to a builder. Not corporate, academic, or promotional.
 - No filler, no throat-clearing, no generic optimism.
-- Avoid: delve, crucial, robust, comprehensive, nuanced, multifaceted,
-  furthermore, moreover, additionally, pivotal, landscape, tapestry, underscore,
-  foster, showcase, intricate, vibrant, seamless, genuinely, honestly,
-  straightforward.
+- Stock machine words: see `prose`.
 
 Good: "auth.ts:47 returns undefined when the session cookie expires. Users get
 a white screen. Fix: null check, redirect to /login. Two lines."
@@ -51,10 +48,11 @@ happens next and what changed?
 ## Asking
 A choice among enumerable options goes to the host's picker, named by name:
 `AskUserQuestion` (Claude Code, Kimi), `question` (OpenCode),
-`request_user_input` (Codex, interactive terminal only). An instruction to
-"ask" that does not name the means degrades to prose — the agent prints a list
-instead of opening a menu. Not among this turn's tools, or the options are
-open-ended: numbered list or plain question.
+`request_user_input` (Codex, terminal only). An instruction to "ask" that does
+not name the means degrades to prose — the agent prints a list instead of
+opening a menu. A rung is one plain sentence, never a picker. An optional
+question nobody answers: proceed on a stated assumption. A rung never opens on
+silence. Without a picker, or open-ended: one plain question.
 
 More options than the picker holds — four in Claude Code — is not one of those
 cases. Batch them: offer the likeliest, spend the last slot on "ещё →", re-ask
