@@ -33,7 +33,8 @@ backend-only work — this lens costs nothing when it does not run.
    → **verify:** every interactive element is reachable and focus never
    disappears
 5. Look for the tells of generated design: even spacing everywhere, no
-   hierarchy, decorative gradients, three fonts → **verify:** you name specific
+   hierarchy, decorative gradients, three fonts, cream background, pill buttons,
+   "01/02/03" labels → **verify:** you name specific
    places or state there are none
 6. Run the swap test on the visual direction: replace the subject with a
    neighbouring one — a concept that still fits equally well is generic

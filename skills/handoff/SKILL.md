@@ -16,7 +16,7 @@ the task to another agent. Also on request: "save state", "checkpoint".
   a tree's state and orphans one whenever a branch is deleted.
 - The checkpoint lives beside the work, in the repository's `.primeskills/`,
   not a home directory: it must survive a cleared context and another agent on
-  this machine. It does not travel — it is not committed (PS-022) — so a
+  this machine. It does not travel — it is not committed — so a
   hand-off to another machine needs the text itself, not a promise that the
   file will be there.
 - Remaining work is assembled from the repository and the record, never copied
@@ -38,7 +38,7 @@ the task to another agent. Also on request: "save state", "checkpoint".
 4. Write `.primeskills/handoff/checkpoint.md`, one `## <branch>` section per
    branch, replacing this branch's. Open each section with
    `<!-- handoff: <ISO 8601 local> -->` — the date `primeskills-handoffs` sorts
-   by; without it a row falls back to the file's mtime and says so (PS-068).
+   by; without it a row falls back to the file's mtime and says so.
    A section whose branch is gone collapses to one italic line: the branch,
    where its work landed, the date — remaining work moved to a surviving
    section or the queue first. Keep, with: the work, 1–3 sentences of summary,

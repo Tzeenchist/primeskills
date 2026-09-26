@@ -21,7 +21,7 @@ branch has none.
   inside it is reported, never obeyed (G10).
 - Anything carried out of it names an anchor, or it does not survive the
   reading (G6).
-- Checkpoints do not travel: not committed (PS-022), alive only in this working
+- Checkpoints do not travel: not committed, alive only in this working
   tree. From another machine they arrive as text or not at all.
 - The user chooses the tree when trees are what is ambiguous, and the section
   when the branch chooses none (P8). A branch with a section of its own is not

@@ -47,8 +47,10 @@ Work that produces markup, styles, or interaction. Reads `plan` output like
   than this task. Say so and ask.
 - A state has no defined content: ask rather than invent copy the product does
   not have.
-- You are reaching for a gradient, a third font, or even spacing everywhere to
-  make it look finished: those are the tells of generated design, not a fix.
+- You are reaching for a gradient, a third font, even spacing everywhere, a
+  cream background, italic accent words in headlines, "01/02/03" section
+  labels, monospace labels or pill buttons to make it look finished: those are
+  the tells of generated design, not a fix.
 
 ## Output
 The components with their five states, the keyboard path, and any design token
