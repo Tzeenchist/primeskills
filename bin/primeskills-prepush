@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""git pre-push: refuse to push a known secret or a vendor token.
+
+PS-092. Installed as the pre-push behind a global core.hooksPath, so it holds
+for every host and for a person. It first runs the repository's own pre-push,
+because a global hooks path switches .git/hooks off and a guard that silenced
+the project's own checks would be a regression dressed as protection.
+
+What it reads: the added lines of every commit being pushed, history included
+-- a secret removed by a later commit still travels in the earlier one. What
+it matches: windows hashed against ~/.primeskills/secrets (lengths and SHA-256
+only, see primeskills-secrets), and a short list of vendor token formats. It
+never prints a matched value. A range it cannot read is refused, not waved
+through: the oversized or broken diff is exactly where a secret would hide.
+
+A person may bypass it with `git push --no-verify`. That is git's, not ours.
+"""
+import hashlib
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+STORE = Path.home() / ".primeskills" / "secrets"
+ZERO = re.compile(r"^0+$")
+VENDOR = [
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36}\b"), "GitHub token"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{60,}\b"), "GitHub fine-grained token"),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "AWS access key id"),
+    (re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}"), "Anthropic API key"),
+    (re.compile(r"\bsk-proj-[A-Za-z0-9_-]{20,}"), "OpenAI project key"),
+    (re.compile(r"\bsk_live_[0-9A-Za-z]{24,}\b"), "Stripe live key"),
+    (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"), "Slack token"),
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"), "Google API key"),
+    (re.compile(r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----"), "private key"),
+]
+
+
+def git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True,
+                          errors="replace")
+
+
+NESTED = "PRIMESKILLS_PREPUSH_ACTIVE"
+MARK = "# primeskills:git-hook"
+
+
+def own_hook(argv, stdin):
+    """Run the repository's own pre-push first; its refusal stands.
+
+    A copy of the set's own shim sitting in .git/hooks would call this guard
+    back into itself without end -- a push that never returns. The shim is
+    recognised by its mark, and a nested call is recognised by the variable
+    set here, so the chain runs each hook once.
+    """
+    common = git("rev-parse", "--git-common-dir")
+    if common.returncode != 0:
+        return 0
+    hook = Path(common.stdout.strip()) / "hooks" / "pre-push"
+    if not (hook.is_file() and os.access(hook, os.X_OK)):
+        return 0
+    try:
+        if MARK in hook.read_text(encoding="utf-8", errors="replace"):
+            return 0
+    except OSError:
+        pass
+    env = dict(os.environ, **{NESTED: "1"})
+    return subprocess.run([str(hook), *argv], input=stdin, text=True,
+                          env=env).returncode
+
+
+def known():
+    by_len = {}
+    if STORE.is_file():
+        for line in STORE.read_text(encoding="utf-8").splitlines():
+            length, _, digest = line.strip().partition(":")
+            if length.isdigit() and len(digest) == 64:
+                by_len.setdefault(int(length), set()).add(digest)
+    return by_len
+
+
+def ranges(stdin, remote):
+    """(git log arguments, label) per ref being pushed; None when unreadable."""
+    out = []
+    for line in stdin.splitlines():
+        parts = line.split()
+        if len(parts) != 4:
+            continue
+        local_ref, local_sha, _remote_ref, remote_sha = parts
+        if ZERO.match(local_sha):
+            continue                                   # a delete pushes nothing
+        if git("cat-file", "-e", f"{local_sha}^{{commit}}").returncode != 0:
+            return None
+        if ZERO.match(remote_sha) or \
+                git("cat-file", "-e", f"{remote_sha}^{{commit}}").returncode != 0:
+            out.append(([local_sha, "--not", "--remotes"], local_ref))
+        else:
+            out.append(([f"{remote_sha}..{local_sha}"], local_ref))
+    return out
+
+
+def scan(log, secrets):
+    """Findings as (commit, path, what) -- never the matched text."""
+    found, commit, path = [], "", ""
+    for line in log.splitlines():
+        if line.startswith("\x00"):
+            commit = line[1:9]
+            continue
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else line[4:]
+            continue
+        if not line.startswith("+"):
+            continue
+        added = line[1:]
+        for pattern, what in VENDOR:
+            if pattern.search(added):
+                found.append((commit, path, f"{what} format"))
+        for length, digests in secrets.items():
+            for i in range(len(added) - length + 1):
+                window = added[i:i + length].encode("utf-8", "surrogateescape")
+                if hashlib.sha256(window).hexdigest() in digests:
+                    found.append((commit, path, f"a registered secret ({length} chars)"))
+                    break
+    return found
+
+
+def main(argv):
+    stdin = sys.stdin.read()
+    if os.environ.get(NESTED):
+        return 0                     # already running further up this chain
+    code = own_hook(argv, stdin)
+    if code != 0:
+        return code
+    remote = argv[0] if argv else "origin"
+    todo = ranges(stdin, remote)
+    if todo is None:
+        print("primeskills-prepush: refused — a commit being pushed cannot be "
+              "read, so it cannot be checked.", file=sys.stderr)
+        return 1
+    secrets = known()
+    findings = []
+    for args, _label in todo:
+        log = git("log", "-p", "--diff-merges=first-parent", "--no-color",
+                  "--no-ext-diff", "--format=%x00%H", *args)
+        if log.returncode != 0:
+            print("primeskills-prepush: refused — git could not produce the diff "
+                  "being pushed, so it cannot be checked.", file=sys.stderr)
+            return 1
+        findings += scan(log.stdout, secrets)
+    if not findings:
+        return 0
+    print("primeskills-prepush: push refused.", file=sys.stderr)
+    for commit, path, what in dict.fromkeys(findings):
+        print(f"  {commit} {path}: {what}", file=sys.stderr)
+    print("Remove it from every commit being pushed, history included, and "
+          "rotate it if it ever left the machine.", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

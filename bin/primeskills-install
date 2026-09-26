@@ -407,7 +407,64 @@ LOCAL_BIN = HOME / ".local" / "bin"
 # ran `fence` live on 2026-08-25 and got exit 127 from the very command that
 # skill's step 1 verifies with. `tests/test_docs.py` now keeps the two in step.
 SHARED_TOOLS = ("primeskills-run", "primeskills-help", "primeskills-handoffs",
-                "primeskills-doctor", "primeskills-release")
+                "primeskills-doctor", "primeskills-release", "primeskills-secrets")
+
+# PS-092. The pre-push guard is a git hook, so it holds for every host and for
+# a person. It is installed behind a global core.hooksPath -- and that setting
+# switches off every repository's .git/hooks, all types at once. So each
+# standard hook gets a shim that hands over to the repository's own hook; only
+# pre-push adds the guard, which itself runs the repository's pre-push first.
+GIT_HOOKS_DIR = HOME / ".primeskills" / "git-hooks"
+GIT_HOOK_MARK = "# primeskills:git-hook"
+GIT_HOOK_NAMES = ("applypatch-msg", "pre-applypatch", "post-applypatch",
+                  "pre-commit", "pre-merge-commit", "prepare-commit-msg",
+                  "commit-msg", "post-commit", "pre-rebase", "post-checkout",
+                  "post-merge", "pre-push", "pre-auto-gc", "post-rewrite",
+                  "push-to-checkout", "reference-transaction",
+                  "sendemail-validate", "post-index-change")
+
+
+def git_hook_text(name):
+    if name == "pre-push":
+        body = ("exec python3 "
+                + shlex.quote(str(ROOT / "bin" / "primeskills-prepush"))
+                + ' "$@"\n')
+    else:
+        body = (f'hook="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/{name}"\n'
+                '[ -x "$hook" ] && exec "$hook" "$@"\n'
+                "exit 0\n")
+    return f"#!/bin/sh\n{GIT_HOOK_MARK}\n{body}"
+
+
+def git_hooks(apply_it, remove):
+    """Global core.hooksPath to the set's hooks, never over someone else's."""
+    cur = git("config", "--global", "--get", "core.hooksPath").stdout.strip()
+    ours = str(GIT_HOOKS_DIR)
+    mine = bool(cur) and os.path.realpath(os.path.expanduser(cur)) == os.path.realpath(ours)
+    if remove:
+        if apply_it:
+            if mine:
+                git("config", "--global", "--unset", "core.hooksPath")
+            for name in GIT_HOOK_NAMES:
+                p = GIT_HOOKS_DIR / name
+                if p.is_file() and GIT_HOOK_MARK in p.read_text(encoding="utf-8"):
+                    p.unlink()
+        return ("core.hooksPath released" if mine
+                else "core.hooksPath was not ours, left alone")
+    if cur and not mine:
+        return (f"core.hooksPath is already set to {cur} — the pre-push secret "
+                f"guard is not installed; it would switch that off")
+    if apply_it:
+        GIT_HOOKS_DIR.mkdir(parents=True, exist_ok=True)
+        for name in GIT_HOOK_NAMES:
+            p = GIT_HOOKS_DIR / name
+            if p.exists() and GIT_HOOK_MARK not in p.read_text(encoding="utf-8"):
+                continue
+            p.write_text(git_hook_text(name), encoding="utf-8")
+            p.chmod(0o755)
+        git("config", "--global", "core.hooksPath", ours)
+    verb = "set" if apply_it else "would set"
+    return f"core.hooksPath {verb} to {ours} (pre-push secret guard, shims for the rest)"
 
 
 def hook_command(script):
@@ -939,6 +996,7 @@ def main():
     created = {}
 
     print(f"shared: {command(args.apply, args.uninstall)}")
+    print(f"git: {git_hooks(args.apply, args.uninstall)}")
     for host in HOOK_SETTINGS:
         if host in agents:
             print(f"{host}: {hooks(args.apply, args.uninstall, host)}")
