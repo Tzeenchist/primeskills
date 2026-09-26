@@ -46,12 +46,12 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   command text: the worst incidents come from harmless commands with a
   misconfigured target. Working and dev stores are not test stores.
 - **G9 Destructive commands.** Recursive deletes, history rewrites, dropped or
-  truncated tables, mass process and container kills: stop and ask. `fence`
-  holds the list and its exceptions. On Claude Code the installer arms it, so
-  it blocks from the session's first command; the
-  other three hosts have no hooks, so there the list is text you follow. With
-  confirmations off it decides instead of asking: the irreversible few wait for
-  an open rung, the rest are journalled. Necessary, never sufficient: G8.
+  truncated tables, mass process and container kills: stop and ask. Except
+  build artifacts in the tree and your own absolute path under the system temp
+  dir. `fence` holds the list. Claude Code and Qoder hook it; elsewhere it is
+  text you follow. With confirmations off it decides instead of asking: the
+  irreversible few wait for an open rung, the rest are journalled. Necessary,
+  never sufficient: G8.
 - **Authority is a ladder, not a switch.** Reading and editing files in the
   work you were asked to do needs no permission. Each rung below is a separate
   yes, and one does not imply the next: commit, push, open a pull request,
