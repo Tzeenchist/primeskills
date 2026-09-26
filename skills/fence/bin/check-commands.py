@@ -381,14 +381,21 @@ def segments(command):
     return out, unreadable
 
 
+SYSTEM_TEMP = ("/tmp", "/var/tmp")
+
+
 def temp_roots():
-    """The system temp directory, as the OS and the session name it."""
-    roots = set()
-    for raw in ("/tmp", os.environ.get("TMPDIR", ""), tempfile.gettempdir()):
-        if raw:
-            real = os.path.realpath(raw)
-            if real != "/" and os.path.isdir(real):
-                roots.add(real)
+    """The system temp directories, and $TMPDIR only when it sits inside one.
+
+    Taken at face value, a $TMPDIR pointed at a home or a project would turn
+    the exemption into a licence to delete there.
+    """
+    system = {os.path.realpath(p) for p in SYSTEM_TEMP if os.path.isdir(p)}
+    roots = set(system)
+    for raw in (os.environ.get("TMPDIR", ""), tempfile.gettempdir()):
+        real = os.path.realpath(raw) if raw else ""
+        if real and any(real.startswith(s + os.sep) for s in system):
+            roots.add(real)
     return roots
 
 

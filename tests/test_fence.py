@@ -408,6 +408,19 @@ def temp_cases(failures):
                 got = decision(run(CMD, payload, cwd=own))
                 if got != expected:
                     failures.append(f"temp: {command!r} -> {got}, expected {expected}")
+            # $TMPDIR widens the temp root only when it sits in the system one:
+            # set to a home or a project, it would turn the exemption into a
+            # licence to delete there. `outside` plays that directory.
+            (outside / "work").mkdir()
+            checks += 1
+            env = dict(os.environ, TMPDIR=str(outside))
+            payload = json.dumps({"cwd": own, "tool_input": {
+                "command": f"rm -rf {outside}/work"}})
+            got = decision(run(CMD, payload, cwd=own, env=env))
+            if got != "ask":
+                failures.append(f"temp: TMPDIR outside /tmp widened the "
+                                f"exemption -> {got}, expected ask")
+            (outside / "work").rmdir()
         finally:
             outside.rmdir()
     return checks
