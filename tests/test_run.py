@@ -832,6 +832,47 @@ def main():
         if "--target" not in out:
             failures.append(f"may без --target не назвал нужный флаг: {out.strip()!r}")
 
+    # PS-093: a review verdict is about the tree the review started on. The
+    # verdict used to bind to the tree at the moment it was written, so a fix
+    # made during the review was certified without anyone reading it (PS-091,
+    # 2026-09-26). Without a start mark the verdict is unbound, not current.
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        make_repo(repo)
+
+        checks += 1
+        run(repo, "note", "vet", "merge: без старта")
+        code, out = run(repo, "check", "vet")
+        if code != 3 or "UNBOUND" not in out:
+            failures.append(f"вердикт без vet-start принят: exit {code}, {out.strip()!r}")
+
+        checks += 1
+        run(repo, "note", "vet-start", "ревью начато")
+        run(repo, "note", "vet", "merge: дерево не менялось")
+        code, out = run(repo, "check", "vet")
+        if code != 0 or "current" not in out:
+            failures.append(f"честный вердикт не current: exit {code}, {out.strip()!r}")
+
+        checks += 1
+        run(repo, "note", "vet-start", "ревью начато")
+        (repo / "fix.txt").write_text("правка посреди ревью\n", encoding="utf-8")
+        run(repo, "note", "vet", "merge: после правки")
+        code, out = run(repo, "check", "vet")
+        if code != 3 or "UNBOUND" not in out:
+            failures.append(f"правка посреди ревью заверена: exit {code}, {out.strip()!r}")
+
+        # a start mark is spent by the verdict that follows it: an old start
+        # cannot stand behind a later verdict on a tree nobody began reviewing
+        checks += 1
+        run(repo, "note", "vet-start", "ревью начато")
+        run(repo, "note", "vet", "merge: первый")
+        (repo / "fix.txt").write_text("вторая правка\n", encoding="utf-8")
+        run(repo, "note", "vet", "merge: второй без нового старта")
+        code, out = run(repo, "check", "vet")
+        if code != 3:
+            failures.append(f"старый старт засчитан второму вердикту: exit {code}, {out.strip()!r}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

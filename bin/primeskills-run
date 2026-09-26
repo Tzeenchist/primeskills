@@ -822,6 +822,9 @@ def cmd_chain(path, flow):
         if not hits:
             print(f"{c}: ничего не записано — шаг не выполнялся")
             worst = max(worst, 1)
+        elif why := unbound(entries, hits[-1]):
+            print(f"{c}: UNBOUND — {why}")
+            worst = max(worst, 2)
         elif hits[-1]["commit"] == commit and hits[-1]["state"] == digest:
             print(f"{c}: current — {hits[-1]['text'][:80]}")
         else:
@@ -832,6 +835,35 @@ def cmd_chain(path, flow):
     return worst
 
 
+# Stages whose verdict is about the tree the work started on, not the tree it
+# was written against (PS-093). A review that fixes what it finds would
+# otherwise certify its own unreviewed fixes -- it did in PS-091.
+START_BOUND = {"vet"}
+
+
+def unbound(notes, last):
+    """Why the newest verdict of a start-bound stage cannot stand, or None.
+
+    The start mark is `<stage>-start`, written before the pass reads anything.
+    It binds only the first verdict after it, and only if the tree did not move
+    in between: an old start cannot vouch for a later verdict.
+    """
+    stage = last.get("stage")
+    if stage not in START_BOUND:
+        return None
+    idx = max(i for i, e in enumerate(notes) if e is last)
+    starts = [i for i, e in enumerate(notes[:idx]) if e.get("stage") == f"{stage}-start"]
+    if not starts:
+        return f"no {stage}-start before the verdict"
+    s = starts[-1]
+    if any(e.get("stage") == stage for e in notes[s + 1:idx]):
+        return f"its {stage}-start was spent by an earlier verdict"
+    start = notes[s]
+    if (start["commit"], start["state"]) != (last["commit"], last["state"]):
+        return "the tree changed between the start of the review and its verdict"
+    return None
+
+
 def cmd_check(path, argv):
     """Is the newest record for this stage still about the tree in front of us?"""
     if not argv:
@@ -839,12 +871,17 @@ def cmd_check(path, argv):
     if "--chain" in argv[1:]:
         return cmd_chain(path, argv[0])
     stage = argv[0]
-    hits = [e for e in read(path, strict=True)
-            if e.get("kind") == "note" and e.get("stage") == stage]
+    notes = [e for e in read(path, strict=True) if e.get("kind") == "note"]
+    hits = [e for e in notes if e.get("stage") == stage]
     if not hits:
         print(f"{stage}: nothing recorded")
         return 1
     last = hits[-1]
+    why = unbound(notes, last)
+    if why:
+        print(f"{stage}: UNBOUND — {why}. Record `{stage}-start` before the "
+              f"pass, review, then record the verdict.")
+        return 3
     commit, digest = state_digest()
     if last["commit"] == commit and last["state"] == digest:
         print(f"{stage}: current — {last['text']}")
