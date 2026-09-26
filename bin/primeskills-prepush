@@ -42,15 +42,32 @@ def git(*args):
                           errors="replace")
 
 
+NESTED = "PRIMESKILLS_PREPUSH_ACTIVE"
+MARK = "# primeskills:git-hook"
+
+
 def own_hook(argv, stdin):
-    """Run the repository's own pre-push first; its refusal stands."""
+    """Run the repository's own pre-push first; its refusal stands.
+
+    A copy of the set's own shim sitting in .git/hooks would call this guard
+    back into itself without end -- a push that never returns. The shim is
+    recognised by its mark, and a nested call is recognised by the variable
+    set here, so the chain runs each hook once.
+    """
     common = git("rev-parse", "--git-common-dir")
     if common.returncode != 0:
         return 0
     hook = Path(common.stdout.strip()) / "hooks" / "pre-push"
     if not (hook.is_file() and os.access(hook, os.X_OK)):
         return 0
-    return subprocess.run([str(hook), *argv], input=stdin, text=True).returncode
+    try:
+        if MARK in hook.read_text(encoding="utf-8", errors="replace"):
+            return 0
+    except OSError:
+        pass
+    env = dict(os.environ, **{NESTED: "1"})
+    return subprocess.run([str(hook), *argv], input=stdin, text=True,
+                          env=env).returncode
 
 
 def known():
@@ -110,6 +127,8 @@ def scan(log, secrets):
 
 def main(argv):
     stdin = sys.stdin.read()
+    if os.environ.get(NESTED):
+        return 0                     # already running further up this chain
     code = own_hook(argv, stdin)
     if code != 0:
         return code

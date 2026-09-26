@@ -128,6 +128,24 @@ def main():
         pc.unlink()
         sh(["git", "push", "-q", "origin", "main"], work, env)
 
+        # a copy of the set's own shim in .git/hooks must not call the guard
+        # back into itself: that is a push that never returns
+        loop = work / ".git" / "hooks" / "pre-push"
+        loop.write_text((hooks_dir / "pre-push").read_text(encoding="utf-8"),
+                        encoding="utf-8")
+        loop.chmod(0o755)
+        commit(work, env, "e.txt", "e\n", "loop probe")
+        try:
+            r = subprocess.run(["git", "push", "-q", "origin", "main"], cwd=work,
+                               env=env, capture_output=True, text=True, timeout=30)
+            looped = False
+        except subprocess.TimeoutExpired:
+            looped = True
+        checks += 1
+        if looped or r.returncode != 0:
+            failures.append("the guard called itself through a copied shim")
+        loop.unlink()
+
         # a known secret is blocked, and the refusal does not print it
         commit(work, env, "db-sync.sh", f'PROD_SUDO_PASS="{KNOWN}"\n', "leak")
         r = sh(["git", "push", "-q", "origin", "main"], work, env)
