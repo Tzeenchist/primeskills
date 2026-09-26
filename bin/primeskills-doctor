@@ -185,6 +185,32 @@ def check_pin(r):
            else "pin.json points at a worktree that is gone")
 
 
+def check_git_hooks(r):
+    """PS-092: pushes pass the secret guard only through core.hooksPath."""
+    ours = Path.home() / ".primeskills" / "git-hooks"
+    cur = subprocess.run(["git", "config", "--global", "--get", "core.hooksPath"],
+                         capture_output=True, text=True).stdout.strip()
+    if not cur:
+        r.line(FAIL, "git", "pre-push secret guard", "core.hooksPath is not set")
+        return
+    if Path(cur).expanduser().resolve() != ours.resolve():
+        r.line(WARN, "git", "pre-push secret guard",
+               f"core.hooksPath is {cur}, not the set's — guard not active")
+        return
+    hook = ours / "pre-push"
+    text = hook.read_text(encoding="utf-8") if hook.is_file() else ""
+    target = next((w.strip("'\"") for w in text.split()
+                   if w.strip("'\"").endswith("primeskills-prepush")), "")
+    if not target or not Path(target).is_file():
+        r.line(FAIL, "git", "pre-push secret guard", f"{hook} does not reach the guard")
+        return
+    store = Path.home() / ".primeskills" / "secrets"
+    known = (sum(1 for _ in store.open(encoding="utf-8")) if store.is_file() else 0)
+    r.line(OK, "git", "pre-push secret guard",
+           f"active; {known} registered secret(s) — a repository with its own "
+           f"local core.hooksPath is not covered")
+
+
 def check_hooks_declared(r, agent="claude", settings=None):
     """Run the command the host installed and compare its actual decision."""
     settings = settings or Path.home() / ".claude" / "settings.json"
@@ -275,6 +301,7 @@ def main():
     check_core(r, "claude", HOME / ".claude" / "CLAUDE.md", "primeskills:begin")
     check_pin(r)
     check_hooks_declared(r)
+    check_git_hooks(r)
 
     check_skills(r, "codex", HOME / ".codex" / "skills")
     check_core(r, "codex", HOME / ".codex" / "AGENTS.md", "primeskills:begin")

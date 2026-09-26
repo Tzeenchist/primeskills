@@ -31,7 +31,9 @@ order exists to prevent.
    again on the final state → **verify:** exit 0, counts match, and `check`
    answers `current`
 2. First pass over the whole change (G17): scan for keys, tokens, passwords,
-   `.env` changes, real identifiers, absolute paths from your machine
+   `.env` changes, real identifiers, absolute paths from your machine. The
+   pre-push hook blocks vendor tokens and secrets registered with
+   `primeskills-secrets add`; anything else is still yours to find
    → **verify:** you name each hit or state there are none
 3. Second pass over the same range: read it and write the message from it → **verify:** every
    claim in the message appears in the diff, and every change in the diff is
