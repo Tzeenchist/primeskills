@@ -49,7 +49,11 @@ not the running system — that is `probe`.
 7. Readability: would someone unfamiliar understand this in six months —
    the reader's path only; ignore behaviour, which other axes own
    → **verify:** you name the place they would stumble, or state there is none
-8. Sort findings: blocking, worth fixing, optional → **verify:** each blocking
+8. Simplification, advisory only: dead code, hand-rolled stdlib, a dependency
+   doing the platform's job, an abstraction with one caller, the same logic
+   five lines shorter. Tests, error paths and input checks are never targets
+   → **verify:** each names what replaces it, or none found
+9. Sort findings: blocking, worth fixing, optional → **verify:** each blocking
    finding says what breaks, with the input that breaks it
 
 ## Stop conditions
