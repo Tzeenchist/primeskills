@@ -284,8 +284,10 @@ def check_command(r):
         if not found:
             r.line(FAIL, "shared", f"{name} on PATH", "not found")
             continue
-        target = ROOT / "bin" / name
-        if Path(found).resolve() != target.resolve():
+        # ours is either tree, as the installer counts it: it leaves links into
+        # the working copy alone and adds new ones into the pinned tree
+        target = Path(found).resolve()
+        if not under_root(found) or target.name != name:
             r.line(WARN, "shared", f"{name} on PATH", f"{found} is not ours")
             continue
         if probe is None:
