@@ -398,15 +398,13 @@ MANIFEST = HOME / ".primeskills" / "installed.json"
 # any tree.
 HOOKS_MANIFEST = HOME / ".primeskills" / "hooks.json"
 LOCAL_BIN = HOME / ".local" / "bin"
-# Every tool a skill names by bare name belongs here: `handon` called
-# `primeskills-handoffs` and Codex answered 127, command not found
-# (2026-08-21). A skill that names a command the shell cannot find is an
-# instruction that fails silently.
-# Every command a skill names by name belongs here: one it cannot resolve is an
-# instruction that fails silently. The list stood two names short until `cline`
-# ran `fence` live on 2026-08-25 and got exit 127 from the very command that
-# skill's step 1 verifies with. `tests/test_docs.py` now keeps the two in step.
-# The list itself lives in psmeta.SHARED_TOOLS, shared with the doctor.
+# Every command a skill names by bare name goes on PATH: one the shell cannot
+# find is an instruction that fails silently. `handon` called
+# `primeskills-handoffs` and Codex answered 127 (2026-08-21); the list then
+# stood two names short until `cline` ran `fence` live and got 127 from the
+# very command its step 1 verifies with (2026-08-25). The list lives in
+# psmeta.SHARED_TOOLS, shared with the doctor; `tests/test_docs.py` holds the
+# skills to it.
 
 # PS-092. The pre-push guard is a git hook, so it holds for every host and for
 # a person. It is installed behind a global core.hooksPath -- and that setting
