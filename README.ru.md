@@ -117,9 +117,9 @@ python3 bin/primeskills-doctor             # проверяет, что всё �
 разработки самого набора это лишнее:
 
 ```
-python3 bin/primeskills-install --apply --live   # ставить с рабочей копии
-python3 bin/primeskills-install --pin <коммит>   # закрепить другой коммит
-python3 bin/primeskills-install --unpin          # вернуться на рабочую копию
+python3 bin/primeskills-install --apply --live           # ставить с рабочей копии
+python3 bin/primeskills-install --pin <коммит> --apply   # закрепить другой коммит
+python3 bin/primeskills-install --unpin --apply          # вернуться на рабочую копию
 ```
 
 Установщик забирает только то, что положил сам: чужие навыки и ваши файлы
