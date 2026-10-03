@@ -12,15 +12,14 @@ refs:
 # Vet
 
 ## Trigger
-A diff that is ready to merge, after `verify` reports PASS. Reviews the change,
+A diff ready to merge, after `verify` reports PASS. Reviews the change,
 not the running system — that is `probe`.
 
 ## Invariants
-- Approve a change that improves the health of the codebase, even if it is not
-  how you would have written it. Perfect is not the bar; better is.
+- Approve a change that improves the codebase, even if you would have written
+  it differently. Perfect is not the bar; better is.
 - Every axis gets an answer. "Nothing found" is an answer; silence is not.
-- A finding names a file and a line. "Consider improving error handling" is not
-  a review comment, it is a mood.
+- A finding names a file and a line; without them it is a mood.
 - You read and report. Fixing is `build`.
 
 ## Procedure
@@ -34,7 +33,8 @@ not the running system — that is `probe`.
    identifiers in tests → **verify:** you name each hit or state there are none
    (G17)
 3. Correctness: for each changed path, what happens on nil, empty, and error
-   input, judged on behaviour alone — ignore naming and style here
+   input, judged on behaviour alone — ignore naming and style here. Where the
+   plan is silent, a reasonable user's expectation decides
    → **verify:** each has an answer drawn from the code, not assumed
 4. Scope: does every changed line trace to the request — intent is the only
    question; ignore whether the change is good
@@ -53,17 +53,19 @@ not the running system — that is `probe`.
    doing the platform's job, an abstraction with one caller, the same logic
    five lines shorter. Tests, error paths and input checks are never targets
    → **verify:** each names what replaces it, or none found
-9. Sort findings: blocking, worth fixing, optional → **verify:** each blocking
-   finding says what breaks, with the input that breaks it
+9. Sort findings: blocking, worth fixing, optional; list apart what you set
+   aside, with reasons, for the author to rule on
+   → **verify:** each blocking finding says what breaks, with the input that
+   breaks it
 
 ## Stop conditions
 - The diff does something the plan did not ask for: that is a blocking finding,
   not a nice-to-have.
 - You disagree with a decision the user already made: say it once as an
-  optional finding and move on. Re-litigating is not reviewing.
+  optional finding and move on.
 - A finding you raised earlier is already fixed in this diff: strike it, do not
   carry it (G6).
-- The change is too large to review honestly: say so and ask for it in parts.
+- The change is too large to review honestly: say so, ask for parts.
 
 ## Output
 Findings grouped blocking / worth fixing / optional, each with file, line, and

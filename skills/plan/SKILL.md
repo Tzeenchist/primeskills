@@ -13,11 +13,14 @@ An intent with success criteria, from `brief` or from the user directly. Skip
 for a change that fits in one file and alters no contract — that gate is G2.
 
 ## Invariants
-- Write for an implementer with no context, no judgement, and an aversion to
-  testing. If such a reader could go wrong, the plan is not finished.
+- Write for a capable implementer new to this code: given the interface and
+  the test, they write idiomatic code. They cannot know what you decided —
+  files, signatures, the values the request pins, the test for each task. The
+  plan carries that.
 - Every task carries its own acceptance criterion. "Implement X" is not a task.
-- No placeholders. "TBD", "handle appropriately", "add tests as needed" are how
-  a plan looks when the thinking has not happened yet.
+- A step lets the implementer write one reasonable thing. "TBD" or "handle
+  appropriately" decides nothing; a body the signature and test already fix is
+  code written early.
 - A task fits one commit. If it needs three, it is three tasks.
 - You do not write code here. This skill reads and plans.
 
@@ -29,17 +32,19 @@ for a change that fits in one file and alters no contract — that gate is G2.
 3. Give each task an acceptance criterion that names a command or an
    observation → **verify:** you could hand the criterion to someone else and
    they would agree on whether it is met
-4. Mark the standing bar separately from the per-task criteria: tests green, no
+4. Review focus: up to five inputs the goal implies but no criterion
+   exercises, likeliest to bite first, each with what a reasonable user expects
+   → **verify:** each is pinned to the task owning that code, or you say none
+   after checking
+5. Mark the standing bar separately from the per-task criteria: tests green, no
    regressions, docs current → **verify:** both lists exist and neither
    swallows the other
-5. Decide the gate by reversibility: one file and no contract change proceeds;
-   a new module needs its acceptance criteria approved, and the how judged on a
-   draft thin enough to discard; a migration or a public API needs the plan
-   approved as well, and any irreversible part pulls the whole change to both
-   → **verify:** the decision is stated, not assumed, and the criteria you hand
-   over name checkable outcomes rather than the shape of the code (G2)
-6. Re-read as the implementer described above → **verify:** name the first place
-   they would guess, and remove the guess
+6. Decide the gate by reversibility (G2) → **verify:** the decision is stated,
+   not assumed, and the criteria you hand over name checkable outcomes rather
+   than the shape of the code
+7. Re-read as that implementer; a plan several times the request's length, or
+   mostly code, is the program written early → **verify:** name the first place
+   they would guess and remove it; bodies become signatures and assertions
 
 ## Stop conditions
 - The goal cannot be stated in one sentence: it is more than one goal. Split it
@@ -50,7 +55,8 @@ for a change that fits in one file and alters no contract — that gate is G2.
 
 ## Output
 The goal, what is out of scope, ordered tasks with acceptance criteria, the
-standing bar, and whether approval is required before implementation.
+review focus, the standing bar, and whether approval is required before
+implementation.
 
 ## References
 Lenses `ceo`, `money`, `eng`, `beauty` review this plan; `teams` runs the panel.
