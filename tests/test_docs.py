@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "bin"))
+from psmeta import SHARED_TOOLS  # noqa: E402
 # TODOS keeps the record of what was wrong and quotes it on purpose; review/
 # holds other people's words. Neither describes the set as it is now.
 HISTORY = {"TODOS.md", "PLAN.md"}
@@ -316,9 +318,7 @@ def main():
     named = set()
     for doc in list((ROOT / "skills").glob("*/SKILL.md")) + list((ROOT / "core").glob("*.md")):
         named.update(re.findall(r"primeskills-[a-z]+", doc.read_text(encoding="utf-8")))
-    psmeta = (ROOT / "bin" / "psmeta.py").read_text(encoding="utf-8")
-    listed = set(re.findall(r"primeskills-[a-z]+",
-                            re.search(r"SHARED_TOOLS = \{([^}]*)\}", psmeta).group(1)))
+    listed = set(SHARED_TOOLS)
     for name in sorted(named - listed):
         checks += 1
         failures.append(f"{name} назван в скиллах, но не в SHARED_TOOLS — "
