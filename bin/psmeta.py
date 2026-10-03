@@ -23,6 +23,22 @@ import re
 
 MODEL_REFS = {"gpt-6-astra": "ASTRA.md"}
 
+# Every command a skill names by bare name, and the argument that proves it runs
+# without side effects. One list: the installer puts these on PATH, the doctor
+# checks each of them, and tests/test_docs.py holds the skills to it. Two copies
+# drifted -- the doctor checked three of seven (PS-098).
+SHARED_TOOLS = {
+    "primeskills-run": "--help",
+    "primeskills-help": "--which-lang",
+    "primeskills-handoffs": "--help",
+    # the doctor is the process asking: running it would ask again, forever
+    # (2026-10-03, 340 processes before the kill) -- found and ours is the check
+    "primeskills-doctor": None,
+    "primeskills-release": "--help",
+    "primeskills-secrets": "count",  # its --help exits 1; count prints a number only
+    "primeskills-floor": "--help",
+}
+
 # Keys whose value this parser carries but never interprets, because no tool
 # here reads them. Adding a key to this list is a decision to stop checking it.
 OPAQUE_KEYS = ("hooks",)

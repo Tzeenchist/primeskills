@@ -25,7 +25,7 @@ import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from psmeta import MODEL_REFS, split_frontmatter
+from psmeta import MODEL_REFS, SHARED_TOOLS, split_frontmatter
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -406,9 +406,7 @@ LOCAL_BIN = HOME / ".local" / "bin"
 # instruction that fails silently. The list stood two names short until `cline`
 # ran `fence` live on 2026-08-25 and got exit 127 from the very command that
 # skill's step 1 verifies with. `tests/test_docs.py` now keeps the two in step.
-SHARED_TOOLS = ("primeskills-run", "primeskills-help", "primeskills-handoffs",
-                "primeskills-doctor", "primeskills-release", "primeskills-secrets",
-                "primeskills-floor")
+# The list itself lives in psmeta.SHARED_TOOLS, shared with the doctor.
 
 # PS-092. The pre-push guard is a git hook, so it holds for every host and for
 # a person. It is installed behind a global core.hooksPath -- and that setting

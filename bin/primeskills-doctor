@@ -22,6 +22,8 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "bin"))
+from psmeta import SHARED_TOOLS  # noqa: E402
 
 
 _INSTALLER = None
@@ -277,9 +279,7 @@ def check_profile(r, agent, dest):
 def check_command(r):
     """Skills name these tools by bare name. If the shell cannot find one, the
     instruction fails silently -- the exact failure this tool exists to catch."""
-    for name, probe in (("primeskills-run", "--help"),
-                        ("primeskills-help", "--which-lang"),
-                        ("primeskills-handoffs", "--help")):
+    for name, probe in SHARED_TOOLS.items():
         found = shutil.which(name)
         if not found:
             r.line(FAIL, "shared", f"{name} on PATH", "not found")
@@ -288,8 +288,15 @@ def check_command(r):
         if Path(found).resolve() != target.resolve():
             r.line(WARN, "shared", f"{name} on PATH", f"{found} is not ours")
             continue
-        p = subprocess.run([sys.executable, str(target), probe],
-                           capture_output=True, text=True)
+        if probe is None:
+            r.line(OK, "shared", f"{name} on PATH", found)
+            continue
+        try:
+            p = subprocess.run([sys.executable, str(target), probe],
+                               capture_output=True, text=True, timeout=60)
+        except subprocess.TimeoutExpired:
+            r.line(FAIL, "shared", f"{name} on PATH", f"{found} timed out on {probe}")
+            continue
         r.line(OK if p.returncode == 0 else FAIL, "shared", f"{name} on PATH", found)
 
 

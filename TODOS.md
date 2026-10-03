@@ -26,7 +26,14 @@
 Перестановка называет причину в своей записи.
 
 ### PS-098. `doctor` проверяет в PATH три общие команды из семи
-**Открыто 2026-10-03** (найдено при выпуске 0.22.0). `check_command`
+**Открыто 2026-10-03** (найдено при выпуске 0.22.0). **Этап:** build — зелёно
+на ветке `ps-098-doctor-shared-tools`, ждёт коммита и `land`. Список перенесён
+в `bin/psmeta.py` (`SHARED_TOOLS` с пробой на каждую команду), его читают
+установщик, `doctor` и `tests/test_docs.py`. **По ходу:** проба
+`primeskills-doctor --help` запускала полный `doctor`, тот снова себя —
+340 процессов до остановки; теперь `doctor` себя не вызывает, у пробы таймаут
+60 с (истёк — строка `[FAIL]`, а не трассировка), у вызовов `doctor` в тесте —
+120 с. `check_command`
 (`bin/primeskills-doctor:277`) держит свой список — `primeskills-run`,
 `-help`, `-handoffs`, — а `SHARED_TOOLS` (`bin/primeskills-install:409`)
 ставит в PATH семь: ещё `-doctor`, `-release`, `-secrets`, `-floor`. Если одна
