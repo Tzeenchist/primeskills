@@ -32,8 +32,8 @@ for a change that fits in one file and alters no contract — that gate is G2.
 3. Give each task an acceptance criterion that names a command or an
    observation → **verify:** you could hand the criterion to someone else and
    they would agree on whether it is met
-4. Name up to five inputs the goal implies but no criterion exercises,
-   likeliest to bite first, each with what a reasonable user expects
+4. Review focus: up to five inputs the goal implies but no criterion
+   exercises, likeliest to bite first, each with what a reasonable user expects
    → **verify:** each is pinned to the task owning that code, or you say none
    after checking
 5. Mark the standing bar separately from the per-task criteria: tests green, no
@@ -55,7 +55,8 @@ for a change that fits in one file and alters no contract — that gate is G2.
 
 ## Output
 The goal, what is out of scope, ordered tasks with acceptance criteria, the
-review focus, the standing bar, and whether approval is required before implementation.
+review focus, the standing bar, and whether approval is required before
+implementation.
 
 ## References
 Lenses `ceo`, `money`, `eng`, `beauty` review this plan; `teams` runs the panel.
