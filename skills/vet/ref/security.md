@@ -12,6 +12,10 @@ external integration. Answer each line or mark it not applicable.
 - [ ] Values reaching a shell use an argument list, never a formatted string.
 - [ ] Values reaching HTML are escaped by the template, not by hand.
 - [ ] Paths built from input cannot climb out of their directory.
+- [ ] Deleting, moving or overwriting a path named by data resolves symlinks
+      first, then checks it against an allowlist of roots, a minimum depth
+      so a root is never the target, and evidence of ownership read before
+      the call.
 
 ## Authentication and authorisation
 - [ ] Every new endpoint states who may call it. "Logged in" is not an answer
