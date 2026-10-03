@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Name every change that lowers the bar, between the merge base and now.
+
+PS-097. G7 forbids turning a build green by weakening tests or thresholds; on
+the projects the set works in, that rule was text. This reads the diff from
+the merge base with --base to the working tree -- committed, staged, unstaged
+-- plus untracked files, and reports each change that lowers the bar as
+`path:line rule` (`-` where there is no line). Only added lines and lowered
+values count: tightening is silent, and the suppressions a project already
+carries are not this change's doing.
+
+Rules: skip (a skip or xfail added), test-deleted, fewer-asserts (a test file
+that stayed lost assertions), suppression (a new bare noqa or type: ignore
+without an error code, or pragma: no cover), threshold (a coverage floor lowered or removed; a
+value it cannot read is named, not skipped), ci-silenced (`|| true` or
+continue-on-error in a workflow), stub (raise NotImplementedError outside
+tests). Python and CI only: JS files are counted and said to be unread.
+
+Exit 0: nothing lowered, with how many files were looked at. Exit 1: findings
+-- not a block; the author names a reason in review (`vet` step 6). Exit 2:
+could not check, with the reason. A 2 never prints the clean line, so it
+cannot be read as a 0. It never prints the content of a line, only where.
+"""
+import argparse
+import io
+import os
+import re
+import subprocess
+import sys
+import tokenize
+from pathlib import PurePosixPath
+
+CLEAN = "проверено"
+# anchored to the start of a statement: the same words inside a string are
+# data, and a project that tests its own checks carries plenty of them
+SKIP = re.compile(r"^\s*(?:@pytest\.mark\.(?:skip|skipif|xfail)\b"
+                  r"|@unittest\.skip\w*"
+                  r"|self\.skipTest\("
+                  r"|pytest\.skip\()")
+STUB = re.compile(r"^\s*raise\s+NotImplementedError\b")
+# bare forms only (owner, 2026-10-03): a noqa or type: ignore that names its
+# error code is narrow and deliberate, and on four projects those were 44 of 46
+SUPPRESSION = re.compile(r"#\s*(?:noqa\b(?!\s*:)|type:\s*ignore\b(?!\[)"
+                         r"|pragma:\s*no\s+cover\b)")
+ASSERT = re.compile(r"^\s*assert\b|\bself\.assert\w*\(")
+CI_SILENCED = re.compile(r"\|\|\s*true\b|continue-on-error:\s*true\b")
+THRESHOLD = [("fail_under", re.compile(r"\bfail_under\s*[=:]\s*(\S+)")),
+             ("--cov-fail-under", re.compile(r"--cov-fail-under[=\s]+(\S+)"))]
+CONFIGS = {"pyproject.toml", "setup.cfg", ".coveragerc", "pytest.ini", "tox.ini"}
+JS = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def git(*args):
+    # a user's config must not change what is parsed: quoted non-ASCII paths
+    # would not open, and diff.noprefix strips the a/ b/ the parser expects
+    p = subprocess.run(["git", "-c", "core.quotePath=false", *args],
+                       capture_output=True, text=True)
+    return p.returncode, p.stdout
+
+
+def cannot(reason):
+    print(f"primeskills-floor: проверка не выполнена — {reason}", file=sys.stderr)
+    return 2
+
+
+def is_test(path):
+    p = PurePosixPath(path)
+    return (p.suffix == ".py" and (p.name.startswith("test_") or p.name.endswith("_test.py")
+                                   or p.name == "tests.py"
+                                   or any(d in ("tests", "test") for d in p.parts[:-1])))
+
+
+def is_workflow(path):
+    return path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml"))
+
+
+def read(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def changes(mb):
+    """Return {path: status} for tracked changes and untracked files."""
+    code, out = git("diff", "--name-status", "-M", "--no-color", mb)
+    if code != 0:
+        raise RuntimeError("git diff не прочитался")
+    status = {}
+    for row in out.splitlines():
+        parts = row.split("\t")
+        status[parts[-1]] = parts[0][0]
+    code, out = git("ls-files", "--others", "--exclude-standard", "-z")
+    if code != 0:
+        raise RuntimeError("список неотслеживаемых не прочитался")
+    for name in filter(None, out.split("\0")):
+        status[name] = "?"
+    return status
+
+
+def added_lines(mb, status):
+    """Return {path: {line number: text}} for every line added since mb."""
+    code, out = git("diff", "-U0", "-M", "--no-color", "--no-ext-diff",
+                    "--src-prefix=a/", "--dst-prefix=b/", mb)
+    if code != 0:
+        raise RuntimeError("git diff не прочитался")
+    added, path, line = {}, None, 0
+    for row in out.splitlines():
+        if row.startswith("+++ "):
+            path = None if row == "+++ /dev/null" else row[6:]
+        elif m := HUNK.match(row):
+            line = int(m.group(1))
+        elif row.startswith("+") and path is not None:
+            added.setdefault(path, {})[line] = row[1:]
+            line += 1
+    for name, s in status.items():
+        if s == "?" and (text := read(name)) is not None:
+            added[name] = dict(enumerate(text.splitlines(), 1))
+    return added
+
+
+def comment_lines(text):
+    """Line numbers of comments that suppress a check, or None if untokenizable."""
+    found = set()
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT and SUPPRESSION.search(tok.string):
+                found.add(tok.start[0])
+    except (tokenize.TokenError, SyntaxError, IndentationError):
+        return None
+    return found
+
+
+def thresholds(text):
+    """{kind: (value, line)} for the first coverage floor of each kind."""
+    got = {}
+    for n, row in enumerate((text or "").splitlines(), 1):
+        for kind, rx in THRESHOLD:
+            if kind not in got and (m := rx.search(row)):
+                got[kind] = (m.group(1).strip("\"'"), n)
+    return got
+
+
+def number(v):
+    try:
+        return float(v)
+    except ValueError:
+        return None
+
+
+def show(v):
+    return v if number(v) is None else f"{number(v):g}"
+
+
+def findings_for(mb, status, added):
+    out = []
+    for path, s in sorted(status.items()):
+        lines = added.get(path, {})
+        if s == "D":
+            if is_test(path):
+                out.append(f"{path}:- test-deleted")
+            continue
+        if path.endswith(".py"):
+            for n, text in sorted(lines.items()):
+                if SKIP.search(text):
+                    out.append(f"{path}:{n} skip")
+                if not is_test(path) and STUB.search(text):
+                    out.append(f"{path}:{n} stub")
+            text = read(path)
+            if lines and text is not None:
+                marked = comment_lines(text)
+                if marked is None:  # cannot tokenize: fall back to the raw line
+                    marked = {n for n, t in lines.items() if SUPPRESSION.search(t)}
+                for n in sorted(marked & set(lines)):
+                    out.append(f"{path}:{n} suppression")
+            if is_test(path) and s == "M" and text is not None:
+                code, old = git("show", f"{mb}:{path}")
+                before = sum(bool(ASSERT.search(r)) for r in old.splitlines()) if code == 0 else 0
+                after = sum(bool(ASSERT.search(r)) for r in text.splitlines())
+                if after < before:
+                    out.append(f"{path}:- fewer-asserts {before}→{after}")
+        if is_workflow(path):
+            for n, text in sorted(lines.items()):
+                if CI_SILENCED.search(text):
+                    out.append(f"{path}:{n} ci-silenced")
+        if PurePosixPath(path).name in CONFIGS or is_workflow(path):
+            code, old = git("show", f"{mb}:{path}")
+            was = thresholds(old if code == 0 else "")
+            now = thresholds(read(path))
+            for kind in sorted(set(was) | set(now)):
+                if kind in now and number(now[kind][0]) is None:
+                    out.append(f"{path}:{now[kind][1]} не знаю этот формат порога")
+                    continue
+                if kind not in was or number(was[kind][0]) is None:
+                    continue
+                if kind not in now:
+                    out.append(f"{path}:- threshold {show(was[kind][0])}→нет")
+                elif number(now[kind][0]) < number(was[kind][0]):
+                    out.append(f"{path}:{now[kind][1]} threshold "
+                               f"{show(was[kind][0])}→{show(now[kind][0])}")
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--base", help="ref to compare with; default origin/HEAD")
+    args = ap.parse_args()
+
+    code, top = git("rev-parse", "--show-toplevel")
+    if code != 0:
+        return cannot("не git-репозиторий")
+    os.chdir(top.strip())
+
+    base = args.base or "origin/HEAD"
+    if git("rev-parse", "--verify", "--quiet", base + "^{commit}")[0] != 0:
+        hint = "" if args.base else ", укажите --base"
+        return cannot(f"нет базы {base!r}{hint}")
+    code, mb = git("merge-base", base, "HEAD")
+    if code != 0:
+        return cannot(f"нет merge-base между {base!r} и HEAD")
+    mb = mb.strip()
+
+    try:
+        status = changes(mb)
+        added = added_lines(mb, status)
+    except RuntimeError as e:
+        return cannot(str(e))
+
+    findings = findings_for(mb, status, added)
+    js = sum(p.endswith(JS) for p in status)
+    note = f"; JS не смотрю: {js}" if js else ""
+    if findings:
+        print("\n".join(findings))
+        print(f"primeskills-floor: {len(findings)} — назовите причину в ревью{note}")
+        return 1
+    print(f"primeskills-floor: {CLEAN}: {len(status)} файлов, планка не снижена{note}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

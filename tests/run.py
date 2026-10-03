@@ -157,6 +157,7 @@ def main():
     frame = subprocess.run([sys.executable, str(Path(__file__).parent / "test_screen.py")])
     screen = subprocess.run([sys.executable, str(Path(__file__).parent / "test_screen_live.py")])
     prepush = subprocess.run([sys.executable, str(Path(__file__).parent / "test_prepush.py")])
+    floor = subprocess.run([sys.executable, str(Path(__file__).parent / "test_floor.py")])
 
     # routing over the real skill set, not just fixtures
     live = subprocess.run([sys.executable, str(ROUTE), str(ROOT / "skills"),
@@ -168,6 +169,7 @@ def main():
                  or checkpoints.returncode or coverage.returncode
                  or livecall.returncode or models.returncode or bench.returncode
                  or frame.returncode or screen.returncode or prepush.returncode
+                 or floor.returncode
                  or live.returncode) else 0
 
 

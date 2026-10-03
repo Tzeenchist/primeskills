@@ -27,8 +27,8 @@ not the running system — that is `probe`.
    verdict counts only for the tree the pass began on. Read the whole change —
    `git diff <base>...HEAD` plus staged and unstaged (G17) — and state what it
    is meant to do
-   → **verify:** your statement matches the plan or the commit message, and you
-   say so when it does not
+   → **verify:** your statement matches the plan or commit message, or you say
+   it does not
 2. Scan for secrets first: keys, tokens, passwords, `.env` files, real
    identifiers in tests → **verify:** you name each hit or state there are none
    (G17)
@@ -41,11 +41,11 @@ not the running system — that is `probe`.
    → **verify:** you name any line that does not, including formatting and
    comment churn (G1)
 5. Security: read `ref/security.md` if the diff touches input, auth, storage, or
-   an integration → **verify:** the checklist is answered or explicitly not
-   applicable
-6. Tests: does a new test fail without this change — coverage only; ignore
-   test style and speed
-   → **verify:** you can point at the test, or you say coverage is missing
+   an integration → **verify:** each line answered or marked not applicable
+6. Tests: does a new test fail without this change, and what
+   `primeskills-floor --base <base>` reports — coverage only; ignore test style
+   and speed → **verify:** you point at the test or say coverage is missing; a
+   floor line is worth fixing until its reason is named; exit 2 means unchecked
 7. Readability: would someone unfamiliar understand this in six months —
    the reader's path only; ignore behaviour, which other axes own
    → **verify:** you name the place they would stumble, or state there is none
@@ -59,18 +59,17 @@ not the running system — that is `probe`.
    breaks it
 
 ## Stop conditions
-- The diff does something the plan did not ask for: that is a blocking finding,
-  not a nice-to-have.
+- The diff does something the plan did not ask for: a blocking finding.
 - You disagree with a decision the user already made: say it once as an
   optional finding and move on.
 - A finding you raised earlier is already fixed in this diff: strike it, do not
   carry it (G6).
-- The change is too large to review honestly: say so, ask for parts.
+- Too large to review honestly: say so, ask for parts.
 
 ## Output
-Findings grouped blocking / worth fixing / optional, each with file, line, and
-the failure it causes. Then a verdict: merge, merge after the blocking ones, or
+Findings as sorted in step 9, each with the failure it causes. Then a verdict:
+merge, merge after the blocking ones, or
 rework — recorded with `primeskills-run note vet "<verdict>"`.
 
 ## References
-`ref/security.md` for the input, auth, storage and integration checklist.
+`ref/security.md` — the step-5 checklist.
