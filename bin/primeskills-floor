@@ -52,7 +52,10 @@ HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
 
 def git(*args):
-    p = subprocess.run(["git", *args], capture_output=True, text=True)
+    # a user's config must not change what is parsed: quoted non-ASCII paths
+    # would not open, and diff.noprefix strips the a/ b/ the parser expects
+    p = subprocess.run(["git", "-c", "core.quotePath=false", *args],
+                       capture_output=True, text=True)
     return p.returncode, p.stdout
 
 
@@ -99,7 +102,8 @@ def changes(mb):
 
 def added_lines(mb, status):
     """Return {path: {line number: text}} for every line added since mb."""
-    code, out = git("diff", "-U0", "-M", "--no-color", "--no-ext-diff", mb)
+    code, out = git("diff", "-U0", "-M", "--no-color", "--no-ext-diff",
+                    "--src-prefix=a/", "--dst-prefix=b/", mb)
     if code != 0:
         raise RuntimeError("git diff не прочитался")
     added, path, line = {}, None, 0

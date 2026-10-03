@@ -254,6 +254,19 @@ def main():
                case("js", {"app.test.js": "it.skip('x', () => {})\n"}), 0,
                must=("JS не смотрю",))
 
+        # a user's git config must not change what is read: noprefix strips the
+        # a/ b/ the parser expects, and quotePath quotes a non-ASCII name
+        work = repo(base, env, "noprefix")
+        sh(["git", "config", "diff.noprefix", "true"], work, env)
+        write(work, "tests/test_price.py",
+              "import pytest\n@pytest.mark.skip\ndef test_price():\n    assert 1\n")
+        sh(["git", "commit", "-qam", "skip"], work, env)
+        expect("diff.noprefix", floor(work, env, "--base", "main"), 1,
+               must=("tests/test_price.py:2 skip",))
+        expect("non-ascii name",
+               case("unicode", {"tests/test_цена.py": "x = 1  # noqa\n"}), 1,
+               must=("tests/test_цена.py:1 suppression",))
+
         # 5: could not check -- exit 2 with the reason, never the clean word
         nogit = base / "nogit"
         nogit.mkdir()
