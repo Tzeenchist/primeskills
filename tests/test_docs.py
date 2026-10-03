@@ -316,9 +316,9 @@ def main():
     named = set()
     for doc in list((ROOT / "skills").glob("*/SKILL.md")) + list((ROOT / "core").glob("*.md")):
         named.update(re.findall(r"primeskills-[a-z]+", doc.read_text(encoding="utf-8")))
-    installer = (ROOT / "bin" / "primeskills-install").read_text(encoding="utf-8")
+    psmeta = (ROOT / "bin" / "psmeta.py").read_text(encoding="utf-8")
     listed = set(re.findall(r"primeskills-[a-z]+",
-                            re.search(r"SHARED_TOOLS = \(([^)]*)\)", installer).group(1)))
+                            re.search(r"SHARED_TOOLS = \{([^}]*)\}", psmeta).group(1)))
     for name in sorted(named - listed):
         checks += 1
         failures.append(f"{name} назван в скиллах, но не в SHARED_TOOLS — "

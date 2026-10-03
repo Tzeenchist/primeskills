@@ -5,12 +5,18 @@ Written after an external review found two unconditional deletions: a foreign
 `prime-analyst.md` was unlinked, and a `prime-<name>` directory belonging to
 another tool would have gone through `shutil.rmtree`.
 """
+import contextlib
+import importlib.machinery
+import importlib.util
+import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -126,6 +132,58 @@ def main():
         checks += 1
         if "missing: handoff" not in told:
             failures.append(f"доктор не назвал отсутствующий навык:\n{told}")
+
+    # PS-098: the doctor checks every command the installer puts on PATH, not a
+    # list of its own -- it named three of seven, so a missing primeskills-floor
+    # read "0 failed" while vet's step 6 would get exit 127
+    with tempfile.TemporaryDirectory() as home:
+        env = dict(os.environ, HOME=home,
+                   PATH=f"{home}/.local/bin:/usr/local/bin:/usr/bin:/bin")
+        subprocess.run([sys.executable, str(TOOL), "--apply", "--live"],
+                       capture_output=True, text=True, env=env)
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        # a timeout, because a doctor that probes itself recurses without end
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=env, timeout=120).stdout
+        for name in ("primeskills-run", "primeskills-help", "primeskills-handoffs",
+                     "primeskills-doctor", "primeskills-release", "primeskills-secrets",
+                     "primeskills-floor"):
+            checks += 1
+            if not re.search(rf"\[ok  \] shared\s+{name} on PATH", told):
+                failures.append(f"доктор не проверил {name} на PATH:\n{told[-600:]}")
+        (Path(home) / ".local" / "bin" / "primeskills-floor").unlink()
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=env, timeout=120).stdout
+        checks += 1
+        if not re.search(r"\[FAIL\] shared\s+primeskills-floor on PATH", told):
+            failures.append(f"доктор промолчал о пропавшем primeskills-floor:\n{told[-600:]}")
+
+        # a probe that hangs past its timeout is a failed check, not a traceback
+        # that ends the report halfway: loaded in-process with run() made to
+        # time out, since no shared tool of ours can be made to hang on demand
+        loader = importlib.machinery.SourceFileLoader("_doctor", str(doctor))
+        mod = importlib.util.module_from_spec(
+            importlib.util.spec_from_loader("_doctor", loader))
+        loader.exec_module(mod)
+
+        def hang(cmd, **kw):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout"))
+
+        mod.subprocess = types.SimpleNamespace(run=hang,
+                                               TimeoutExpired=subprocess.TimeoutExpired)
+        saved, os.environ["PATH"] = os.environ["PATH"], env["PATH"]
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out):
+                mod.check_command(mod.Report())
+            told = out.getvalue()
+        except subprocess.TimeoutExpired as e:
+            told = f"{out.getvalue()}TimeoutExpired: {e}"
+        finally:
+            os.environ["PATH"] = saved
+        checks += 1
+        if not re.search(r"\[FAIL\] shared\s+primeskills-run on PATH — .*timed out", told):
+            failures.append(f"зависшая проба не дала строки FAIL:\n{told[-600:]}")
 
     # the same installation, read from another tree. `--apply` builds a pinned
     # worktree and runs from there, so everything installed live led out of the
@@ -628,8 +686,6 @@ def main():
     # ownership is decided by path components, not by substring: a neighbour
     # directory whose name merely begins with ours is not ours, and the caller
     # of this check is allowed to shutil.rmtree what it owns
-    import importlib.machinery
-    import importlib.util
     loader = importlib.machinery.SourceFileLoader("_pi_test", str(TOOL))
     spec = importlib.util.spec_from_loader("_pi_test", loader)
     mod = importlib.util.module_from_spec(spec)
