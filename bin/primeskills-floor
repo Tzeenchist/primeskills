@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Name every added line that lowers the bar, between the merge base and now.
+
+PS-097. G7 forbids turning a build green by weakening tests or thresholds; on
+the projects the set works in, that rule was text. This reads the diff from
+the merge base with --base to the working tree -- committed, staged, unstaged
+-- plus untracked files, and reports each added line that lowers the bar as
+`path:line rule`. Only added lines count: tightening is silent, and the
+suppressions a project already carries are not this change's doing.
+
+Exit 0: nothing lowered, with how many files were looked at. Exit 1: findings
+-- not a block; the author names a reason in review (`vet` step 6). Exit 2:
+could not check, with the reason. A 2 never prints the clean line, so it
+cannot be read as a 0. It never prints the content of a line, only where.
+
+Draft: one rule, skip.
+"""
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+CLEAN = "проверено"
+RULES = [
+    # anchored to the start of a statement: the same words inside a string are
+    # data, and a project that tests its own checks carries plenty of them
+    ("skip", re.compile(
+        r"^\s*(?:@pytest\.mark\.(?:skip|skipif|xfail)\b"
+        r"|@unittest\.skip\w*"
+        r"|self\.skipTest\("
+        r"|pytest\.skip\()")),
+]
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def git(*args):
+    p = subprocess.run(["git", *args], capture_output=True, text=True)
+    return p.returncode, p.stdout
+
+
+def cannot(reason):
+    print(f"primeskills-floor: проверка не выполнена — {reason}", file=sys.stderr)
+    return 2
+
+
+def added_lines(merge_base):
+    """Yield (path, line number, text) for every line added since merge_base."""
+    code, out = git("diff", "-U0", "--no-color", "--no-ext-diff", merge_base)
+    if code != 0:
+        raise RuntimeError("git diff не прочитался")
+    path, line = None, 0
+    for row in out.splitlines():
+        if row.startswith("+++ "):
+            path = None if row == "+++ /dev/null" else row[6:]
+        elif m := HUNK.match(row):
+            line = int(m.group(1))
+        elif row.startswith("+") and path is not None:
+            yield path, line, row[1:]
+            line += 1
+    code, out = git("ls-files", "--others", "--exclude-standard", "-z")
+    if code != 0:
+        raise RuntimeError("список неотслеживаемых не прочитался")
+    for name in filter(None, out.split("\0")):
+        try:
+            with open(name, encoding="utf-8") as f:
+                for n, text in enumerate(f, 1):
+                    yield name, n, text
+        except (UnicodeDecodeError, IsADirectoryError):
+            continue
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--base", help="ref to compare with; default origin/HEAD")
+    args = ap.parse_args()
+
+    code, top = git("rev-parse", "--show-toplevel")
+    if code != 0:
+        return cannot("не git-репозиторий")
+    os.chdir(top.strip())
+
+    base = args.base or "origin/HEAD"
+    if git("rev-parse", "--verify", "--quiet", base + "^{commit}")[0] != 0:
+        hint = "" if args.base else ", укажите --base"
+        return cannot(f"нет базы {base!r}{hint}")
+    code, mb = git("merge-base", base, "HEAD")
+    if code != 0:
+        return cannot(f"нет merge-base между {base!r} и HEAD")
+
+    try:
+        rows = list(added_lines(mb.strip()))
+    except RuntimeError as e:
+        return cannot(str(e))
+
+    findings = []
+    for path, n, text in rows:
+        if not path.endswith(".py"):
+            continue
+        for rule, rx in RULES:
+            if rx.search(text):
+                findings.append(f"{path}:{n} {rule}")
+    files = len({path for path, _, _ in rows})
+    if findings:
+        print("\n".join(findings))
+        print(f"primeskills-floor: {len(findings)} — назовите причину в ревью")
+        return 1
+    print(f"primeskills-floor: {CLEAN}: {files} файлов, планка не снижена")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
