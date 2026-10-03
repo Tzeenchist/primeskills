@@ -46,11 +46,11 @@ pushing, and before handing work to another agent.
    → **verify:** the recorded failure and this pass describe the same test.
    With no record, prove it in a throwaway worktree — never by reverting the
    live tree, which can eat work that is not yours
-7. For a change that adds a condition, mutate one in a throwaway worktree
-   carrying the uncommitted change, never the live tree: invert it and run the
-   affected tests against the step-2 target → **verify:** an assertion fails;
-   a green mutant names the missing test or why it is equivalent, and a build
-   or import error kills nothing
+7. When a change adds a condition, mutate it once in a throwaway worktree
+   with the uncommitted change, never the live tree — swap `and`/`or`, shift a
+   boundary (`>`→`>=`) or drop a negation — and run affected tests against the
+   step-2 target → **verify:** an assertion fails; a green mutant names the
+   missing test or why it is equivalent; a build or import error kills nothing
 8. Run affected checks first. Broaden to the full suite for named risks or a
    repository/release gate, unless a flow already ran it for this state
    → **verify:** exit code is 0, and you name the run used and what it left out
