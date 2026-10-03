@@ -155,6 +155,101 @@ def main():
         expect("untracked skip", floor(work, env, "--base", "main"), 1,
                must=("tests/test_new.py:4 skip",))
 
+        def case(name, files, main_files=None, commit=True):
+            """A repo whose main carries main_files, and feature changes files."""
+            work = repo(base, env, name)
+            if main_files:
+                sh(["git", "switch", "-q", "main"], work, env)
+                for n, text in main_files.items():
+                    write(work, n, text)
+                    sh(["git", "add", n], work, env)
+                sh(["git", "commit", "-q", "-m", "main"], work, env)
+                sh(["git", "switch", "-q", "-C", "feature"], work, env)
+            for n, text in files.items():
+                if text is None:
+                    sh(["git", "rm", "-q", n], work, env)
+                else:
+                    write(work, n, text)
+                    sh(["git", "add", n], work, env)
+            if commit:
+                sh(["git", "commit", "-q", "-m", "change"], work, env)
+            return floor(work, env, "--base", "main")
+
+        # 2b: a deleted test file; a renamed one is not deleted
+        expect("deleted test file", case("deleted", {"tests/test_price.py": None}), 1,
+               must=("tests/test_price.py:- test-deleted",))
+        work = repo(base, env, "renamed")
+        sh(["git", "mv", "tests/test_price.py", "tests/test_cost.py"], work, env)
+        sh(["git", "commit", "-q", "-m", "rename"], work, env)
+        expect("renamed test file", floor(work, env, "--base", "main"), 0)
+
+        # 2c: fewer assertions in a test file that stayed
+        two = ("class T:\n    def test_a(self):\n        assert 1\n"
+               "        self.assertEqual(1, 1)\n")
+        one = "class T:\n    def test_a(self):\n        assert 1\n"
+        expect("assertion removed", case("fewer", {"tests/test_t.py": one},
+                                         main_files={"tests/test_t.py": two}), 1,
+               must=("tests/test_t.py:- fewer-asserts 2→1",))
+        expect("assertion added", case("more", {"tests/test_t.py": two},
+                                       main_files={"tests/test_t.py": one}), 0)
+
+        # 2d: new suppressions, as comments only
+        for i, c in enumerate(("# noqa", "# noqa: E501", "# type: ignore",
+                               "# pragma: no cover")):
+            expect(f"suppression {c}",
+                   case(f"supp{i}", {"price.py": f"x = 1\ny = 2  {c}\n"}), 1,
+                   must=("price.py:2 suppression",))
+        expect("suppression inside a string",
+               case("suppstr", {"price.py": "HELP = 'add # noqa to silence'\n"}), 0)
+        expect("suppression removed",
+               case("suppgone", {"price.py": "y = 2\n"},
+                    main_files={"price.py": "y = 2  # noqa\n"}), 0)
+
+        # 2e: a lowered or removed coverage floor; a raised one is silent
+        cfg = "[tool.coverage.report]\nfail_under = {}\n"
+        expect("threshold lowered",
+               case("lower", {"pyproject.toml": cfg.format(50)},
+                    main_files={"pyproject.toml": cfg.format(60)}), 1,
+               must=("pyproject.toml:2 threshold 60→50",))
+        expect("threshold raised",
+               case("raise", {"pyproject.toml": cfg.format(70)},
+                    main_files={"pyproject.toml": cfg.format(60)}), 0)
+        expect("threshold removed",
+               case("dropped", {"pyproject.toml": "[tool.coverage.report]\n"},
+                    main_files={"pyproject.toml": cfg.format(60)}), 1,
+               must=("pyproject.toml:- threshold 60→нет",))
+        expect("cov-fail-under lowered",
+               case("covflag", {"pytest.ini": "[pytest]\naddopts = --cov-fail-under=70\n"},
+                    main_files={"pytest.ini": "[pytest]\naddopts = --cov-fail-under=80\n"}), 1,
+               must=("pytest.ini:2 threshold 80→70",))
+
+        # 6: a threshold it cannot read is named, not skipped
+        expect("unknown threshold format",
+               case("unknown", {"setup.cfg": "[coverage:report]\nfail_under = ${MIN}\n"},
+                    main_files={"setup.cfg": "[coverage:report]\nfail_under = 60\n"}), 1,
+               must=("setup.cfg:2 не знаю этот формат",))
+
+        # 2f: CI that stops failing
+        wf = ".github/workflows/gate.yml"
+        expect("or-true in CI",
+               case("ortrue", {wf: "jobs:\n  t:\n    steps:\n      - run: pytest || true\n"}), 1,
+               must=(f"{wf}:4 ci-silenced",))
+        expect("continue-on-error in CI",
+               case("coe", {wf: "jobs:\n  t:\n    continue-on-error: true\n"}), 1,
+               must=(f"{wf}:3 ci-silenced",))
+
+        # 2g: a stub where code was; abstract methods in tests are not the case
+        expect("stub in code",
+               case("stub", {"price.py": "def price(t):\n    raise NotImplementedError\n"}), 1,
+               must=("price.py:2 stub",))
+        expect("stub in a test helper",
+               case("stubtest", {"tests/helpers.py": "def f():\n    raise NotImplementedError\n"}), 0)
+
+        # JS is out of scope in this version, and the output says so
+        expect("js not looked at",
+               case("js", {"app.test.js": "it.skip('x', () => {})\n"}), 0,
+               must=("JS не смотрю",))
+
         # 5: could not check -- exit 2 with the reason, never the clean word
         nogit = base / "nogit"
         nogit.mkdir()
