@@ -864,7 +864,7 @@ def pinned_is_dirty():
     return bool(out.stdout.strip())
 
 
-def pin(ref, agents, force=False):
+def pin(ref, agents, force=False, apply_it=True):
     """Point the agents at a fixed commit, and let that commit install itself.
 
     Ordered so that a failure leaves the previous state: the worktree is built
@@ -882,6 +882,14 @@ def pin(ref, agents, force=False):
                  f"move it, or repeat with --force to discard it.")
     previous = PIN_FILE.read_text(encoding="utf-8") if PIN_FILE.is_file() else None
     was = (pin_state() or {}).get("commit")
+    # PS-099: a plan, like every other path here. The "dry run" used to build
+    # the tree and install from it, and moved the machine before the mandate
+    # for it was spent
+    if not apply_it:
+        print(f"would pin: {ref} = {sha[:8]} at {PINNED} "
+              f"(now: {was[:8] if was else 'not pinned'})")
+        print("\nnothing changed. Re-run with --apply.")
+        return 0
     PINNED.parent.mkdir(parents=True, exist_ok=True)
     # Build the new tree beside the old one, not in its place. The old tree used
     # to be removed first, so a `worktree add` that failed -- a bad commit, a
@@ -920,7 +928,7 @@ def pin(ref, agents, force=False):
     return 0
 
 
-def unpin(agents, force=False):
+def unpin(agents, force=False, apply_it=True):
     """Return the agents to the working copy, and only then let go of the pin.
 
     Ordered the other way round at first: the record was deleted, the reinstall
@@ -934,6 +942,10 @@ def unpin(agents, force=False):
     if pinned_is_dirty() and not force:
         sys.exit(f"primeskills-install: {PINNED} has uncommitted work. Commit it, "
                  f"move it, or repeat with --force to discard it.")
+    if not apply_it:
+        print(f"would unpin: agents would follow the working copy at {ROOT}")
+        print("\nnothing changed. Re-run with --apply.")
+        return 0
     code = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                            *agents, "--apply", "--live"], text=True).returncode
     if code != 0:
@@ -971,9 +983,9 @@ def main():
         return 2
 
     if args.pin:
-        return pin(args.pin, args.agents, args.force)
+        return pin(args.pin, args.agents, args.force, args.apply)
     if args.unpin:
-        return unpin(args.agents, args.force)
+        return unpin(args.agents, args.force, args.apply)
     # Pinned by default. An installation that follows a working copy is a
     # supply chain the length of one editor: every save reaches installed agents and
     # the hooks they run, in sessions already in flight. Development wants that

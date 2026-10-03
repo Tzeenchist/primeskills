@@ -115,9 +115,9 @@ tree, and editing the working copy does not reach them until you install again.
 While developing the set itself that is in the way:
 
 ```
-python3 bin/primeskills-install --apply --live   # install from the working copy
-python3 bin/primeskills-install --pin <commit>   # pin a different commit
-python3 bin/primeskills-install --unpin          # go back to the working copy
+python3 bin/primeskills-install --apply --live           # install from the working copy
+python3 bin/primeskills-install --pin <commit> --apply   # pin a different commit
+python3 bin/primeskills-install --unpin --apply          # go back to the working copy
 ```
 
 The installer takes back only what it put there: other people's skills and your

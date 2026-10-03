@@ -637,7 +637,17 @@ def main():
           else:
               tool = clone / "bin" / "primeskills-install"
               env = dict(os.environ, HOME=str(h))
-              subprocess.run([sys.executable, str(tool), "claude", "--pin", "HEAD"],
+              # PS-099: without --apply a pin is a plan like any other -- on
+              # 2026-10-03 the "dry run" moved the machine before the mandate
+              # for it was spent
+              plan = subprocess.run([sys.executable, str(tool), "claude", "--pin", "HEAD"],
+                                    capture_output=True, text=True, env=env)
+              checks += 1
+              if (plan.returncode != 0 or "would pin" not in plan.stdout
+                      or (h / ".primeskills" / "pinned").exists()
+                      or (h / ".primeskills" / "pin.json").exists()):
+                  failures.append(f"--pin без --apply изменил машину:\n{plan.stdout}{plan.stderr}")
+              subprocess.run([sys.executable, str(tool), "claude", "--pin", "HEAD", "--apply"],
                              capture_output=True, text=True, env=env)
               link = h / ".claude" / "skills" / "build" / "SKILL.md"
               checks += 1
@@ -653,7 +663,7 @@ def main():
                               "-c", "user.name=t", "tag", "-a", "pin-test",
                               "-m", "pin test"], capture_output=True)
               tagged = subprocess.run(
-                  [sys.executable, str(tool), "claude", "--pin", "pin-test"],
+                  [sys.executable, str(tool), "claude", "--pin", "pin-test", "--apply"],
                   capture_output=True, text=True, env=env)
               state = json.loads(
                   (h / ".primeskills" / "pin.json").read_text(encoding="utf-8"))
@@ -665,16 +675,25 @@ def main():
                   failures.append(
                       "annotated tag записал в pin.json не deployed commit: "
                       f"recorded={state.get('commit')} deployed={deployed}")
+              # and --unpin without --apply leaves the pin, its tree and links
+              plan = subprocess.run([sys.executable, str(tool), "claude", "--unpin"],
+                                    capture_output=True, text=True, env=env)
+              checks += 1
+              if (plan.returncode != 0 or "would unpin" not in plan.stdout
+                      or not (h / ".primeskills" / "pin.json").is_file()
+                      or "/.primeskills/pinned/" not in os.path.realpath(link)):
+                  failures.append(f"--unpin без --apply изменил машину:\n{plan.stdout}{plan.stderr}")
               # uncommitted work inside the pinned tree must stop the removal
               (h / ".primeskills" / "pinned" / "DIRTY.txt").write_text("моё\n",
                                                                       encoding="utf-8")
               checks += 1
-              out = subprocess.run([sys.executable, str(tool), "claude", "--unpin"],
-                                   capture_output=True, text=True, env=env)
+              out = subprocess.run([sys.executable, str(tool), "claude", "--unpin",
+                                    "--apply"], capture_output=True, text=True, env=env)
               if "uncommitted work" not in (out.stdout + out.stderr):
                   failures.append("снятие пина не заметило незакоммиченную работу")
               off = subprocess.run([sys.executable, str(tool), "claude", "--unpin",
-                                    "--force"], capture_output=True, text=True, env=env)
+                                    "--force", "--apply"],
+                                   capture_output=True, text=True, env=env)
               checks += 1
               if "/.primeskills/pinned/" in os.path.realpath(link):
                   failures.append("снятие пина не вернуло ссылки на рабочую копию")
