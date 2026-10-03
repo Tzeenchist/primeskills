@@ -10,8 +10,8 @@ values count: tightening is silent, and the suppressions a project already
 carries are not this change's doing.
 
 Rules: skip (a skip or xfail added), test-deleted, fewer-asserts (a test file
-that stayed lost assertions), suppression (a new noqa, type: ignore or
-pragma: no cover comment), threshold (a coverage floor lowered or removed; a
+that stayed lost assertions), suppression (a new bare noqa or type: ignore
+without an error code, or pragma: no cover), threshold (a coverage floor lowered or removed; a
 value it cannot read is named, not skipped), ci-silenced (`|| true` or
 continue-on-error in a workflow), stub (raise NotImplementedError outside
 tests). Python and CI only: JS files are counted and said to be unread.
@@ -38,7 +38,10 @@ SKIP = re.compile(r"^\s*(?:@pytest\.mark\.(?:skip|skipif|xfail)\b"
                   r"|self\.skipTest\("
                   r"|pytest\.skip\()")
 STUB = re.compile(r"^\s*raise\s+NotImplementedError\b")
-SUPPRESSION = re.compile(r"#\s*(?:noqa\b|type:\s*ignore\b|pragma:\s*no\s+cover\b)")
+# bare forms only (owner, 2026-10-03): a noqa or type: ignore that names its
+# error code is narrow and deliberate, and on four projects those were 44 of 46
+SUPPRESSION = re.compile(r"#\s*(?:noqa\b(?!\s*:)|type:\s*ignore\b(?!\[)"
+                         r"|pragma:\s*no\s+cover\b)")
 ASSERT = re.compile(r"^\s*assert\b|\bself\.assert\w*\(")
 CI_SILENCED = re.compile(r"\|\|\s*true\b|continue-on-error:\s*true\b")
 THRESHOLD = [("fail_under", re.compile(r"\bfail_under\s*[=:]\s*(\S+)")),

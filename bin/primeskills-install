@@ -407,7 +407,8 @@ LOCAL_BIN = HOME / ".local" / "bin"
 # ran `fence` live on 2026-08-25 and got exit 127 from the very command that
 # skill's step 1 verifies with. `tests/test_docs.py` now keeps the two in step.
 SHARED_TOOLS = ("primeskills-run", "primeskills-help", "primeskills-handoffs",
-                "primeskills-doctor", "primeskills-release", "primeskills-secrets")
+                "primeskills-doctor", "primeskills-release", "primeskills-secrets",
+                "primeskills-floor")
 
 # PS-092. The pre-push guard is a git hook, so it holds for every host and for
 # a person. It is installed behind a global core.hooksPath -- and that setting

@@ -193,12 +193,16 @@ def main():
         expect("assertion added", case("more", {"tests/test_t.py": two},
                                        main_files={"tests/test_t.py": one}), 0)
 
-        # 2d: new suppressions, as comments only
-        for i, c in enumerate(("# noqa", "# noqa: E501", "# type: ignore",
-                               "# pragma: no cover")):
+        # 2d: new bare suppressions, as comments only (owner, 2026-10-03: one
+        # with an error code is narrow and deliberate -- 44 of 46 findings on
+        # four projects were those, and a reason asked 44 times is a ritual)
+        for i, c in enumerate(("# noqa", "# type: ignore", "# pragma: no cover")):
             expect(f"suppression {c}",
                    case(f"supp{i}", {"price.py": f"x = 1\ny = 2  {c}\n"}), 1,
                    must=("price.py:2 suppression",))
+        for i, c in enumerate(("# noqa: E501", "# noqa:F401", "# type: ignore[attr-defined]")):
+            expect(f"coded suppression {c}",
+                   case(f"coded{i}", {"price.py": f"x = 1\ny = 2  {c}\n"}), 0)
         expect("suppression inside a string",
                case("suppstr", {"price.py": "HELP = 'add # noqa to silence'\n"}), 0)
         expect("suppression removed",
