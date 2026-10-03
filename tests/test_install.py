@@ -158,6 +158,33 @@ def main():
         if not re.search(r"\[FAIL\] shared\s+primeskills-floor on PATH", told):
             failures.append(f"доктор промолчал о пропавшем primeskills-floor:\n{told[-600:]}")
 
+        # a link into the pinned tree is ours too: the installer leaves links
+        # into the working copy alone and adds new ones into the pinned tree,
+        # so on 0.22.1 five led one way and two the other -- and the doctor,
+        # comparing with its own tree only, called the two "not ours"
+        pinned_bin = Path(home) / ".primeskills" / "pinned" / "bin"
+        shutil.copytree(ROOT / "bin", pinned_bin)
+        (Path(home) / ".local" / "bin" / "primeskills-floor").symlink_to(
+            pinned_bin / "primeskills-floor")
+        told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                              text=True, env=env, timeout=120).stdout
+        checks += 1
+        if not re.search(r"\[ok  \] shared\s+primeskills-floor on PATH", told):
+            failures.append(f"ссылка в закреплённое дерево названа чужой:\n{told[-600:]}")
+        # and still not ours: a file outside both trees, or our tree's other file
+        floor_link = Path(home) / ".local" / "bin" / "primeskills-floor"
+        foreign = Path(home) / "elsewhere" / "primeskills-floor"
+        foreign.parent.mkdir()
+        shutil.copy(ROOT / "bin" / "primeskills-floor", foreign)
+        for wrong in (foreign, pinned_bin / "primeskills-run"):
+            floor_link.unlink()
+            floor_link.symlink_to(wrong)
+            told = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                                  text=True, env=env, timeout=120).stdout
+            checks += 1
+            if not re.search(r"\[warn\] shared\s+primeskills-floor on PATH .*not ours", told):
+                failures.append(f"ссылка на {wrong} названа своей:\n{told[-600:]}")
+
         # a probe that hangs past its timeout is a failed check, not a traceback
         # that ends the report halfway: loaded in-process with run() made to
         # time out, since no shared tool of ours can be made to hang on demand
