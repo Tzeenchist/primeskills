@@ -179,7 +179,8 @@ def rows_of(top, here_branch):
         else:
             what = f"{stem}.md"
         stamped = written_at(body)
-        rows.append({"what": what if stamped else what + "  [время файла]",
+        rows.append({"path": path,
+                     "what": what if stamped else what + "  [время файла]",
                      "when": stamped if stamped else path.stat().st_mtime})
     rows.sort(key=lambda r: r["when"], reverse=True)
     return rows, skipped
@@ -197,6 +198,24 @@ def show(rows, first=1):
         when = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["when"]))
         print(f"  [{n}] {when}  {r['what']}")
     return first + len(rows)
+
+
+def verdict(trees, total):
+    """The last line says who chooses, so the agent does not.
+
+    The skill used to leave it to the agent to judge whether "the user's
+    context names" a tree, and agents started from `$HOME` judged that it
+    did: the first tree in their memory, the freshest one, the last session's
+    (2026-10-07, reported by the owner). A count is not a judgement -- it is
+    printed here, last, where the reader stops.
+    """
+    if total == 1:
+        return (f"→ чекпоинт один: читать {trees[0][1][0]['path']} целиком, "
+                f"без вопроса")
+    return (f"→ чекпоинтов {total}: выбирает пользователь — окном выбора "
+            f"хоста, варианты подписаны номерами из списка, пачками с «ещё →». "
+            f"Самому не выбирать: память, свежесть и прошлая сессия дерева "
+            f"не называют")
 
 
 def sources(args, here, known):
@@ -269,6 +288,7 @@ def main():
         print(f"ещё деревьев в реестре: {len(known) - 1} — "
               f"primeskills-handoffs --all")
     print("не коммитятся (PS-022) и живут только в своих деревьях")
+    print(verdict(trees, total))
     return 0
 
 

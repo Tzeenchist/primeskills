@@ -34,18 +34,19 @@ branch has none.
    argument for one you name
 2. Non-zero: say what it said — nothing saved, or an empty register — and offer
    the path form → **verify:** you never scanned the filesystem for checkpoints
-3. One tree on the list, or the user's context names one: read it, no question
-   asked. Several could be meant — you stand outside a repository, an ambiguous
-   "continue": the tree goes to the picker by `OUTPUT` §Asking, batched when
-   the register holds more trees than the picker takes; register order is
-   freshness order → **verify:** the user chose by picking, not by typing
+3. The program's last line decides, not you. One checkpoint: read it
+   unasked. Several: the picker by `OUTPUT` §Asking, options labelled with
+   their list numbers, batched, freshest first. Only the user's words this
+   turn name a tree — rerun step 1 with its path; memory and freshness name
+   none → **verify:** the user picked, or the last line said one
 4. Read that file whole → **verify:** you can say when it was last updated
 5. Choose the section: the `## <branch>` section for the branch you stand on,
    silently. None matches, or you stand outside a repository — the sections go
    to the picker too, freshest first, the date in a section's preamble
-   deciding, not position. No picker this turn: take the freshest and name the
-   mismatch in one clause → **verify:** the report says which section, and
-   whether the branch or the user chose it
+   deciding, not position. A host without a picker (`claude -p`, `codex
+   exec`): take the freshest and name the mismatch in one clause →
+   **verify:** the report says which section, and whether the branch or the
+   user chose it
 6. Check its open items against the repository before repeating any: the record
    beats the file (G6) → **verify:** every item you carry has an anchor you
    looked at, the rest are dropped

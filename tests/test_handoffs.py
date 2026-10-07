@@ -96,6 +96,10 @@ def main():
              f"чекпоинт зарегистрированного дерева не показан:\n{done.stdout}")
         want("реестр" in done.stdout,
              f"не сказано, откуда взялся список:\n{done.stdout}")
+        # one checkpoint: the last line says so, and nobody is asked
+        last = (done.stdout.splitlines() or [""])[-1]
+        want(last.startswith("→ чекпоинт один") and str(top) in last,
+             f"последняя строка не велит читать единственный чекпоинт:\n{done.stdout}")
 
         # a named tree works from anywhere, register or no register
         done = run(Path(home), str(top), home=str(Path(home) / "empty"))
@@ -190,6 +194,12 @@ def main():
              f"нумерация не сквозная по деревьям:\n{done.stdout}")
         want("выбор по номеру" in done.stdout,
              f"не сказано, что выбор делается номером:\n{done.stdout}")
+        # several: the last line hands the choice to the user, so the agent
+        # stops judging which one "the context names" (2026-10-07)
+        last = (done.stdout.splitlines() or [""])[-1]
+        want(last.startswith("→ чекпоинтов 3") and "выбирает пользователь" in last
+             and "номерами" in last,
+             f"последняя строка не отдаёт выбор пользователю:\n{done.stdout}")
 
     # 6. The orphan. A checkpoint whose branch was deleted is still a file, and
     #    without a mark it is indistinguishable from a live one.
@@ -328,6 +338,17 @@ def main():
         # and the order follows the same date, not the touch
         want(rows.index(plain[0]) < rows.index(stamped[0]),
              f"сортировка всё ещё идёт по mtime:\n{out}")
+
+    # 8. The verdict names the file it found, not a reparse of the row label:
+    #    a legacy name with a space must come out whole (2026-10-07).
+    with tempfile.TemporaryDirectory() as tmp:
+        top = Path(tmp)
+        repo(top)
+        path = checkpoint(top, "мои заметки", "один\n")
+        done = run(top)
+        last = (done.stdout.splitlines() or [""])[-1]
+        want(str(path) in last,
+             f"вердикт назвал не тот файл:\n{done.stdout}")
 
     for f in failures:
         print(f)
