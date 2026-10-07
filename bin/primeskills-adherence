@@ -785,7 +785,11 @@ def check_red_phase(span):
     if not between:
         return "violated", (f"тест #{first_test} раньше кода #{first_source}, "
                             f"но прогона между ними не было — красноты никто не видел")
-    failed = next((c for c in runs if c["returncode"] not in (None, 0)), None)
+    # The exit code alone lies under `| tail; echo "exit=$?"`: the shell logs
+    # echo's 0, and a run that printed "4 failed" read as green (PS-086). The
+    # runner's own printout counts too, as G4 asks.
+    failed = next((c for c in runs if c["returncode"] not in (None, 0)
+                   or signal_of(c)[0] == "violated"), None)
     if failed:
         return "ok", f"тест #{first_test}, прогон #{failed['n']}, код #{first_source}"
     if any(c["returncode"] is None for c in runs):
@@ -820,7 +824,9 @@ def check_suite_ran(span):
     the proof and the logs do carry it: the tool's own success signal.
     """
     runs = [c for c in span["calls"] if ran_tests(c)]
-    passed = next((c for c in runs if c["returncode"] == 0), None)
+    # code 0 with a printout of failures is echo's 0, not the runner's (PS-086)
+    passed = next((c for c in runs if c["returncode"] == 0
+                   and signal_of(c)[0] != "violated"), None)
     if passed:
         return "ok", f"#{passed['n']}: код 0, {safe(passed['cmd'].splitlines()[0][:50])}"
     failed = next((c for c in runs if c["returncode"] not in (None, 0)), None)

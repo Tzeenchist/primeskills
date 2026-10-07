@@ -91,6 +91,45 @@ def test_arm_order_reproducible(failures):
         failures.append(f"план содержит посторонние плечи: {c}")
 
 
+def test_adherence_run(failures):
+    """PS-086: the seed reproduces the order, the printout is read verdict by
+    verdict, and the table counts only the skill the scenario called."""
+    sys.path.insert(0, str(BENCH))
+    import adherence_run as ar
+    if ar.plan(["a", "b"], ["x", "y"], 3, 7) != ar.plan(["a", "b"], ["x", "y"], 3, 7):
+        failures.append("adherence_run.plan: один seed дал два порядка")
+    printout = (
+        "/x.jsonl\n  core/ прочитан: действие #2\n"
+        "  · vet (вызван #1, 3 действий в пролёте)\n"
+        "      [НАРУШЕН] не пишет (G16) — #2 shell: tee x\n"
+        "  · build (вызван #4, 9 действий в пролёте)\n"
+        "      [ok  ] красная фаза (P7, TDD) — тест до кода\n"
+        "      [н/п ] гигиена git (G14) — git не трогали\n")
+    rows, core = ar.parse_report(printout)
+    want = [("vet", "не пишет (G16)", "violated"),
+            ("build", "красная фаза (P7, TDD)", "ok"),
+            ("build", "гигиена git (G14)", "na")]
+    if rows != want or not core:
+        failures.append(f"adherence_run.parse_report: {rows}, core={core}")
+    if ar.parse_report("  core/ прочитан: нет\n")[1]:
+        failures.append("adherence_run.parse_report: «нет» прочитано как чтение core/")
+    if ar.skill_called("/x/-tmp-verify-2/s.jsonl\n  вызовов скиллов: 0\n", "verify"):
+        failures.append("adherence_run.skill_called: имя в пути принято за вызов")
+    if not ar.skill_called("  вызовов скиллов: 2 (build, verify)\n", "verify"):
+        failures.append("adherence_run.skill_called: вызов из строки счёта не виден")
+    data = {"arms": ["a"], "units": [{
+        "arm": "a", "scenario": "build", "session": "s", "skill_seen": True,
+        "core_read": True, "status": "done",
+        "verdicts": [{"skill": s, "rule": r, "verdict": v} for s, r, v in rows]}]}
+    table = ar.report(data)
+    if "не пишет" in table:
+        failures.append("adherence_run.report: вердикт чужого навыка попал в таблицу")
+    if "гигиена" in table:
+        failures.append("adherence_run.report: н/п посчитано в таблице")
+    if "| build | красная фаза (P7, TDD) | 1/1" not in table:
+        failures.append(f"adherence_run.report: нет строки красной фазы:\n{table}")
+
+
 def main():
     failures = []
     test_split_bill_pristine(failures)
@@ -105,6 +144,10 @@ def main():
         test_arm_order_reproducible(failures)
     except Exception as exc:
         failures.append(f"plan_arms: {exc!r}")
+    try:
+        test_adherence_run(failures)
+    except Exception as exc:
+        failures.append(f"adherence_run: {exc!r}")
     print(f"{len(failures)} failed")
     for f in failures:
         print(f)
