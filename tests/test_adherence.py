@@ -60,6 +60,19 @@ EXPECT = {
         "тест #3, прогон #4, код #5",
         "доля 100%",
     ],
+    # PS-086. `cmd | tail; echo "exit=$?"` records the exit code of `echo`:
+    # qoder and codex log that 0, and a run that printed "4 failed" was read
+    # as green -- two Flash sessions with a real red phase scored violated.
+    # The runner's own printout decides as well (G4).
+    "build-red-phase-masked-exit.jsonl": [
+        "[ok  ] красная фаза",
+        "тест #2, прогон #3, код #4",
+    ],
+    # ... and a run that printed only passes stays green, whatever the code.
+    "build-red-phase-green-run.jsonl": [
+        "[НАРУШЕН] красная фаза",
+        "завершился кодом 0",
+    ],
     "readonly-violation.jsonl": [
         "[НАРУШЕН] не пишет (G16)",
         "sed -i",
@@ -143,6 +156,11 @@ EXPECT = {
     "suite-signal-in-output.jsonl": [
         "[ok  ] прогон состоялся (G4)",
         "0 failed",
+    ],
+    # PS-086: echo's 0 after `| tail` is not the runner's verdict
+    "suite-masked-exit-red.jsonl": [
+        "[НАРУШЕН] прогон состоялся (G4)",
+        "3 failed",
     ],
     "suite-signal-red.jsonl": [
         "[НАРУШЕН] прогон состоялся (G4)",
