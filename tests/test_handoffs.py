@@ -339,6 +339,17 @@ def main():
         want(rows.index(plain[0]) < rows.index(stamped[0]),
              f"сортировка всё ещё идёт по mtime:\n{out}")
 
+    # 8. The verdict names the file it found, not a reparse of the row label:
+    #    a legacy name with a space must come out whole (2026-10-07).
+    with tempfile.TemporaryDirectory() as tmp:
+        top = Path(tmp)
+        repo(top)
+        path = checkpoint(top, "мои заметки", "один\n")
+        done = run(top)
+        last = (done.stdout.splitlines() or [""])[-1]
+        want(str(path) in last,
+             f"вердикт назвал не тот файл:\n{done.stdout}")
+
     for f in failures:
         print(f)
     print(f"{checks} checks, {len(failures)} failed")

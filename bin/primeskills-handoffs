@@ -179,7 +179,8 @@ def rows_of(top, here_branch):
         else:
             what = f"{stem}.md"
         stamped = written_at(body)
-        rows.append({"what": what if stamped else what + "  [время файла]",
+        rows.append({"path": path,
+                     "what": what if stamped else what + "  [время файла]",
                      "when": stamped if stamped else path.stat().st_mtime})
     rows.sort(key=lambda r: r["when"], reverse=True)
     return rows, skipped
@@ -209,10 +210,8 @@ def verdict(trees, total):
     printed here, last, where the reader stops.
     """
     if total == 1:
-        top, rows = trees[0]
-        name = rows[0]["what"].split(" ")[0]
-        return (f"→ чекпоинт один: читать "
-                f"{top / '.primeskills' / 'handoff' / name} целиком, без вопроса")
+        return (f"→ чекпоинт один: читать {trees[0][1][0]['path']} целиком, "
+                f"без вопроса")
     return (f"→ чекпоинтов {total}: выбирает пользователь — окном выбора "
             f"хоста, варианты подписаны номерами из списка, пачками с «ещё →». "
             f"Самому не выбирать: память, свежесть и прошлая сессия дерева "
