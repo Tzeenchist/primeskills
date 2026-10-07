@@ -199,6 +199,26 @@ def show(rows, first=1):
     return first + len(rows)
 
 
+def verdict(trees, total):
+    """The last line says who chooses, so the agent does not.
+
+    The skill used to leave it to the agent to judge whether "the user's
+    context names" a tree, and agents started from `$HOME` judged that it
+    did: the first tree in their memory, the freshest one, the last session's
+    (2026-10-07, reported by the owner). A count is not a judgement -- it is
+    printed here, last, where the reader stops.
+    """
+    if total == 1:
+        top, rows = trees[0]
+        name = rows[0]["what"].split(" ")[0]
+        return (f"→ чекпоинт один: читать "
+                f"{top / '.primeskills' / 'handoff' / name} целиком, без вопроса")
+    return (f"→ чекпоинтов {total}: выбирает пользователь — окном выбора "
+            f"хоста, варианты подписаны номерами из списка, пачками с «ещё →». "
+            f"Самому не выбирать: память, свежесть и прошлая сессия дерева "
+            f"не называют")
+
+
 def sources(args, here, known):
     """Which trees to list, and the one line saying where they came from."""
     if args.trees:
@@ -269,6 +289,7 @@ def main():
         print(f"ещё деревьев в реестре: {len(known) - 1} — "
               f"primeskills-handoffs --all")
     print("не коммитятся (PS-022) и живут только в своих деревьях")
+    print(verdict(trees, total))
     return 0
 
 
