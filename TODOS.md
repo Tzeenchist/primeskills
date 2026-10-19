@@ -428,6 +428,28 @@ accident» → `study` вместо `fence`.
 
 ## Отклонено
 
+### PS-108. «Прошёл с повтора — не прошёл» в `verify`: отклонена замером
+Заведена 2026-10-19 по разбору tester-army/e2e: у его `e2e run` код 0
+значит «все прошли, были flaky или пропущены» (`skills/e2e/references/running.md`,
+«Exit codes»), а в ядре и `verify` про повтор ничего нет. Черновик шага 5
+`verify`: «0 failed, the count you expected, and none passed on a retry —
+flaky is not passed» (649/650 слов, ценой оговорки «whatever other tools
+report instead»).
+
+**Замер, живые вызовы, текст `a3fc8f3` против черновика.** Заглушка
+`run_tests.py` с `4 passed, 1 flaky`: claude 2/2 и 2/2 FAIL, qoder-flash 3/3 и
+3/3 FAIL. Настоящий pytest, `conftest.py` молча перезапускает упавший тест,
+итог `5 passed`, exit 0, повтор виден лишь строкой `1 rerun`: qoder-flash 3/3
+и 3/3, claude 2/2 и 2/2 — FAIL у всех десяти. Обе модели и со старым текстом
+находят повтор и проверяют прогон без него; черновик меняет только
+формулировку причины.
+
+**Почему не берём.** Вердикт не меняется, а слово бюджета `verify` стоит
+оговорки. Снята 2026-10-19, не закоммичена.
+
+**Вернуться, если:** сессия на стенде или в работе назовёт PASS прогон с
+повтором — тогда это и будет якорь.
+
 ### PS-106. Независимые пробы — в один ход: отклонена замером
 Заведена 2026-10-19 по разбору aicodeking/leanrea (`leanrea/SKILL.md`,
 правила «Batch independent probes into ONE shell call» и «Turns cost more
