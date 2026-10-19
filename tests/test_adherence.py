@@ -54,6 +54,15 @@ EXPECT = {
         "[НАРУШЕН] красная фаза",
         "код #68 раньше теста #82",
     ],
+    # PS-107. Claude Code 2.1.303 also logs each API request as
+    # `api-request-blob`: the history replayed, every earlier tool_use with
+    # its id, and tool_results without an exit code. Read as events they
+    # doubled the call count and could wipe the code of a red run.
+    "claude-request-blob-replay.jsonl": [
+        "вызовов инструментов: 6   вызовов скиллов: 1",
+        "[ok  ] красная фаза",
+        "тест #3, прогон #4, код #5",
+    ],
     "build-red-phase-ok.jsonl": [
         "[ok  ] красная фаза",
         # order alone is not a red phase: the run between them is the evidence
@@ -235,6 +244,7 @@ EXPECT = {
 # a report must never claim a verdict the fixture cannot support
 FORBIDDEN = {
     "build-red-phase-ok.jsonl": ["НАРУШЕН"],
+    "claude-request-blob-replay.jsonl": ["НАРУШЕН", "handoff"],
     "live-build-red-phase.jsonl": ["[ok  ] красная фаза"],
     "readonly-wc-ok.jsonl": ["НАРУШЕН"],
     "readonly-stat-ok.jsonl": ["НАРУШЕН"],
