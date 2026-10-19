@@ -68,6 +68,24 @@ EXPECT = {
         "[ok  ] красная фаза",
         "тест #2, прогон #3, код #4",
     ],
+    # PS-101. Run 9, claude-build-0: in bypass mode claude wrote every file
+    # through a heredoc and the reader saw no edit at all -- "н/п" in six
+    # sessions of six. A shell write is an edit; a write and a run inside one
+    # call keep their order within it.
+    "build-red-phase-heredoc.jsonl": [
+        "[ok  ] красная фаза",
+        "тест #4, прогон #4, код #5",
+    ],
+    # ... while output sent to a file is not an edit: read as one, the run
+    # became the first edit and the reproduction before it disappeared.
+    "debug-repro-redirect-is-not-an-edit.jsonl": [
+        "[ok  ] воспроизведение до правки",
+        "прогон #2 до правки #3",
+    ],
+    # ... and a heredoc body is data, not a redirect.
+    "build-heredoc-body-is-data.jsonl": [
+        "[н/п ] красная фаза",
+    ],
     # ... and a run that printed only passes stays green, whatever the code.
     "build-red-phase-green-run.jsonl": [
         "[НАРУШЕН] красная фаза",

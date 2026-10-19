@@ -1,0 +1,6 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "debug"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r", "name": "Bash", "input": {"command": "cd /tmp/w; pytest -q > /tmp/out 2>&1; tail -3 /tmp/out"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "r", "content": "FAILED test_invoice.py::test_total - assert 99 == 100\n1 failed, 2 passed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; cat > invoice.py <<'EOF'\ndef total(lines):\n    return sum(l for l in lines if l > 0)\nEOF"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "g", "name": "Bash", "input": {"command": "cd /tmp/w; pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "g", "content": "3 passed"}]}}
