@@ -1,0 +1,4 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "build"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; cat > calc.py <<'EOF'\n# to check by hand: pytest > test_out.py\ndef half(x):\n    return x >> 1\nEOF"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "g", "name": "Bash", "input": {"command": "cd /tmp/w; pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "g", "content": "4 passed"}]}}

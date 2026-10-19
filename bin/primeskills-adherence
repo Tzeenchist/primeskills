@@ -763,24 +763,97 @@ def role_of(skill, skills_dir):
     return m.group(1) if m else None
 
 
+# --- shell edits --------------------------------------------------------------
+# PS-101. In bypass mode claude writes files through the shell -- `cat > f.py
+# <<'EOF'`, `>>`, `tee`, `sed -i` -- and the editors-only reading saw no edit in
+# six sessions of six. A shell write counts when its target is a code file:
+# `pytest > /tmp/out` sends output somewhere, it edits nothing. A heredoc body
+# is data, and steps keep their order inside one call, so a write and the run
+# after it in the same command stay in sequence.
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1")
+CODE_FILE = re.compile(r"\.(py|pyi|js|jsx|mjs|cjs|ts|tsx|go|rs|rb|java|kt|swift"
+                       r"|c|h|cc|cpp|hpp|cs|php|sh|bash|sql|vue|svelte)$")
+SHELL_REDIRECT = re.compile(r"(?<![\d<>&])>>?\s*([^\s;|&<>]+)")
+SHELL_TEE = re.compile(r"\btee\s+(?:-a\s+)?([^\s;|&<>]+)")
+SHELL_SED_I = re.compile(r"\bsed\s+(?:-\w+\s+)*-i\S*\s")
+
+
+def without_heredocs(cmd):
+    """The command's lines with every heredoc body taken out."""
+    lines, tag = [], None
+    for line in cmd.split("\n"):
+        if tag:
+            if line.strip() == tag:
+                tag = None
+            continue
+        lines.append(line)
+        m = HEREDOC.search(line)
+        if m:
+            tag = m.group(2)
+    return lines
+
+
+def shell_steps(c):
+    """[(k, "write", path) | (k, "run", None)] in the order the shell runs them."""
+    steps, k = [], 0
+    for line in without_heredocs(c["cmd"]):
+        for seg in SEGMENT.split(line):
+            seg = seg.strip()
+            if not seg:
+                continue
+            targets = SHELL_REDIRECT.findall(seg) + SHELL_TEE.findall(seg)
+            if SHELL_SED_I.search(seg):
+                targets.append(seg.split()[-1])
+            for t in (t.strip("'\"") for t in targets):
+                if CODE_FILE.search(t):
+                    steps.append((k, "write", t))
+            # the whole command still decides neutering: `pytest || true`
+            if ran_tests(c) and TEST_RUN.search(seg) and not NEUTERED.search(seg):
+                steps.append((k, "run", None))
+            k += 1
+    return steps
+
+
+def edits_of(span):
+    """Every edit in the span, editor or shell, as {n, k, path}."""
+    out = []
+    for c in span["calls"]:
+        if c["tool"] in WRITING_TOOLS:
+            out.append({"n": c["n"], "k": 0, "path": c["path"]})
+        elif c["tool"] == "Bash":
+            out += [{"n": c["n"], "k": k, "path": p}
+                    for k, kind, p in shell_steps(c) if kind == "write"]
+    return out
+
+
+def run_steps(span):
+    """Every test run in the span as (call, k), k its place inside the call."""
+    return [(c, k) for c in span["calls"] if ran_tests(c)
+            for k, kind, _p in shell_steps(c) if kind == "run"]
+
+
+def at(e):
+    return (e["n"], e["k"])
+
+
 # --- checks -----------------------------------------------------------------
 # Each returns (verdict, detail); verdict is "ok", "violated" or None for n/a.
 
 def check_red_phase(span):
     """build: a failing test comes before the code that makes it pass."""
-    edits = [c for c in span["calls"] if c["tool"] in WRITING_TOOLS]
-    tests = [c for c in edits if is_test_file(c["path"])]
-    source = [c for c in edits if not is_test_file(c["path"])]
+    edits = edits_of(span)
+    tests = [e for e in edits if is_test_file(e["path"])]
+    source = [e for e in edits if not is_test_file(e["path"])]
     if not tests or not source:
         return None, "правок обоих видов нет — по порядку не различить"
     first_test, first_source = tests[0]["n"], source[0]["n"]
-    if first_test > first_source:
+    if at(tests[0]) > at(source[0]):
         return "violated", f"код #{first_source} раньше теста #{first_test}"
     # Order alone proves the files were touched in sequence, not that anything
     # was ever red. A red phase is a run that failed, so require a run between
     # the test and the code it is supposed to have failed against.
-    runs = [c for c in span["calls"]
-            if first_test < c["n"] < first_source and ran_tests(c)]
+    runs = list({c["n"]: c for c, k in run_steps(span)
+                 if at(tests[0]) < (c["n"], k) < at(source[0])}.values())
     between = [c["n"] for c in runs]
     if not between:
         return "violated", (f"тест #{first_test} раньше кода #{first_source}, "
@@ -848,12 +921,12 @@ def check_suite_ran(span):
 
 def check_repro_first(span):
     """debug: reproduce before touching anything."""
-    edits = [c for c in span["calls"] if c["tool"] in WRITING_TOOLS]
+    edits = edits_of(span)
     if not edits:
         return None, "правок не было"
     first_edit = edits[0]["n"]
-    for c in span["calls"]:
-        if c["n"] < first_edit and ran_tests(c):
+    for c, k in run_steps(span):
+        if (c["n"], k) < at(edits[0]):
             return "ok", f"прогон #{c['n']} до правки #{first_edit}"
     return "violated", f"первая правка #{first_edit} без прогона до неё"
 
