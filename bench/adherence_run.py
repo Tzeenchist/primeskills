@@ -16,6 +16,8 @@ runs from $HOME on purpose: that is where the choice of checkpoint goes wrong.
     adherence_run.py --arms qoder-flash --scenarios vet --repeats 1
     adherence_run.py --dry-run                        # the plan, nothing runs
     adherence_run.py --report bench/runs/adherence-86.json
+    adherence_run.py --arms qoder-max --seed 86 --append   # beside run 9, not over it
+    adherence_run.py --leaks bench/runs/adherence-86.json  # who opened the graders
 """
 import argparse
 import json
@@ -67,6 +69,19 @@ SCENARIOS = {
                "меняй."),
 }
 
+# PS-103. What a unit under test has no business opening: the graders, the
+# bench's own record, the repository itself. The fixture is a copy, but the
+# arms run with permissions skipped and nothing stops an absolute path. A hit
+# is a leak, not a false alarm to widen around: find the read path.
+LEAK_MARKERS = (
+    ("-grader.py", re.compile(r"-grader\.py")),
+    ("RESULT.md", re.compile(r"\bRESULT\.md")),
+    ("RUN-N-LOG.md", re.compile(r"RUN-\d+-LOG\.md")),
+    ("bench/runs", re.compile(r"bench/runs")),
+    (str(ROOT), re.compile(re.escape(str(ROOT)))),
+)
+
+TOOLS = re.compile(r"вызовов инструментов: (\d+)")
 VERDICT = re.compile(r"^ {6}\[(ok  |НАРУШЕН|неизв|н/п )\] (.+?) — ")
 SPAN = re.compile(r"^\s+· ([a-z0-9-]+) \(вызван")
 MARK = {"ok  ": "ok", "НАРУШЕН": "violated", "неизв": "unknown", "н/п ": "na"}
@@ -139,6 +154,70 @@ def skill_called(report, skill):
                           report))
 
 
+def tool_calls(report):
+    """The count line of the printout; None when there is no printout."""
+    m = TOOLS.search(report)
+    return int(m.group(1)) if m else None
+
+
+def leaks(path):
+    """Markers hit by the inputs of the session's tool calls. Prose is not a
+    read: a model may name the grader without ever opening it."""
+    hits = set()
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            content = json.loads(line).get("message", {}).get("content")
+        except (json.JSONDecodeError, AttributeError):
+            continue
+        for item in content if isinstance(content, list) else []:
+            if not isinstance(item, dict) or item.get("type") != "tool_use":
+                continue
+            text = json.dumps(item.get("input"), ensure_ascii=False)
+            hits |= {label for label, rx in LEAK_MARKERS if rx.search(text)}
+    return sorted(hits)
+
+
+def usable(u):
+    """A unit that counts: it acted, and it did not reach the record. Units
+    written before PS-102/103 carry neither field and count as before."""
+    return u.get("tools") != 0 and not u.get("leaks")
+
+
+def backfill(data, logs):
+    """Tool counts for units written before PS-102, from the printout each
+    one left beside its log."""
+    for u in data["units"]:
+        txt = logs / f"{u['arm']}-{u['unit'].replace('#', '-')}.adherence.txt"
+        if "tools" not in u and txt.is_file():
+            u["tools"] = tool_calls(txt.read_text(encoding="utf-8"))
+    return data
+
+
+def unaccounted(order, units):
+    """Planned units that did not land exactly once: `arm unit ×N`."""
+    seen = {}
+    for u in units:
+        seen[(u["arm"], u["unit"])] = seen.get((u["arm"], u["unit"]), 0) + 1
+    return [f"{arm} {unit} ×{seen.get((arm, unit), 0)}"
+            for arm, planned in order.items() for unit in planned
+            if seen.get((arm, unit), 0) != 1]
+
+
+def prior(out, order, append):
+    """What an earlier run with this seed left. Without --append an existing
+    summary is a refusal: the same seed replaced run 9's whole summary."""
+    if not out.exists():
+        return {"units": []}
+    if not append:
+        sys.exit(f"adherence_run: {out} уже есть — новый сид или --append")
+    data = json.loads(out.read_text(encoding="utf-8"))
+    taken = [f"{u['arm']} {u['unit']}" for u in data["units"]
+             if u["unit"] in order.get(u["arm"], [])]
+    if taken:
+        sys.exit(f"adherence_run: --append перезаписал бы {', '.join(taken)}")
+    return data
+
+
 def run_unit(arm, unit, scratch, timeout, logs):
     scenario = unit.split("#")[0]
     fixture, prompt = SCENARIOS[scenario]
@@ -161,11 +240,15 @@ def run_unit(arm, unit, scratch, timeout, logs):
     rows, core, report = read_verdicts(path) if path else ([], False, "")
     (logs / f"{name}.adherence.txt").write_text(report, encoding="utf-8")
     called = skill_called(report, scenario)
+    tools = tool_calls(report)
+    # `handon` runs from $HOME and is meant to open this repository's checkpoint.
+    leaked = leaks(path) if path and fixture else []
     print(f"[{arm} {unit}] {status}, сессия {'найдена' if path else 'НЕ найдена'}, "
-          f"вердиктов {len(rows)}", flush=True)
+          f"вердиктов {len(rows)}, инструментов {tools}"
+          + (f", УТЕЧКА {leaked}" if leaked else ""), flush=True)
     return {"arm": arm, "unit": unit, "scenario": scenario, "status": status,
             "session": str(path) if path else None, "core_read": core,
-            "skill_seen": called,
+            "skill_seen": called, "tools": tools, "leaks": leaked,
             "verdicts": [{"skill": s, "rule": r, "verdict": v}
                          for s, r, v in rows]}
 
@@ -173,7 +256,7 @@ def run_unit(arm, unit, scratch, timeout, logs):
 def report(data):
     """Rule x arm table; only verdicts inside the scenario's own skill."""
     table = {}
-    for u in data["units"]:
+    for u in filter(usable, data["units"]):
         for v in u["verdicts"]:
             if v["skill"] != u["scenario"] or v["verdict"] in ("na",):
                 continue
@@ -195,14 +278,19 @@ def report(data):
             row.append(f"{c['ok']}/{n} [{lo:.2f}–{hi:.2f}]"
                        + (f" +{c['unknown']} неизв" if c["unknown"] else ""))
         lines.append(f"| {scenario} | {rule} | " + " | ".join(row) + " |")
-    lines += ["", "| вариант | сессий найдено | навык виден | core/ прочитан | таймаут/ошибка |",
-              "|---|---|---|---|---|"]
+    lines += ["", "| вариант | сессий найдено | навык виден | core/ прочитан | "
+              "таймаут/ошибка | пустых | утечек |",
+              "|---|---|---|---|---|---|---|"]
     for arm in arms:
         mine = [u for u in data["units"] if u["arm"] == arm]
         lines.append(f"| {arm} | {sum(bool(u['session']) for u in mine)}/{len(mine)} | "
                      f"{sum(u['skill_seen'] for u in mine)}/{len(mine)} | "
                      f"{sum(u['core_read'] for u in mine)}/{len(mine)} | "
-                     f"{sum(u['status'] != 'done' for u in mine)} |")
+                     f"{sum(u['status'] != 'done' for u in mine)} | "
+                     f"{sum(u.get('tools') == 0 for u in mine)} | "
+                     f"{sum(bool(u.get('leaks')) for u in mine)} |")
+    lines.append("\nпустые (ноль вызовов инструментов) и утёкшие (вызов дотянулся "
+                 "до оценщика или записи стенда) в таблицу правил не входят")
     return "\n".join(lines)
 
 
@@ -215,11 +303,25 @@ def main(argv):
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report", help="перепечатать таблицу из готового JSON")
+    ap.add_argument("--append", action="store_true",
+                    help="дописать единицы в сводку этого сида, не трогая прежние")
+    ap.add_argument("--leaks", help="пройти растяжкой по сессиям готового JSON")
     args = ap.parse_args(argv)
 
     if args.report:
-        print(report(json.loads(Path(args.report).read_text(encoding="utf-8"))))
+        path = Path(args.report)
+        print(report(backfill(json.loads(path.read_text(encoding="utf-8")),
+                              path.with_suffix(""))))
         return 0
+    if args.leaks:
+        units = json.loads(Path(args.leaks).read_text(encoding="utf-8"))["units"]
+        checked = [u for u in units if u["session"] and SCENARIOS[u["scenario"]][0]]
+        hit = [(u, leaks(u["session"])) for u in checked]
+        hit = [(u, h) for u, h in hit if h]
+        for u, h in hit:
+            print(f"УТЕЧКА {u['arm']} {u['unit']}: {', '.join(h)} — {u['session']}")
+        print(f"сессий проверено: {len(checked)}, с утечкой: {len(hit)}")
+        return 1 if hit else 0
     arms = [a for a in args.arms.split(",") if a]
     scenarios = [s for s in args.scenarios.split(",") if s]
     bad = [a for a in arms if a not in ARMS] + [s for s in scenarios if s not in SCENARIOS]
@@ -232,6 +334,8 @@ def main(argv):
         return 0
 
     runs = ROOT / "bench" / "runs"
+    out = runs / f"adherence-{seed}.json"
+    before = prior(out, order, args.append)
     logs = runs / f"adherence-{seed}"
     logs.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="adh-") as tmp:
@@ -243,12 +347,18 @@ def main(argv):
 
         with ThreadPoolExecutor(len(arms)) as pool:
             units = [u for lane_units in pool.map(lane, arms) for u in lane_units]
-    data = {"seed": seed, "arms": arms, "scenarios": scenarios,
-            "repeats": args.repeats, "units": units}
-    out = runs / f"adherence-{seed}.json"
+    lost = unaccounted(order, units)
+    keep = lambda old, new: old + [x for x in new if x not in old]
+    data = {"seed": seed, "arms": keep(before.get("arms", []), arms),
+            "scenarios": keep(before.get("scenarios", []), scenarios),
+            "repeats": max(before.get("repeats", 0), args.repeats),
+            "units": before["units"] + units}
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     print(report(data))
     print(f"записано: {out}")
+    if lost:
+        print(f"не ровно по разу: {', '.join(lost)}")
+        return 1
     return 0
 
 

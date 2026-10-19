@@ -130,6 +130,106 @@ def test_adherence_run(failures):
         failures.append(f"adherence_run.report: нет строки красной фазы:\n{table}")
 
 
+def test_adherence_run_accounting(failures):
+    """PS-102: a reused seed does not overwrite a summary, a unit with no tool
+    call is not a run, and every planned unit lands exactly once."""
+    import tempfile
+    sys.path.insert(0, str(BENCH))
+    import adherence_run as ar
+    if ar.tool_calls("  вызовов инструментов: 0   вызовов скиллов: 0\n") != 0:
+        failures.append("adherence_run.tool_calls: ноль вызовов не прочитан")
+    if ar.tool_calls("  вызовов инструментов: 12   вызовов скиллов: 1\n") != 12:
+        failures.append("adherence_run.tool_calls: 12 вызовов не прочитано")
+    if ar.tool_calls("") is not None:
+        failures.append("adherence_run.tool_calls: пустой отчёт дал число")
+    verdict = [{"skill": "build", "rule": "красная фаза (P7, TDD)", "verdict": "ok"}]
+    unit = {"arm": "a", "scenario": "build", "session": "s", "skill_seen": True,
+            "core_read": True, "status": "done", "verdicts": verdict}
+    data = {"arms": ["a"], "units": [dict(unit, unit="build#0", tools=5),
+                                     dict(unit, unit="build#1", tools=0)]}
+    table = ar.report(data)
+    if "| build | красная фаза (P7, TDD) | 1/1" not in table:
+        failures.append(f"adherence_run.report: пустая единица в знаменателе:\n{table}")
+    if "| a | 2/2 | 2/2 | 2/2 | 0 | 1 | 0 |" not in table:
+        failures.append(f"adherence_run.report: пустая единица не названа:\n{table}")
+    order = {"a": ["build#0", "build#1"]}
+    if ar.unaccounted(order, data["units"]):
+        failures.append("adherence_run.unaccounted: полный прогон назван неполным")
+    twice = data["units"] + [dict(unit, unit="build#0", tools=3)]
+    if "a build#0 ×2" not in ar.unaccounted(order, twice):
+        failures.append("adherence_run.unaccounted: дубль единицы не найден")
+    if "a build#1 ×0" not in ar.unaccounted(order, data["units"][:1]):
+        failures.append("adherence_run.unaccounted: пропавшая единица не найдена")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "adherence-7.json"
+        if ar.prior(out, order, append=False) != {"units": []}:
+            failures.append("adherence_run.prior: без сводки нечего дописывать")
+        out.write_text(json.dumps({"arms": ["a"], "scenarios": ["build"],
+                                   "units": data["units"][:1]}), encoding="utf-8")
+        try:
+            ar.prior(out, order, append=False)
+            failures.append("adherence_run.prior: сид повторён без --append, сводка не защищена")
+        except SystemExit:
+            pass
+        try:
+            ar.prior(out, order, append=True)
+            failures.append("adherence_run.prior: --append перезаписал бы build#0")
+        except SystemExit:
+            pass
+        kept = ar.prior(out, {"b": ["build#0"]}, append=True)
+        if [u["unit"] for u in kept["units"]] != ["build#0"]:
+            failures.append(f"adherence_run.prior: --append потерял прежние единицы: {kept}")
+        (Path(tmp) / "a-verify-2.adherence.txt").write_text(
+            "  вызовов инструментов: 0   вызовов скиллов: 0\n", encoding="utf-8")
+        old = {"units": [{"arm": "a", "unit": "verify#2"}, {"arm": "a", "unit": "verify#0"}]}
+        if [u.get("tools") for u in ar.backfill(old, Path(tmp))["units"]] != [0, None]:
+            failures.append(f"adherence_run.backfill: {old}")
+
+
+def test_adherence_run_leaks(failures):
+    """PS-103: a tool call that reaches the grader or the bench record marks
+    the session; the task's own files and prose about them do not."""
+    import tempfile
+    sys.path.insert(0, str(BENCH))
+    import adherence_run as ar
+
+    def session(*calls, text=""):
+        content = [{"type": "tool_use", "id": str(i), "name": n, "input": inp}
+                   for i, (n, inp) in enumerate(calls)]
+        if text:
+            content.append({"type": "text", "text": text})
+        return json.dumps({"type": "assistant", "message": {"content": content}})
+
+    cases = [
+        ("чисто", [("Read", {"file_path": "/tmp/adh-x/split_bill.py"}),
+                   ("Bash", {"command": "pytest -q"})], "", []),
+        ("оценщик", [("Bash", {"command": "cat ../../bench/orders-grader.py"})], "",
+         ["-grader.py"]),
+        ("журнал", [("Read", {"file_path": f"{ar.ROOT}/bench/RUN-9-LOG.md"})], "",
+         [str(ar.ROOT), "RUN-N-LOG.md"]),
+        ("сводка", [("Grep", {"pattern": "x", "path": "/a/bench/runs"})], "",
+         ["bench/runs"]),
+        ("только текст", [], "оценщик лежит в invoice-grader.py", []),
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, calls, text, want in cases:
+            p = Path(tmp) / f"{name}.jsonl"
+            p.write_text(session(*calls, text=text) + "\n", encoding="utf-8")
+            got = ar.leaks(p)
+            if got != sorted(want):
+                failures.append(f"adherence_run.leaks «{name}»: {got}, ждали {sorted(want)}")
+    verdict = [{"skill": "build", "rule": "красная фаза (P7, TDD)", "verdict": "ok"}]
+    unit = {"arm": "a", "scenario": "build", "session": "s", "skill_seen": True,
+            "core_read": True, "status": "done", "tools": 4, "verdicts": verdict}
+    data = {"arms": ["a"], "units": [dict(unit, unit="build#0", leaks=[]),
+                                     dict(unit, unit="build#1", leaks=["-grader.py"])]}
+    table = ar.report(data)
+    if "| build | красная фаза (P7, TDD) | 1/1" not in table:
+        failures.append(f"adherence_run.report: утёкшая единица в счёте:\n{table}")
+    if "| a | 2/2 | 2/2 | 2/2 | 0 | 0 | 1 |" not in table:
+        failures.append(f"adherence_run.report: утечка не названа:\n{table}")
+
+
 def main():
     failures = []
     test_split_bill_pristine(failures)
@@ -148,6 +248,11 @@ def main():
         test_adherence_run(failures)
     except Exception as exc:
         failures.append(f"adherence_run: {exc!r}")
+    for test in (test_adherence_run_accounting, test_adherence_run_leaks):
+        try:
+            test(failures)
+        except Exception as exc:
+            failures.append(f"{test.__name__}: {exc!r}")
     print(f"{len(failures)} failed")
     for f in failures:
         print(f)
