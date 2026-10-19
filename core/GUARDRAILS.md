@@ -13,8 +13,8 @@ Always loaded. Hard rules. Where a skill needs the long form, it says so.
   irreversible part pulls the whole change to both gates.
 - **G3 Reading budget.** Reading is budgeted per task, not banned: twenty
   reads a task. Past that, stop and name the question the next read must
-  answer. Prefer `rg`, signatures, and `offset/limit`. Read a file whole when
-  it is short or plainly cheaper than five searches.
+  answer. Prefer `rg`, signatures, `offset/limit`, and short files whole.
+  Batch independent probes into one turn: a turn costs more than its bytes.
 
 ## Evidence
 - **G4 Exit-code proof.** Nothing passes until a command says so: exit code 0
