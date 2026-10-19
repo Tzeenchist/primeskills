@@ -21,8 +21,9 @@ the task to another agent. Also on request: "save state", "checkpoint".
   file will be there.
 - Remaining work is assembled from the repository and the record, never copied
   from the previous checkpoint. Copying is how finished work stays open (G6).
-- What was tried and failed is the most valuable section: the part the next
-  reader cannot reconstruct.
+- What failed is the most valuable section: the part the next reader cannot
+  reconstruct. Each entry names its anchor and case count; one case is an
+  observation — label it, or write no rule.
 - The queue is committed and the checkpoint is not. Done in one beside open in
   the other makes the next reader trust the wrong file.
 
@@ -47,7 +48,7 @@ the task to another agent. Also on request: "save state", "checkpoint".
    → **verify:** a reader who was not here could act on it
 5. Record it: `primeskills-run note handoff "<branch> section written"`
    → **verify:** `.primeskills/.gitignore` exists and `git status` does not
-   offer the file. Say where it is
+   offer the file
 6. Reconcile the queue with this session, checkpoint first so a spent budget
    costs one file, not two. `merge` closes what landed; finish the rest — a
    commit and date on anything closed, an entry for what was found, and on
