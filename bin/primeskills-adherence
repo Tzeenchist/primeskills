@@ -420,6 +420,10 @@ def load_claude(path):
                 event = json.loads(line)
             except ValueError:
                 continue
+            # PS-107: `api-request-blob` replays the history sent to the API --
+            # the same tool_use ids again, results without exit codes.
+            if event.get("type") not in ("user", "assistant"):
+                continue
             message = event.get("message") or {}
             content = message.get("content")
             if message.get("role") == "user":
