@@ -8,7 +8,7 @@ allowed-tools: [Read, Grep, Glob, Bash, AskUserQuestion]
 
 # Handon
 
-Read-only: this skill reads and reports, and writes nothing (G16).
+Read-only: reads and reports, writes only its exit note (G16).
 
 ## Trigger
 Called by hand: `/handon`, or "continue where we stopped". The checkpoint is

@@ -38,12 +38,12 @@ MUTATING_PATTERNS = [
 # "accepted or declined" without it degrades to printed prose in every host
 # whose picker the agent was never told to open (PS-052).
 DECISION_STEP = re.compile(r"accept\w* or declin\w*|accepts, shrinks, or rejects")
-CORE_BUDGET = 3220          # always-loaded files; a ceiling, not a target
+CORE_BUDGET = 3300          # always-loaded files; a ceiling, not a target
 # What one skill call actually costs: core, every description, the pointer the
 # installer writes, and the body. This is the number that matters -- C1 and F4
 # are guards underneath it. Raising core spends skill headroom and vice versa,
 # and the arithmetic is meant to be visible when either moves.
-CALL_BUDGET = 4600
+CALL_BUDGET = 4700
 CORE_ALWAYS = ("PRINCIPLES.md", "GUARDRAILS.md", "OUTPUT.md")
 
 

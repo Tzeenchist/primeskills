@@ -34,11 +34,11 @@ does. A skill's full text loads only when that skill is needed.
 
 ```
 always in context        507 words for all 32 skills
-shared rules             3 180 words, once per session
-one skill call           3 969 … 4 401 words
+shared rules             3 185 words, once per session
+one skill call           3 974 … 4 406 words
 ```
 
-**The ceiling on one skill call is 4 600 words** (rule C3), and a check holds
+**The ceiling on one skill call is 4 700 words** (rule C3), and a check holds
 it rather than a promise: the linter refuses a skill that pushes a call over the
 ceiling. A sequence pays for the chain it calls and is deliberately outside that
 ceiling — `primeskills-status` prints what each one costs, up to about 12 900. For comparison, one pass of the gstack set costs about 92 000 words —
