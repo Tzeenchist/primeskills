@@ -87,11 +87,14 @@ def main():
         # no longer includes Kimi Code, and a demand nobody can satisfy turns
         # the gate into a wall. It comes back the way qoder arrived: with a
         # live call, not with an edit here.
-        if set(mod.HOSTS) != {"claude", "codex", "opencode", "omp", "qoder"}:
-            failures.append(f"HOSTS не покрывает пять хостов: {mod.HOSTS}")
-        # Returning any of them is a decision with a live call behind it, never
-        # a slip. This guard goes when they come back (PS-081), like PS-075's.
-        for host in ("cline", "kilo", "kimi"):
+        # 2026-10-27: kilo returns by the owner's decision (PS-081) -- a free
+        # model, kilo/stealth/glyph-cluster, answers without signing in, and a
+        # live call loaded five skills through kilo's own skill tool.
+        if set(mod.HOSTS) != {"claude", "codex", "opencode", "omp", "qoder", "kilo"}:
+            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
+        # Returning either of them is a decision with a live call behind it,
+        # never a slip. This guard goes when they come back (PS-081, PS-089).
+        for host in ("cline", "kimi"):
             if host in mod.HOSTS:
                 failures.append(f"{host} вернулся в HOSTS — это решение, а не правка")
 
