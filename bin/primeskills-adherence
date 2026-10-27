@@ -29,6 +29,7 @@ import importlib.util
 import re
 import shlex
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -810,8 +811,8 @@ def without_heredocs(cmd):
 
 
 # PS-105. Runs 9 and 10: claude rewrote files with a script read from stdin --
-# `python3 - <<'EOF'`, `open(p, 'w')` inside -- and 86 of the 102 such scripts
-# on this machine write. A script of this shape is Python, so it is read as
+# `python3 - <<'EOF'`, `open(p, 'w')` inside -- and 1332 of the 1502 such
+# scripts in this machine's Claude transcripts write. A script of this shape is Python, so it is read as
 # Python: `open` in a writing mode and `write_text`/`write_bytes`, the path a
 # string, a name bound to one, `Path(...)` or `a / 'b'`. A write whose path the
 # script computes is an edit to a file nobody can name (None); a body `ast`
@@ -828,7 +829,10 @@ WRITING_MODE = re.compile(r"[wax+]")
 def python_writes(src):
     """The paths a script writes, None for one it computes, [UNREAD] if unread."""
     try:
-        tree = ast.parse(src)
+        # someone else's script: its stray escapes are not this report's news
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            tree = ast.parse(src)
     except (SyntaxError, ValueError, RecursionError, MemoryError):
         return [UNREAD]
     names = {}

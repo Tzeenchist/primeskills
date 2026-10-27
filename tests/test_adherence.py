@@ -123,6 +123,11 @@ EXPECT = {
         "[неизв] красная фаза",
         "путь правки #2 не опознан",
     ],
+    # ... and reading a body is silent: ast warns about a stray escape in
+    # someone else's script, and the warning landed in the report.
+    "debug-python-heredoc-warning-is-silent.jsonl": [
+        "[ok  ] воспроизведение до правки",
+    ],
     # ... and a body nobody can parse is an edit nobody can rule out.
     "debug-python-unparsed.jsonl": [
         "[неизв] воспроизведение до правки",
@@ -289,6 +294,7 @@ FORBIDDEN = {
     "span-approval-is-not-a-turn.jsonl": ["конец по реплике"],
     "rollout-user-turn-ends-span.jsonl": ["длиннее отсечки"],
     "wire.jsonl": ["длиннее отсечки"],
+    "debug-python-heredoc-warning-is-silent.jsonl": ["SyntaxWarning"],
 }
 
 
