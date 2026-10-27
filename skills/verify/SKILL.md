@@ -1,11 +1,13 @@
 ---
 name: verify
 description: Use before claiming tests pass or work is done, and before any commit or PR
-budget: 650
+budget: 690
 role: write
 refs:
   - path: ref/harness.md
     when: tests touch a database, an external service, or spawn processes
+  - path: ref/mutator.md
+    when: a mutation tool is installed for step 7
 ---
 
 # Verify
@@ -49,8 +51,11 @@ pushing, and before handing work to another agent.
 7. When a change adds a condition, mutate it once in a throwaway worktree
    with the uncommitted change, never the live tree — swap `and`/`or`, shift a
    boundary (`>`→`>=`) or drop a negation — and run affected tests against the
-   step-2 target → **verify:** an assertion fails; a green mutant names the
-   missing test or why it is equivalent; a build or import error kills nothing
+   step-2 target. Any new test: would it still pass if every function it
+   reaches returned nothing and changed nothing? Then it checks nothing the
+   code's user sees → **verify:** an assertion fails; a green mutant names the
+   missing test or why it is equivalent; a build or import error kills
+   nothing; no new test passes against empty functions
 8. Run affected checks first. Broaden to the full suite for named risks or a
    repository/release gate, unless a flow already ran it for this state
    → **verify:** exit code is 0, and you name the run used and what it left out
@@ -74,4 +79,4 @@ the result to this exact tree, so a later step can tell proof from memory.
 
 ## References
 `ref/harness.md` for isolation, seeds, and teardown when the run touches shared
-state.
+state. `ref/mutator.md` before letting a tool do step 7.

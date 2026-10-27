@@ -42,8 +42,12 @@ planning gate does not apply (G2). Not for exploration — that is `brief`.
 6. Cut it into steps a single commit can carry → **verify:** each step has its
    own check, and no step needs a later one to be meaningful
 7. Before a risky step — migration, bulk edit, refactor — take a snapshot that
-   covers untracked files too, and a dump for data (G11) → **verify:** you
-   restored it somewhere disposable and saw your newest file come back
+   covers untracked files too, and a dump for data (G11). A bulk edit of more
+   identical units than you can check by eye — about ten — goes through a
+   script: do the first unit by hand, and the script's output on it must match
+   yours; fewer go by hand → **verify:** you restored the snapshot somewhere
+   disposable and saw your newest file come back; a script's output matched
+   the hand-made unit
 8. **Red.** Write the test that fails for the right reason → **verify:** run it,
    record the failure message verbatim — that record is the red half of the
    proof and `verify` will read it rather than re-deriving it
