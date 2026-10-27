@@ -1,0 +1,4 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "vet"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: vet"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "p", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\nfrom slug import slugify\nprint(slugify('Hello World'))\nwith open('slug.py') as f:\n    print(len(f.read()))\nEOF"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "p", "content": "hello-world\n120"}]}}

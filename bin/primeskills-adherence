@@ -690,14 +690,18 @@ SPAN_CAP = 40
 
 
 def closes(c, skill):
-    """The exit that skill wrote down: run, not merely mentioned, and its own."""
+    """The exit that skill wrote down: run, not merely mentioned, and its own.
+    Its place among the call's segments, or None."""
     if c["tool"] != "Bash":
-        return False
-    for piece in SEGMENT.split(c["cmd"]):
-        m = FLOW_END.match(piece.strip())
+        return None
+    pieces = [p.strip() for p in SEGMENT.split(c["cmd"])]
+    for i, piece in enumerate(pieces):
+        m = FLOW_END.match(piece)
         if m and m.group(1) == skill:
-            return True
-    return False
+            # `cd dir && note end` is the exit alone; anything else before it
+            # is work done in the same breath
+            return i if any(p and not re.match(r"cd\b", p) for p in pieces[:i]) else 0
+    return None
 
 
 def spans(calls):
@@ -729,9 +733,12 @@ def spans(calls):
             if not mark["n"] < c["n"] < end:
                 continue
             # The boundary call is the next thing's, not this skill's: the
-            # note is bookkeeping and the turn is a new instruction.
-            if closes(c, mark["skill"]):
-                end, how = c["n"], "записи"
+            # note is bookkeeping and the turn is a new instruction. Unless
+            # the call did the work first and wrote the exit after it (PS-116):
+            # then the work is the skill's, and the call with it.
+            place = closes(c, mark["skill"])
+            if place is not None:
+                end, how = (c["n"] + 1 if place else c["n"]), "записи"
                 break
             if c.get("after_user"):
                 end, how = c["n"], "реплике пользователя"
@@ -882,6 +889,15 @@ def python_c_bodies(lines):
         return []
     return [tokens[i + 1] for i, t in enumerate(tokens[:-1])
             if t == "-c" and i and PY_C.search(" ".join(tokens[max(0, i - 3):i + 1]))]
+
+
+def python_bodies(cmd):
+    """Every Python script a command runs whose text it carries: a heredoc fed
+    to `python3 -`, and the argument of `python -c`."""
+    pairs = lines_with_bodies(cmd)
+    out = [body for line, body in pairs if body is not None
+           and any("<<" in seg and PY_STDIN.search(seg) for seg in SEGMENT.split(line))]
+    return out + python_c_bodies([line for line, _body in pairs])
 
 
 def script_writes(src):
@@ -1053,6 +1069,15 @@ def check_read_only(span):
             return "violated", f"#{c['n']} {c['tool']} {c['path']}"
         if c["tool"] == "Bash" and mutates_shell(c["cmd"]):
             return "violated", f"#{c['n']} shell: {c['cmd'].splitlines()[0][:50]}"
+        # PS-115: a script is a writer too, whatever the file it writes --
+        # read by the same parser edits_of uses, so the two cannot disagree again
+        if c["tool"] == "Bash":
+            for body in python_bodies(c["cmd"]):
+                for p in python_writes(body):
+                    if p == UNREAD:
+                        return "unknown", f"#{c['n']} скрипт не опознан"
+                    if p is None or not re.search(r"(?:^|/)\.primeskills/", p):
+                        return "violated", f"#{c['n']} скрипт пишет {safe(p or 'вычисленный путь')}"
     return "ok", "записи в пролёте нет"
 
 

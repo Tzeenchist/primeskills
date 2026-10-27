@@ -154,6 +154,35 @@ EXPECT = {
         "[ok  ] не пишет (G16)",
         "доля 100%",
     ],
+    # PS-115. A read-only skill rewriting a file with a script from stdin was
+    # "no writes in the span": check_read_only had its own idea of a write,
+    # and a Python body was not in it.
+    "readonly-python-write-violation.jsonl": [
+        "[НАРУШЕН] не пишет (G16)",
+        "#3 скрипт пишет slug.py",
+    ],
+    "readonly-python-c-write-violation.jsonl": [
+        "[НАРУШЕН] не пишет (G16)",
+        "#2 скрипт пишет PLAN.md",
+    ],
+    # ... and a path the script computes is still somewhere it wrote
+    "readonly-python-computed-path-violation.jsonl": [
+        "[НАРУШЕН] не пишет (G16)",
+        "#2 скрипт пишет вычисленный путь",
+    ],
+    # ... while its own verdict under .primeskills/ is no write to the work,
+    # and a script names it relative to where it stands
+    "readonly-python-own-verdict-ok.jsonl": [
+        "[ok  ] не пишет (G16)",
+    ],
+    # ... a script that only reads is still read-only
+    "readonly-python-probe-ok.jsonl": [
+        "[ok  ] не пишет (G16)",
+    ],
+    "readonly-python-unparsed-unknown.jsonl": [
+        "[неизв] не пишет (G16)",
+        "#2 скрипт не опознан",
+    ],
     "readonly-tee-violation.jsonl": [
         "[НАРУШЕН] не пишет (G16)",
         "tee findings.txt",
@@ -267,6 +296,19 @@ EXPECT = {
     # on record for this; anywhere-in-the-text was the wider version of it.
     "span-record-mentioned-not-run.jsonl": [
         "build (вызван #1, 3 действий в пролёте)",
+    ],
+    # PS-116. Run 10, claude-debug-2: the edit, the run and the skill's exit
+    # in one command. The exit made the whole call the next thing's, and the
+    # work in it fell out of the span -- "no edits". A call that ends with the
+    # exit belongs to the skill it closes.
+    "span-exit-shares-call-with-work.jsonl": [
+        "debug (вызван #1, 2 действий в пролёте, конец по записи)",
+        "[ok  ] воспроизведение до правки",
+        "прогон #2 до правки #3",
+    ],
+    # ... but `cd dir && note end` is the exit alone, still the boundary
+    "span-exit-after-cd-is-bookkeeping.jsonl": [
+        "build (вызван #1, 1 действий в пролёте, конец по записи)",
     ],
     "span-survives-tool-results.jsonl": [
         "build (вызван #1, 3 действий в пролёте)",
