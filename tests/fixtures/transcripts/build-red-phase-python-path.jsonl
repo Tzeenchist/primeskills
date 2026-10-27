@@ -1,0 +1,8 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "build"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: build"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\nfrom pathlib import Path\nroot = Path('.')\n(root / 'test_split_bill.py').write_text('def test_rest():\\n    assert split_bill(100, 3) == [34, 33, 33]\\n')\nEOF"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t", "content": ""}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r", "name": "Bash", "input": {"command": "cd /tmp/w; python3 -m pytest -q 2>&1 | tail -3"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "r", "content": "FAILED test_split_bill.py::test_rest\n1 failed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "c", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\nfrom pathlib import Path\np = Path('split_bill.py')\np.write_text(p.read_text() + '\\n# remainder goes to the first share\\n')\nEOF\npython3 -m pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "c", "content": "1 passed"}]}}
