@@ -1076,7 +1076,7 @@ def check_read_only(span):
                 for p in python_writes(body):
                     if p == UNREAD:
                         return "unknown", f"#{c['n']} скрипт не опознан"
-                    if p is None or "/.primeskills/" not in p:
+                    if p is None or not re.search(r"(?:^|/)\.primeskills/", p):
                         return "violated", f"#{c['n']} скрипт пишет {safe(p or 'вычисленный путь')}"
     return "ok", "записи в пролёте нет"
 

@@ -170,6 +170,11 @@ EXPECT = {
         "[НАРУШЕН] не пишет (G16)",
         "#2 скрипт пишет вычисленный путь",
     ],
+    # ... while its own verdict under .primeskills/ is no write to the work,
+    # and a script names it relative to where it stands
+    "readonly-python-own-verdict-ok.jsonl": [
+        "[ok  ] не пишет (G16)",
+    ],
     # ... a script that only reads is still read-only
     "readonly-python-probe-ok.jsonl": [
         "[ok  ] не пишет (G16)",
