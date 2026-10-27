@@ -90,11 +90,14 @@ def main():
         # 2026-10-27: kilo returns by the owner's decision (PS-081) -- a free
         # model, kilo/stealth/glyph-cluster, answers without signing in, and a
         # live call loaded five skills through kilo's own skill tool.
-        if set(mod.HOSTS) != {"claude", "codex", "opencode", "omp", "qoder", "kilo"}:
-            failures.append(f"HOSTS не покрывает шесть хостов: {mod.HOSTS}")
-        # Returning either of them is a decision with a live call behind it,
-        # never a slip. This guard goes when they come back (PS-081, PS-089).
-        for host in ("cline", "kimi"):
+        # 2026-10-27: cline returns too (PS-081) -- reinstalled at 3.0.74, the
+        # latest, so its self-update has nothing to install; GLM-5.3 Flash on
+        # zai-coding-plan; a live call loaded five skills through its skill tool.
+        if set(mod.HOSTS) != {"claude", "codex", "opencode", "omp", "qoder", "kilo", "cline"}:
+            failures.append(f"HOSTS не покрывает семь хостов: {mod.HOSTS}")
+        # Returning kimi is a decision with a live call behind it, never a
+        # slip. This guard goes when it comes back (PS-089).
+        for host in ("kimi",):
             if host in mod.HOSTS:
                 failures.append(f"{host} вернулся в HOSTS — это решение, а не правка")
 
