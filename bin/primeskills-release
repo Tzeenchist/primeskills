@@ -58,7 +58,12 @@ ROOT = Path(__file__).resolve().parent.parent
 # with `0 credentials` -- no sign-in -- and a live call loaded build, debug,
 # eng, verify and vet through kilo's own skill tool. Its default model still
 # asks for a sign-in, so the call names the model; stdin closed (`< /dev/null`).
-HOSTS = ("claude", "codex", "opencode", "omp", "qoder", "kilo")
+# 2026-10-27, by the owner's decision: cline returns as well (PS-081). It is
+# reinstalled at 3.0.74, the npm latest, so its self-update -- the one that
+# destroyed the install on 2026-09-11 -- has nothing to install. Calls run
+# `cline -P zai-coding-plan -m glm-5.3-flash -y "…" < /dev/null`: plain
+# `cline "…"` starts in act mode with every tool auto-approved.
+HOSTS = ("claude", "codex", "opencode", "omp", "qoder", "kilo", "cline")
 
 # Every host name the set knows, demanded or not. Two different questions were
 # being answered by one list: which pairs the gate demands, and which words in a
