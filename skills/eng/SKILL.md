@@ -25,13 +25,18 @@ A written plan, before implementation. The question is not "will it work" but
    with the reason it cannot
 2. Map failures: per call that can fail, what goes wrong, what is raised, is it
    caught, what does the user then see → **verify:** no row ends in silence
-3. Name what becomes coupled that was not → **verify:** the coupling is either
+3. For each write to stored or shared state: what a second run leaves, what
+   a crash halfway leaves, and whether one writer is enforced by the structure
+   rather than by timing → **verify:** each write ends in the same state run
+   twice, or the gap is flagged; no writes at all is "cannot happen", with the
+   reason
+4. Name what becomes coupled that was not → **verify:** the coupling is either
    justified in one sentence or flagged
-4. State the rollback: if this ships and breaks, what undoes it and how long
+5. State the rollback: if this ships and breaks, what undoes it and how long
    → **verify:** the answer is a procedure, not "revert the commit"
-5. Check the test plan covers the paths from step 1 → **verify:** each path maps
+6. Check the test plan covers the paths from step 1 → **verify:** each path maps
    to a named test
-6. Present findings one at a time, each decided by the means named in
+7. Present findings one at a time, each decided by the means named in
    OUTPUT §Asking → **verify:** each is accepted or declined by
    the user
 

@@ -1,7 +1,7 @@
 ---
 name: vet
 description: Use to review a diff before it merges, for correctness, security and scope
-budget: 550
+budget: 575
 role: reports
 allowed-tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch, AskUserQuestion]
 refs:
@@ -42,9 +42,11 @@ not the running system — that is `probe`.
    comment churn (G1)
 5. Security: read `ref/security.md` if the diff touches input, auth, storage, or
    an integration → **verify:** each line answered or marked not applicable
-6. Tests: does a new test fail without this change, and what
+6. Tests: does a new test fail without this change, would it still pass if
+   every function it reaches returned nothing, and what
    `primeskills-floor --base <base>` reports — coverage only; ignore test style
    and speed → **verify:** you point at the test or say coverage is missing; a
+   test that passes against empty functions is named as checking nothing; a
    floor line is worth fixing until its reason is named; exit 2 means unchecked
 7. Readability: would someone unfamiliar understand this in six months —
    the reader's path only; ignore behaviour, which other axes own

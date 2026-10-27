@@ -1,7 +1,7 @@
 ---
 name: debug
 description: Use when a test fails, a build breaks, or behaviour surprises you, before proposing a fix
-budget: 650
+budget: 680
 role: write
 ---
 
@@ -52,8 +52,11 @@ attempt, not after the third.
 9. Run the experiment → **verify:** the result is read, not assumed
 10. If it failed, run `primeskills-run fail "<problem>"` and write the ledger
    line before touching anything: "hypothesis N failed because X; hypothesis
-   N+1 does Y differently" → **verify:** N+1 is different in kind, not in
-   cosmetics (G13), and the counter is below three
+   N+1 does Y differently". When two failed hypotheses rested on one
+   assumption, write it in one sentence and test the assumption itself
+   before N+1 → **verify:** N+1 is different in kind, not in cosmetics
+   (G13), no shared assumption stands untested, and the counter is below
+   three
 11. Fix at the lowest durable layer, then hand to `verify` → **verify:** the MRE
    passes and the full suite passes
 
