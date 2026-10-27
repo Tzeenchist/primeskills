@@ -1,0 +1,8 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "debug"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: debug"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "p", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\nfrom invoice import line_total\nprint(line_total(1, 101, 50))\nwith open('invoice.py') as f:\n    print(f.read()[:80])\nEOF"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "p", "content": "50\n..."}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r", "name": "Bash", "input": {"command": "cd /tmp/w; python3 -m pytest -q 2>&1 | tail -3"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "r", "content": "FAILED test_invoice.py::test_total - assert 99 == 100\n1 failed, 2 passed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\np='invoice.py'; s=open(p).read()\nopen(p,'w').write(s.replace('round(raw)', 'round_half_up(raw)'))\nEOF\npython3 -m pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "e", "content": "3 passed"}]}}

@@ -1,0 +1,4 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "debug"}}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r", "name": "Bash", "input": {"command": "cd /tmp/w; python3 -m pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "r", "content": "1 failed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\np='invoice.py'\nopen(p,'w').write(\"msg = '\\`total\\`'\\n\")\nEOF"}}]}}

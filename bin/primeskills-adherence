@@ -22,12 +22,14 @@ phase and is not applicable. Neither one enters the denominator.
     primeskills-adherence --newest                    # with either: newest session only
     primeskills-adherence --summary <files...>        # rates only
 """
+import ast
 import functools
 import json
 import importlib.util
 import re
 import shlex
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -782,25 +784,118 @@ SHELL_TEE = re.compile(r"\btee\s+(?:-a\s+)?([^\s;|&<>]+)")
 SHELL_SED_I = re.compile(r"\bsed\s+(?:-\w+\s+)*-i\S*\s")
 
 
-def without_heredocs(cmd):
-    """The command's lines with every heredoc body taken out."""
-    lines, tag = [], None
+def lines_with_bodies(cmd):
+    """(line, body) per line with heredoc bodies taken out; a body rides on
+    the line that opened it."""
+    out, tag, body = [], None, []
     for line in cmd.split("\n"):
         if tag:
             if line.strip() == tag:
+                out[-1] = (out[-1][0], "\n".join(body))
                 tag = None
+            else:
+                body.append(line)
             continue
-        lines.append(line)
+        out.append((line, None))
         m = HEREDOC.search(line)
         if m:
-            tag = m.group(2)
-    return lines
+            tag, body = m.group(2), []
+    if tag and out:
+        out[-1] = (out[-1][0], "\n".join(body))
+    return out
+
+
+def without_heredocs(cmd):
+    """The command's lines with every heredoc body taken out."""
+    return [line for line, _body in lines_with_bodies(cmd)]
+
+
+# PS-105. Runs 9 and 10: claude rewrote files with a script read from stdin --
+# `python3 - <<'EOF'`, `open(p, 'w')` inside -- and 1332 of the 1502 such
+# scripts in this machine's Claude transcripts write. A script of this shape is Python, so it is read as
+# Python: `open` in a writing mode and `write_text`/`write_bytes`, the path a
+# string, a name bound to one, `Path(...)` or `a / 'b'`. A write whose path the
+# script computes is an edit to a file nobody can name (None); a body `ast`
+# cannot read is an edit nobody can rule out (UNREAD). A script that writes
+# nothing is a probe, not an edit. Out of reach: `node -e`, a script file
+# (`python3 fix.py`) and a body piped in (`cat x | python3 -`) -- no body to read.
+UNREAD = "<не опознано>"
+PY = r"(?:^|[\s(])(?:\S*/)?python3?(?:\.\d+)?(?:\s+-[IuBsSE]+)*"
+PY_STDIN = re.compile(PY + r"\s+-(?=\s|$)")
+PY_C = re.compile(PY + r"\s+-c\b")
+WRITING_MODE = re.compile(r"[wax+]")
+
+
+def python_writes(src):
+    """The paths a script writes, None for one it computes, [UNREAD] if unread."""
+    try:
+        # someone else's script: its stray escapes are not this report's news
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            tree = ast.parse(src)
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return [UNREAD]
+    names = {}
+
+    def path(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.Name):
+            return names.get(node.id)
+        if isinstance(node, ast.Call) and node.args and not node.keywords:
+            f = node.func
+            if (f.id if isinstance(f, ast.Name) else getattr(f, "attr", None)) in (
+                    "Path", "PurePath", "PosixPath"):
+                return path(node.args[0])
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            right = path(node.right)
+            return right and (f"{path(node.left)}/{right}" if path(node.left) else right)
+        return None
+
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)):
+            name = node.targets[0].id
+            # bound twice to different things: no single answer
+            names[name] = path(node.value) if name not in names else None
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        f = node.func
+        if isinstance(f, ast.Name) and f.id == "open" and node.args:
+            mode = node.args[1] if len(node.args) > 1 else next(
+                (k.value for k in node.keywords if k.arg == "mode"), None)
+            if (isinstance(mode, ast.Constant) and isinstance(mode.value, str)
+                    and WRITING_MODE.search(mode.value)):
+                found.append(path(node.args[0]))
+        elif isinstance(f, ast.Attribute) and f.attr in ("write_text", "write_bytes"):
+            found.append(path(f.value))
+    return found
+
+
+def python_c_bodies(lines):
+    """The script after each `python -c`, read the way the shell would."""
+    try:
+        tokens = shlex.split("\n".join(lines), posix=True)
+    except ValueError:
+        return []
+    return [tokens[i + 1] for i, t in enumerate(tokens[:-1])
+            if t == "-c" and i and PY_C.search(" ".join(tokens[max(0, i - 3):i + 1]))]
+
+
+def script_writes(src):
+    """python_writes, keeping only code files among the paths it could name."""
+    return [p for p in python_writes(src)
+            if p is None or p == UNREAD or CODE_FILE.search(p)]
 
 
 def shell_steps(c):
     """[(k, "write", path) | (k, "run", None)] in the order the shell runs them."""
     steps, k = [], 0
-    for line in without_heredocs(c["cmd"]):
+    pairs = lines_with_bodies(c["cmd"])
+    c_bodies = python_c_bodies([line for line, _body in pairs])
+    for line, body in pairs:
         for seg in SEGMENT.split(line):
             seg = seg.strip()
             if not seg:
@@ -811,6 +906,10 @@ def shell_steps(c):
             for t in (t.strip("'\"") for t in targets):
                 if CODE_FILE.search(t):
                     steps.append((k, "write", t))
+            if body is not None and "<<" in seg and PY_STDIN.search(seg):
+                steps += [(k, "write", p) for p in script_writes(body)]
+            if c_bodies and PY_C.search(seg):
+                steps += [(k, "write", p) for p in script_writes(c_bodies.pop(0))]
             # the whole command still decides neutering: `pytest || true`
             if ran_tests(c) and TEST_RUN.search(seg) and not NEUTERED.search(seg):
                 steps.append((k, "run", None))
@@ -846,8 +945,15 @@ def at(e):
 def check_red_phase(span):
     """build: a failing test comes before the code that makes it pass."""
     edits = edits_of(span)
-    tests = [e for e in edits if is_test_file(e["path"])]
-    source = [e for e in edits if not is_test_file(e["path"])]
+    known = [e for e in edits if e["path"] not in (None, UNREAD)]
+    tests = [e for e in known if is_test_file(e["path"])]
+    source = [e for e in known if not is_test_file(e["path"])]
+    # a file nobody can name is neither test nor code (PS-105): before the
+    # point where the order is decided, it could be either
+    blind = [e for e in edits if e["path"] in (None, UNREAD)]
+    if blind and (not tests or not source
+                  or at(blind[0]) < max(at(tests[0]), at(source[0]))):
+        return "unknown", f"путь правки #{blind[0]['n']} не опознан"
     if not tests or not source:
         return None, "правок обоих видов нет — по порядку не различить"
     first_test, first_source = tests[0]["n"], source[0]["n"]
@@ -932,6 +1038,8 @@ def check_repro_first(span):
     for c, k in run_steps(span):
         if (c["n"], k) < at(edits[0]):
             return "ok", f"прогон #{c['n']} до правки #{first_edit}"
+    if edits[0]["path"] == UNREAD:
+        return "unknown", f"правка #{first_edit} не опознана"
     return "violated", f"первая правка #{first_edit} без прогона до неё"
 
 

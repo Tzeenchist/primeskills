@@ -95,6 +95,44 @@ EXPECT = {
     "build-heredoc-body-is-data.jsonl": [
         "[н/п ] красная фаза",
     ],
+    # PS-105. Runs 9 and 10, claude-debug: the file was rewritten by a script
+    # read from stdin, `python3 - <<'EOF'` with `open(p, 'w')` inside, and the
+    # reader said "no edits". The body is Python and is read as Python.
+    "debug-repro-python-heredoc.jsonl": [
+        "[ok  ] воспроизведение до правки",
+        "прогон #2 до правки #3",
+    ],
+    # ... a script that writes nothing is a probe, and a probe is the
+    # reproduction -- counted as an edit it would swallow the run after it.
+    "debug-python-probe-is-not-an-edit.jsonl": [
+        "[ok  ] воспроизведение до правки",
+        "прогон #3 до правки #4",
+    ],
+    "debug-python-c-edit.jsonl": [
+        "[НАРУШЕН] воспроизведение до правки",
+        "первая правка #2 без прогона до неё",
+    ],
+    # ... paths through Path() and `root / 'name'` are paths.
+    "build-red-phase-python-path.jsonl": [
+        "[ok  ] красная фаза",
+        "тест #2, прогон #3, код #4",
+    ],
+    # ... a path the script computes is an edit to an unknown file: neither a
+    # test nor code, so the order cannot be judged.
+    "build-red-phase-python-unresolved.jsonl": [
+        "[неизв] красная фаза",
+        "путь правки #2 не опознан",
+    ],
+    # ... and reading a body is silent: ast warns about a stray escape in
+    # someone else's script, and the warning landed in the report.
+    "debug-python-heredoc-warning-is-silent.jsonl": [
+        "[ok  ] воспроизведение до правки",
+    ],
+    # ... and a body nobody can parse is an edit nobody can rule out.
+    "debug-python-unparsed.jsonl": [
+        "[неизв] воспроизведение до правки",
+        "правка #2 не опознана",
+    ],
     # ... and a run that printed only passes stays green, whatever the code.
     "build-red-phase-green-run.jsonl": [
         "[НАРУШЕН] красная фаза",
@@ -256,6 +294,7 @@ FORBIDDEN = {
     "span-approval-is-not-a-turn.jsonl": ["конец по реплике"],
     "rollout-user-turn-ends-span.jsonl": ["длиннее отсечки"],
     "wire.jsonl": ["длиннее отсечки"],
+    "debug-python-heredoc-warning-is-silent.jsonl": ["SyntaxWarning"],
 }
 
 

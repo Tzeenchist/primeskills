@@ -1,0 +1,6 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "debug"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: debug"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\ndef fix(:\n    open('invoice.py', 'w')\nEOF"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "e", "content": "SyntaxError: invalid syntax"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "g", "name": "Bash", "input": {"command": "cd /tmp/w; python3 -m pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "g", "content": "3 passed"}]}}
