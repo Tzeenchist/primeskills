@@ -53,7 +53,12 @@ ROOT = Path(__file__).resolve().parent.parent
 # still names a host and cannot be read as another one; only the demand is
 # dropped. It returns the moment the subscription does -- with a live call,
 # like qoder did, never by an edit.
-HOSTS = ("claude", "codex", "opencode", "omp", "qoder")
+# 2026-10-27, by the owner's decision: kilo returns (PS-081). A free model,
+# `kilo/stealth/glyph-cluster`, answers `kilo run -m kilo/stealth/glyph-cluster`
+# with `0 credentials` -- no sign-in -- and a live call loaded build, debug,
+# eng, verify and vet through kilo's own skill tool. Its default model still
+# asks for a sign-in, so the call names the model; stdin closed (`< /dev/null`).
+HOSTS = ("claude", "codex", "opencode", "omp", "qoder", "kilo")
 
 # Every host name the set knows, demanded or not. Two different questions were
 # being answered by one list: which pairs the gate demands, and which words in a
