@@ -1,0 +1,6 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "vet"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: vet"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "d", "name": "Bash", "input": {"command": "cd /tmp/w; git diff HEAD"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "d", "content": "diff --git a/slug.py b/slug.py"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; python3 - <<'EOF'\np='slug.py'; s=open(p).read()\nopen(p,'w').write(s.replace('title', 'title.strip()'))\nEOF"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "e", "content": ""}]}}

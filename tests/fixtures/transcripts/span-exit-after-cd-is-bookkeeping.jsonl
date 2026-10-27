@@ -1,0 +1,8 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "build"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: build"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r", "name": "Bash", "input": {"command": "cd /tmp/w; pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "r", "content": "3 passed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "n", "name": "Bash", "input": {"command": "cd /tmp/w && primeskills-run note end --skill build \"done\""}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "n", "content": "end recorded"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "x", "name": "Bash", "input": {"command": "git status"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": "clean"}]}}

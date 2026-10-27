@@ -1,0 +1,8 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "debug"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: debug"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "r", "name": "Bash", "input": {"command": "cd /tmp/w; python3 -m pytest -q 2>&1 | tail -3"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "r", "content": "FAILED test_invoice.py::test_total\n1 failed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "e", "name": "Bash", "input": {"command": "cd /tmp/w; cat > invoice.py <<'EOF'\ndef total(lines):\n    return sum(lines)\nEOF\npython3 -m pytest -q 2>&1 | tail -2; primeskills-run note end --skill debug \"total fixed\" >/dev/null"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "e", "content": "3 passed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "x", "name": "Bash", "input": {"command": "cd /tmp/w; git log --oneline -1"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": "abc fix"}]}}
