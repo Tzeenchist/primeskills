@@ -1,0 +1,4 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "eng"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: eng"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "0", "name": "Bash", "input": {"command": "cd /tmp/ps117-fixture && python3 -c \"\nfrom split_bill import split_bill\nassert split_bill(100, 3) == [34, 33, 33]\n\"; echo \"exit=$?\""}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "0", "content": "AssertionError\nexit=1"}]}}

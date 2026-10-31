@@ -883,12 +883,20 @@ def python_writes(src):
 
 def python_c_bodies(lines):
     """The script after each `python -c`, read the way the shell would."""
-    try:
-        tokens = shlex.split("\n".join(lines), posix=True)
-    except ValueError:
-        return []
-    return [tokens[i + 1] for i, t in enumerate(tokens[:-1])
-            if t == "-c" and i and PY_C.search(" ".join(tokens[max(0, i - 3):i + 1]))]
+    bodies = []
+    # Split shell commands before unquoting: a closing quote next to `;`
+    # otherwise makes that shell separator part of the Python argument.
+    for part in top_level_parts("\n".join(lines)):
+        try:
+            tokens = shlex.split(part, posix=True)
+        except ValueError:
+            if PY_C.search(part):
+                bodies.append(UNREAD)
+            continue
+        for i, t in enumerate(tokens):
+            if t == "-c" and i and PY_C.search(" ".join(tokens[max(0, i - 3):i + 1])):
+                bodies.append(tokens[i + 1] if i + 1 < len(tokens) else UNREAD)
+    return bodies
 
 
 def python_bodies(cmd):

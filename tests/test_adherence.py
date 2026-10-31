@@ -112,6 +112,13 @@ EXPECT = {
         "[НАРУШЕН] воспроизведение до правки",
         "первая правка #2 без прогона до неё",
     ],
+    "build-python-c-probe-before-edit.jsonl": [
+        "[ok  ] красная фаза",
+        "тест #2, прогон #3, код #5",
+    ],
+    "readonly-python-c-probe-semicolon.jsonl": [
+        "[ok  ] не пишет (G16)",
+    ],
     # ... paths through Path() and `root / 'name'` are paths.
     "build-red-phase-python-path.jsonl": [
         "[ok  ] красная фаза",
@@ -356,6 +363,27 @@ def main():
     checks = 0
     tmp_dir = tempfile.TemporaryDirectory()
     tmp = tmp_dir.name
+
+    # PS-117: shell separators outside -c must never become Python source.
+    for command, wanted in (
+        ('python3 -c "\nassert 1 == 1\n"; echo "exit=$?"', []),
+        ('python3 -c ""; echo done', []),
+        ('python3 -c', [adh.UNREAD]),
+        ('python3 -c; echo done', [adh.UNREAD]),
+        ('python3 -c "unterminated', [adh.UNREAD]),
+        ('python3 -c "if"; echo done', [adh.UNREAD]),
+        ('''python3 -c "from pathlib import Path; Path('a.py').write_text('x;y')"; echo done''',
+         ['a.py']),
+        ('''python3 -c "assert True"&&python3 -c "open('b.py', 'w').write('x')"|cat''',
+         ['b.py']),
+        ('''python3 -c "assert True"\npython3 -c "open('c.py', 'w').write('x')"''',
+         ['c.py']),
+        ('echo "unterminated', []),
+    ):
+        checks += 1
+        got = [p for body in adh.python_bodies(command) for p in adh.python_writes(body)]
+        if got != wanted:
+            failures.append(f"python -c boundary: {command!r}: {got!r}, wanted {wanted!r}")
 
     for name, wanted in sorted(EXPECT.items()):
         path = FIX / name

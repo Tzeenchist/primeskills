@@ -1,0 +1,10 @@
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "s", "name": "Skill", "input": {"skill": "build"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "s", "content": "Launching skill: build"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "0", "name": "Write", "input": {"file_path": "/tmp/ps117-fixture/test_split_bill.py", "content": "from split_bill import split_bill\ndef test_total():\n    assert split_bill(100, 3) == [34, 33, 33]\n"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "0", "content": ""}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "1", "name": "Bash", "input": {"command": "python3 -m pytest -q"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "1", "content": "1 failed"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "2", "name": "Bash", "input": {"command": "cd /tmp/ps117-fixture && python3 -c \"\nfrom split_bill import split_bill\nassert split_bill(100, 3) == [34, 33, 33]\n\"; echo \"exit=$?\""}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "2", "content": "AssertionError: got [33, 33, 33], sum 99\nexit=1"}]}}
+{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "3", "name": "Write", "input": {"file_path": "/tmp/ps117-fixture/split_bill.py", "content": "def split_bill(total, people):\n    q, r = divmod(total, people)\n    return [q + (i < r) for i in range(people)]\n"}}]}}
+{"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "3", "content": ""}]}}
