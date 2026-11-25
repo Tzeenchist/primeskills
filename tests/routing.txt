@@ -20,6 +20,8 @@ click through the app and find bugs -> probe
 open a pull request for this -> land
 build the empty and error states -> ui
 what does that term mean -> baby
+diagnose fragility and convexity in this idea -> babay
+look for optionality and risk of ruin in this decision -> babay
 get this reviewed and into a pull request -> close
 merge the approved branch into main -> merge
 put this on the staging server -> deploy

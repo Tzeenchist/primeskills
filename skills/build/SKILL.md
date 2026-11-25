@@ -1,7 +1,7 @@
 ---
 name: build
 description: Use when implementing a feature or fixing a bug, before writing implementation code
-budget: 800
+budget: 782
 role: write
 ---
 
