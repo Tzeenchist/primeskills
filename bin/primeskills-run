@@ -396,8 +396,8 @@ def warn_if_set_moved(path):
     append(path, {"kind": "set", "version": version, "set": digest})
 
 
-def append(path, entry):
-    commit, digest = state_digest()
+def append(path, entry, *, verified_state=None):
+    commit, digest = state_digest() if verified_state is None else verified_state
     entry.update({"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   "commit": commit, "state": digest})
     # O_NOFOLLOW closes the window between the check in record_path and this
@@ -930,16 +930,18 @@ def cmd_ship(path, argv):
 
     def prove():
         p = subprocess.run(cmd, capture_output=True, text=True)
-        lines = (p.stdout + p.stderr).strip().splitlines()
+        output = p.stdout + p.stderr
+        lines = output.strip().splitlines()
         summary = (lines[-1] if lines else "(no output)")[:160]
-        ok = p.returncode == 0 and (not expect or expect in p.stdout + p.stderr)
-        return ok, summary
+        if p.returncode != 0:
+            return f"test command exited {p.returncode}", summary
+        if expect and expect not in output:
+            return f"--expect {expect!r} not found in the output", summary
+        return None, summary
 
-    ok, summary = prove()
-    if not ok:
-        why = "red run" if expect is None else \
-              f"--expect {expect!r} not found in the output"
-        print(f"ship: {why} — not recorded:\n{summary}")
+    problem, summary = prove()
+    if problem:
+        print(f"ship: {problem} — not recorded:\n{summary}")
         return 1
     e = append(path, {"kind": "note", "stage": stage,
                       "text": f"{' '.join(cmd)} — tail: {summary}"})
@@ -951,14 +953,18 @@ def cmd_ship(path, argv):
                            capture_output=True, text=True)
         if c.returncode != 0:
             sys.exit(f"ship --commit: git commit отказал:\n{c.stderr.strip()}")
-        ok2, summary2 = prove()
-        e2 = append(path, {"kind": "note", "stage": stage,
-                           "text": f"{' '.join(cmd)} — tail: {summary2}"})
-        state = ("переписано после коммита"
-                 if ok2 else "ВНИМАНИЕ: прогон на закоммиченном дереве красный")
-        print(f"{stage} {state}: bound to {e2['commit'][:8]}+{e2['state']}")
-        if not ok2:
+        committed_state = state_digest()
+        problem, summary2 = prove()
+        if not problem and committed_state != state_digest():
+            problem = "the tree changed during verification"
+        if problem:
+            print(f"ship --commit: {problem} after commit — not recorded. "
+                  f"The commit was kept.\n{summary2}")
             return 1
+        e2 = append(path, {"kind": "note", "stage": stage,
+                           "text": f"{' '.join(cmd)} — tail: {summary2}"},
+                    verified_state=committed_state)
+        print(f"{stage} переписано после коммита: bound to {e2['commit'][:8]}+{e2['state']}")
     code = cmd_check(path, [stage])
     ladder = mandates(permission_entries(path))
     open_now = [f"{r}: {e['scope'][:60]}" for r in RUNGS

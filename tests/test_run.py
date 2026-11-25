@@ -187,6 +187,45 @@ def main():
         if code == 0 or "в индексе пусто" not in out:
             failures.append(f"ship --commit без staged прошёл: exit {code}\n{out}")
 
+        # A failed proof or a changed tree must leave the pre-commit note stale.
+        for reason, second_exit, second_output, change_tree, diagnostic in (
+            ("test exit 7", 7, "4 checks, 0 failed", False, "test command exited 7"),
+            ("missing success signal", 0, "verification output incomplete", False,
+             "--expect '0 failed' not found"),
+            ("tree changed", 0, "4 checks, 0 failed", True, "tree changed during verification"),
+        ):
+            before = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+            work = repo / "work.txt"
+            with work.open("a", encoding="utf-8") as stream:
+                stream.write(f"{reason}\n")
+            subprocess.run(["git", "add", work.name], cwd=repo, check=True)
+            test_command = (
+                "import subprocess\n"
+                "head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()\n"
+                f"if head == {before!r}:\n"
+                "    print('4 checks, 0 failed')\n"
+                "else:\n"
+                f"    print({second_output!r})\n"
+                f"    if {change_tree!r}:\n"
+                "        from pathlib import Path\n"
+                "        Path('work.txt').write_text('changed during test')\n"
+                f"    raise SystemExit({second_exit})\n"
+            )
+            code, out = run(repo, "ship", "--commit", reason, "--expect",
+                            "0 failed", "--", sys.executable, "-c", test_command)
+            commit = subprocess.check_output(
+                ["git", "log", "-1", "--format=%P%n%s"], cwd=repo, text=True).splitlines()
+            checks += 1
+            if (code != 1 or commit != [before, reason] or second_output not in out
+                    or diagnostic not in out or "The commit was kept" not in out):
+                failures.append(f"ship --commit ({reason}): exit {code}, commit {commit}\n{out}")
+            check_code, checked = run(repo, "check", "verify")
+            checks += 1
+            if check_code != 2 or "STALE" not in checked:
+                failures.append(f"ship --commit ({reason}) оставил актуальное verify: "
+                                f"exit {check_code}\n{checked}")
+
         # check <flow> --chain walks the declared calls; a fake skills dir
         # keeps this about the walk, not about our own set.
         fakes = repo / "fakeskills" / "fixture-flow"

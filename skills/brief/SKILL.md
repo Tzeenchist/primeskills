@@ -22,23 +22,27 @@ local changes and an approved plan.
 - You are extracting what the user wants, not what they think they should want.
 
 ## Procedure
-1. Restate the request in one sentence and say what you take it to mean
-   → **verify:** the user corrects it or confirms it before you go on
-2. Ask what the user is trying to achieve behind the request → **verify:** you
-   can state the outcome without naming the requested feature
-3. Ask who hits this and how often → **verify:** the answer is a real situation,
-   not a persona
-4. State your hypothesis for the answer before asking the next question
-   → **verify:** it is specific enough to be visibly wrong
-5. Ask what happens today without it, and what the workaround costs
-   → **verify:** the cost is concrete
-6. Propose what to cut: name the smallest version a real user would accept;
-   the choice goes by the means named in OUTPUT §Asking
+1. Read the request, relevant specs, and connected code before asking. Restate
+   the intended outcome and any material conflict you found → **verify:** you
+   use facts the sources already establish and skip the interview if nothing
+   material remains open
+2. If the goal is still unknown and would change the result, ask an open
+   question about it before proposing approaches → **verify:** you can state
+   the outcome without naming the requested feature
+3. For an unresolved choice, show a concrete case. If a business term has
+   multiple meanings, compare how the current code handles that case with
+   the plausible meanings. Explain what each option changes, recommend one
+   when the trade-offs are clear, and ask one question via OUTPUT §Asking
+   → **verify:** the answer settles a specific difference in behaviour
+4. Use the evidence already available for audience, frequency, workaround
+   cost, and success criteria. State reversible defaults for minor gaps.
+   Ask about a missing fact only if its answer would change the result
+   → **verify:** no settled question is repeated and every default is visible
+5. Propose what to cut: name the smallest version a real user would accept.
+   Put unresolved scope choices through OUTPUT §Asking
    → **verify:** the user accepts, shrinks, or rejects the cut explicitly
-7. Ask how you will both know it worked → **verify:** the criterion is
-   observable after shipping
-8. Write the brief and hand it over for approval → **verify:** the user
-   approves it before any planning starts
+6. Hand over the brief for approval with an observable success criterion
+   → **verify:** the user approves it before any planning starts
 
 ## Stop conditions
 - Two readings of the request would lead to different work: stop and ask which.
