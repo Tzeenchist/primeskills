@@ -464,15 +464,64 @@ def main():
             failures.append("kilo: чужие ключи конфига потеряны при записи")
 
         prof = h / ".config" / "kilo" / "agent" / "prime-analyst.md"
+        source = ROOT / "adapters" / "kilo" / prof.name
         checks += 1
-        if not prof.is_symlink():
-            failures.append("kilo: профиль prime-analyst не слинкован в agent/")
+        if prof.is_symlink() or not prof.is_file() or prof.read_bytes() != source.read_bytes():
+            failures.append("kilo: профиль должен быть обычным файлом из адаптера")
+
+        doctor = ROOT / "bin" / "primeskills-doctor"
+        report = subprocess.run([sys.executable, str(doctor)], capture_output=True,
+                                text=True, env=dict(os.environ, HOME=home)).stdout
+        checks += 1
+        if not re.search(r"\[ok\s+\]\s+kilo\s+prime-analyst profile", report):
+            failures.append("kilo: doctor не опознал установленный профиль")
+
+        for legacy in (source, h / ".primeskills" / "pinned" / source.relative_to(ROOT)):
+            prof.unlink(missing_ok=True)
+            prof.symlink_to(legacy)
+            run(home, "kilo")
+            checks += 1
+            if not prof.is_symlink() or prof.readlink() != legacy:
+                failures.append("kilo: сухой ход заменил старый симлинк")
+            run(home, "--apply", "kilo")
+            checks += 1
+            if prof.is_symlink() or not prof.is_file() or prof.read_bytes() != source.read_bytes():
+                failures.append(f"kilo: старый симлинк не заменён обычным файлом: {legacy}")
+
+        if not prof.is_symlink() and prof.is_file():
+            with prof.open("a", encoding="utf-8") as stream:
+                stream.write("\nOld managed profile content\n")
+        run(home, "--apply", "kilo")
+        checks += 1
+        if prof.is_symlink() or not prof.is_file() or prof.read_bytes() != source.read_bytes():
+            failures.append("kilo: ранее установленный профиль не обновился")
 
         run(home, "--apply", "--uninstall", "kilo")
+        checks += 1
+        if prof.exists() or prof.is_symlink():
+            failures.append("kilo: uninstall оставил установленный профиль")
         data = json.loads(cfg.read_text(encoding="utf-8"))
         checks += 1
         if any("primeskills" in i for i in data.get("instructions", [])):
             failures.append("kilo: uninstall не убрал core из instructions")
+
+        prof.unlink(missing_ok=True)
+        foreign = b"Someone else's profile\n"
+        prof.write_bytes(foreign)
+        run(home, "--apply", "kilo")
+        run(home, "--apply", "--uninstall", "kilo")
+        checks += 1
+        if not prof.is_file() or prof.is_symlink() or prof.read_bytes() != foreign:
+            failures.append("kilo: установка или удаление затронули чужой профиль")
+
+        foreign_source = prof.with_name("custom.md")
+        prof.rename(foreign_source)
+        prof.symlink_to(foreign_source)
+        run(home, "--apply", "kilo")
+        run(home, "--apply", "--uninstall", "kilo")
+        checks += 1
+        if not prof.is_symlink() or prof.readlink() != foreign_source or foreign_source.read_bytes() != foreign:
+            failures.append("kilo: установка или удаление затронули чужой симлинк")
 
     # a config with comments is valid JSONC and unreadable as JSON: rewriting
     # it would delete the user's own notes, so the installer says so and stops
