@@ -268,9 +268,16 @@ def check_hooks_declared(r, agent="claude", settings=None):
 
 def check_profile(r, agent, dest):
     """The read-only profile must be where the host looks, and be ours."""
+    if agent == "kilo" and dest.is_symlink():
+        _, source = installer().PROFILES[agent]
+        if installer().legacy_kilo_profile(dest, source):
+            r.line(FAIL, agent, "prime-analyst profile", "legacy symlink — run primeskills-install kilo --apply")
+        else:
+            r.line(WARN, agent, "prime-analyst profile", "present but not ours")
+        return
     if not dest.exists():
         r.line(FAIL, agent, "prime-analyst profile", f"missing at {dest}")
-    elif not under_root(dest):
+    elif not (installer().installed_kilo_profile(dest) if agent == "kilo" else under_root(dest)):
         r.line(WARN, agent, "prime-analyst profile", "present but not ours")
     else:
         r.line(OK, agent, "prime-analyst profile", dest.parent.name + "/")
