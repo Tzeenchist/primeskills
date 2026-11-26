@@ -37,10 +37,16 @@ larger shocks, and the removal of a dependency or commitment.
    at that scale. Check another scale if a threshold is plausible
    → **verify:** report the sign only for the evidenced range, and name missing
    observations or a sign change when relevant.
-4. Check optionality and who bears the consequences. Name the choices that
-   remain open, their exit cost, and who decides, benefits, and absorbs loss
-   → **verify:** any recoverability claim or transferred risk has an anchor.
-5. Apply via negativa: identify a removable dependency, commitment, or
+4. Look for optionality. Find ways to defer a commitment, run small reversible
+   trials, switch paths, or scale up after a favorable result. For each option,
+   name who can exercise it, when, at what cost, and what upside it preserves
+   → **verify:** identify what limits the loss if the trial or switch fails.
+5. Check for antifragility at others' expense. Under the same shock, trace
+   who decides, whose payoff improves, and who absorbs losses, including
+   extreme losses. Find the contract, incentive, or rule that shifts the
+   loss. Would the upside survive if the beneficiary shared that downside?
+   → **verify:** support the claimed gain and risk transfer separately.
+6. Apply via negativa: identify a removable dependency, commitment, or
    assumption. Compare the exposure before and after removing it, including
    what protection or benefit would go with it
    → **verify:** say which mechanism changes, or say why no useful subtraction
@@ -53,9 +59,9 @@ larger shocks, and the removal of a dependency or commitment.
   the observation that would settle it.
 
 ## Output
-Diagnosis in order of consequence: exposures, possible upside, and assumptions
-with their evidence. Give the stressor, outcome, range, exit cost, and parties
-where material. State what evidence could change the findings.
+Report exposures, options, and possible upside in order of consequence.
+Give the stressor, outcome, range, exit cost, and who gains or bears losses
+where material. Name the assumptions and evidence that could change the findings.
 
 ## References
 [Taleb and Douady on curvature](https://arxiv.org/abs/1208.1189),
